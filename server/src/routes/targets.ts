@@ -1,10 +1,18 @@
 import { Router } from "express";
 import { z } from "zod";
 import { prisma } from "../lib/prisma";
-import { assertBusinessUnitAccess, requireAuth, requireRole, resolveCompanyBusinessUnit, scopedBusinessUnitFilter } from "../middleware/auth";
+import {
+  assertBusinessUnitAccess,
+  blockPendingPasswordChange,
+  requireAuth,
+  requireRole,
+  resolveCompanyBusinessUnit,
+  scopedBusinessUnitFilter,
+} from "../middleware/auth";
 
 const router = Router();
 router.use(requireAuth);
+router.use(blockPendingPasswordChange);
 
 const figuresSchema = z.object({
   revenueInternal: z.number().min(0).default(0),
@@ -47,7 +55,7 @@ router.get("/annual", async (req, res) => {
   res.json(targets);
 });
 
-router.put("/annual", requireRole("GROUP_INTEGRATOR"), async (req, res) => {
+router.put("/annual", requireRole("GROUP_INTEGRATOR", "SUPERADMIN"), async (req, res) => {
   const parsed = z
     .object({ companyId: z.string().uuid(), yearId: z.string().uuid() })
     .merge(figuresSchema)
@@ -97,7 +105,7 @@ router.get("/quarter", async (req, res) => {
   res.json(targets);
 });
 
-router.put("/quarter", requireRole("GROUP_INTEGRATOR"), async (req, res) => {
+router.put("/quarter", requireRole("GROUP_INTEGRATOR", "SUPERADMIN"), async (req, res) => {
   const parsed = z
     .object({ companyId: z.string().uuid(), yearId: z.string().uuid(), quarter: z.number().int().min(1).max(4) })
     .merge(figuresSchema)

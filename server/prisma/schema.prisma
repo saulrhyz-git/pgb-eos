@@ -12,22 +12,39 @@ datasource db {
 }
 
 enum Role {
+  SUPERADMIN
   GROUP_INTEGRATOR
   BU_INTEGRATOR
 }
 
 model User {
-  id           String   @id @default(uuid())
-  email        String   @unique
-  passwordHash String
-  name         String
-  role         Role
-  createdAt    DateTime @default(now())
+  id                 String   @id @default(uuid())
+  email              String   @unique
+  username           String?  @unique
+  passwordHash       String
+  name               String
+  role               Role
+  mustChangePassword Boolean  @default(false)
+  createdAt          DateTime @default(now())
 
   businessUnits UserBusinessUnit[]
   actualEdits   QuarterActual[]    @relation("ActualEditedBy")
 
   @@index([role])
+}
+
+// Singleton row (fixed id "default") holding the outbound SMTP configuration
+// used to send email notifications. Managed by SUPERADMIN only.
+model SmtpSettings {
+  id          String   @id
+  host        String
+  port        Int      @default(587)
+  secure      Boolean  @default(false)
+  username    String?
+  password    String?
+  fromAddress String
+  fromName    String?
+  updatedAt   DateTime @updatedAt
 }
 
 // Join table: which BU(s) a BU Integrator is responsible for.

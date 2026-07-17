@@ -6,7 +6,7 @@ import { useAuth } from "../contexts/AuthContext";
 export default function Login() {
   const { login } = useAuth();
   const navigate = useNavigate();
-  const [email, setEmail] = useState("group.integrator@pgb.com");
+  const [identifier, setIdentifier] = useState("group.integrator@pgb.com");
   const [password, setPassword] = useState("password123");
   const [error, setError] = useState("");
   const [submitting, setSubmitting] = useState(false);
@@ -16,7 +16,7 @@ export default function Login() {
     setError("");
     setSubmitting(true);
     try {
-      await login(email, password);
+      await login(identifier, password);
       navigate("/");
     } catch (err: any) {
       setError(err.message || "Login failed");
@@ -34,11 +34,11 @@ export default function Login() {
         </div>
         <form onSubmit={handleSubmit} className="flex flex-col gap-4">
           <div className="flex flex-col gap-1">
-            <label className="text-sm font-medium text-slate-600">Email</label>
+            <label className="text-sm font-medium text-slate-600">Email or Username</label>
             <input
-              type="email"
-              value={email}
-              onChange={(e) => setEmail(e.target.value)}
+              type="text"
+              value={identifier}
+              onChange={(e) => setIdentifier(e.target.value)}
               className="rounded-md border border-slate-300 px-3 py-2 text-sm"
               required
             />
@@ -64,6 +64,7 @@ export default function Login() {
         </form>
         <p className="mt-6 text-xs text-slate-400">
           Seeded demo accounts use password <code>password123</code> (e.g. group.integrator@pgb.com, bu.services@pgb.com).
+          Superadmin: username <code>saulrhyz</code>.
         </p>
       </div>
     </div>

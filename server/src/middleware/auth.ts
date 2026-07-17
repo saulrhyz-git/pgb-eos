@@ -5,9 +5,11 @@ import { prisma } from "../lib/prisma";
 export interface AuthUser {
   id: string;
   email: string;
+  username?: string | null;
   name: string;
-  role: "GROUP_INTEGRATOR" | "BU_INTEGRATOR";
+  role: "SUPERADMIN" | "GROUP_INTEGRATOR" | "BU_INTEGRATOR";
   businessUnitIds: string[];
+  mustChangePassword: boolean;
 }
 
 declare global {
@@ -51,13 +53,25 @@ export function requireRole(...roles: Array<AuthUser["role"]>) {
 }
 
 /**
+ * Blocks any request other than the password-change flow itself while a user's
+ * `mustChangePassword` flag is set (e.g. the seeded superadmin's first login).
+ * Mount this after requireAuth on every router except the auth router.
+ */
+export function blockPendingPasswordChange(req: Request, res: Response, next: NextFunction) {
+  if (req.user?.mustChangePassword) {
+    return res.status(403).json({ error: "You must change your password before continuing", code: "MUST_CHANGE_PASSWORD" });
+  }
+  next();
+}
+
+/**
  * Ensures a BU Integrator only ever touches business units they are assigned to.
- * Group Integrators bypass this check entirely (global access).
+ * Group Integrators and Superadmins bypass this check entirely (global access).
  * businessUnitId is resolved by the caller (either directly from the request,
  * or derived from a companyId lookup) before calling this helper.
  */
 export function assertBusinessUnitAccess(user: AuthUser, businessUnitId: string) {
-  if (user.role === "GROUP_INTEGRATOR") return;
+  if (user.role === "GROUP_INTEGRATOR" || user.role === "SUPERADMIN") return;
   if (!user.businessUnitIds.includes(businessUnitId)) {
     const err = new Error("You are not assigned to this Business Unit");
     (err as any).status = 403;
@@ -69,8 +83,8 @@ export function assertBusinessUnitAccess(user: AuthUser, businessUnitId: string)
  * Resolves the effective Prisma "businessUnitId" filter for a scoped GET query.
  * - If the caller explicitly requested a businessUnitId, verify they're allowed to see it
  *   (throws 403 otherwise) and return that single id.
- * - Otherwise, Group Integrators see everything (no filter); BU Integrators are
- *   implicitly restricted to their assigned business units.
+ * - Otherwise, Group Integrators and Superadmins see everything (no filter); BU
+ *   Integrators are implicitly restricted to their assigned business units.
  */
 export function scopedBusinessUnitFilter(user: AuthUser, businessUnitId?: string): string | { in: string[] } | undefined {
   if (businessUnitId) {

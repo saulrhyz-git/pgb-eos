@@ -1,10 +1,11 @@
 import { Router } from "express";
 import { prisma } from "../lib/prisma";
-import { assertBusinessUnitAccess, requireAuth, resolveCompanyBusinessUnit } from "../middleware/auth";
+import { assertBusinessUnitAccess, blockPendingPasswordChange, requireAuth, resolveCompanyBusinessUnit } from "../middleware/auth";
 import { addFigures, emptyFigures, Figures, pct, revenueTotal, toFigures } from "../utils/aggregate";
 
 const router = Router();
 router.use(requireAuth);
+router.use(blockPendingPasswordChange);
 
 /**
  * GET /api/dashboard

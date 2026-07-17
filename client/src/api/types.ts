@@ -1,11 +1,35 @@
-export type Role = "GROUP_INTEGRATOR" | "BU_INTEGRATOR";
+export type Role = "SUPERADMIN" | "GROUP_INTEGRATOR" | "BU_INTEGRATOR";
 
 export interface AuthUser {
   id: string;
   email: string;
+  username?: string | null;
   name: string;
   role: Role;
   businessUnitIds: string[];
+  mustChangePassword: boolean;
+}
+
+export interface AdminUser {
+  id: string;
+  email: string;
+  username: string | null;
+  name: string;
+  role: Role;
+  mustChangePassword: boolean;
+  createdAt: string;
+  businessUnits: { id: string; name: string }[];
+}
+
+export interface SmtpSettings {
+  host: string;
+  port: number;
+  secure: boolean;
+  username: string | null;
+  hasPassword: boolean;
+  fromAddress: string;
+  fromName: string | null;
+  updatedAt: string;
 }
 
 export interface Year {

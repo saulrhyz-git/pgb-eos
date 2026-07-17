@@ -1,10 +1,17 @@
 import { Router } from "express";
 import { z } from "zod";
 import { prisma } from "../lib/prisma";
-import { assertBusinessUnitAccess, requireAuth, resolveCompanyBusinessUnit, scopedBusinessUnitFilter } from "../middleware/auth";
+import {
+  assertBusinessUnitAccess,
+  blockPendingPasswordChange,
+  requireAuth,
+  resolveCompanyBusinessUnit,
+  scopedBusinessUnitFilter,
+} from "../middleware/auth";
 
 const router = Router();
 router.use(requireAuth);
+router.use(blockPendingPasswordChange);
 
 const figuresSchema = z.object({
   revenueInternal: z.number().min(0).default(0),

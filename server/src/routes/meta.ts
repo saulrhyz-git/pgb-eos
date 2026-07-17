@@ -1,10 +1,11 @@
 import { Router } from "express";
 import { z } from "zod";
 import { prisma } from "../lib/prisma";
-import { requireAuth, requireRole } from "../middleware/auth";
+import { blockPendingPasswordChange, requireAuth, requireRole } from "../middleware/auth";
 
 const router = Router();
 router.use(requireAuth);
+router.use(blockPendingPasswordChange);
 
 // ---------- Years ----------
 
@@ -13,7 +14,7 @@ router.get("/years", async (_req, res) => {
   res.json(years);
 });
 
-router.post("/years", requireRole("GROUP_INTEGRATOR"), async (req, res) => {
+router.post("/years", requireRole("GROUP_INTEGRATOR", "SUPERADMIN"), async (req, res) => {
   const parsed = z.object({ year: z.number().int().min(2000).max(2100) }).safeParse(req.body);
   if (!parsed.success) return res.status(400).json({ error: "Valid 'year' is required" });
   const year = await prisma.year.upsert({
@@ -28,7 +29,7 @@ router.post("/years", requireRole("GROUP_INTEGRATOR"), async (req, res) => {
 
 router.get("/business-units", async (req, res) => {
   const user = req.user!;
-  const where = user.role === "GROUP_INTEGRATOR" ? {} : { id: { in: user.businessUnitIds } };
+  const where = user.role === "GROUP_INTEGRATOR" || user.role === "SUPERADMIN" ? {} : { id: { in: user.businessUnitIds } };
   const bus = await prisma.businessUnit.findMany({
     where,
     include: { companies: { select: { id: true, name: true } } },
@@ -37,14 +38,14 @@ router.get("/business-units", async (req, res) => {
   res.json(bus);
 });
 
-router.post("/business-units", requireRole("GROUP_INTEGRATOR"), async (req, res) => {
+router.post("/business-units", requireRole("GROUP_INTEGRATOR", "SUPERADMIN"), async (req, res) => {
   const parsed = z.object({ name: z.string().min(1) }).safeParse(req.body);
   if (!parsed.success) return res.status(400).json({ error: "'name' is required" });
   const bu = await prisma.businessUnit.create({ data: { name: parsed.data.name } });
   res.status(201).json(bu);
 });
 
-router.post("/business-units/:id/assign", requireRole("GROUP_INTEGRATOR"), async (req, res) => {
+router.post("/business-units/:id/assign", requireRole("GROUP_INTEGRATOR", "SUPERADMIN"), async (req, res) => {
   const parsed = z.object({ userId: z.string().uuid() }).safeParse(req.body);
   if (!parsed.success) return res.status(400).json({ error: "'userId' is required" });
   const assignment = await prisma.userBusinessUnit.upsert({
@@ -73,7 +74,7 @@ router.get("/companies", async (req, res) => {
   res.json(companies);
 });
 
-router.post("/companies", requireRole("GROUP_INTEGRATOR"), async (req, res) => {
+router.post("/companies", requireRole("GROUP_INTEGRATOR", "SUPERADMIN"), async (req, res) => {
   const parsed = z
     .object({ name: z.string().min(1), businessUnitId: z.string().uuid() })
     .safeParse(req.body);
@@ -84,7 +85,7 @@ router.post("/companies", requireRole("GROUP_INTEGRATOR"), async (req, res) => {
 
 // ---------- Users (Group Integrator admin only, used to assign BU Integrators) ----------
 
-router.get("/users", requireRole("GROUP_INTEGRATOR"), async (_req, res) => {
+router.get("/users", requireRole("GROUP_INTEGRATOR", "SUPERADMIN"), async (_req, res) => {
   const users = await prisma.user.findMany({
     select: {
       id: true,

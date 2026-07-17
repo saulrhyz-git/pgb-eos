@@ -36,6 +36,22 @@ async function main() {
   // ---------- Users ----------
   const passwordHash = await bcrypt.hash("password123", 10);
 
+  // Superadmin: full system access (users, companies, business units, SMTP settings).
+  // Must change this password on first login.
+  const superadminPasswordHash = await bcrypt.hash("0811837Sey@me7", 10);
+  await prisma.user.upsert({
+    where: { username: "saulrhyz" },
+    update: {},
+    create: {
+      email: "saulrhyz@pgb-eos.local",
+      username: "saulrhyz",
+      name: "Saul Rhyz",
+      role: "SUPERADMIN",
+      passwordHash: superadminPasswordHash,
+      mustChangePassword: true,
+    },
+  });
+
   const groupIntegrator = await prisma.user.upsert({
     where: { email: "group.integrator@pgb.com" },
     update: {},
@@ -204,6 +220,8 @@ async function main() {
   }
 
   console.log("Seed complete.");
+  console.log("");
+  console.log("  Superadmin:            username 'saulrhyz' / password '0811837Sey@me7' (must change on first login)");
   console.log("");
   console.log("Login credentials (all use password: password123):");
   console.log("  Group Integrator:      group.integrator@pgb.com");

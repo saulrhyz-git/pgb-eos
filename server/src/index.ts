@@ -6,6 +6,8 @@ import metaRoutes from "./routes/meta";
 import targetRoutes from "./routes/targets";
 import actualRoutes from "./routes/actuals";
 import dashboardRoutes from "./routes/dashboard";
+import adminRoutes from "./routes/admin";
+import settingsRoutes from "./routes/settings";
 
 const app = express();
 app.use(cors({ origin: process.env.CLIENT_ORIGIN || "*" }));
@@ -18,6 +20,8 @@ app.use("/api", metaRoutes);
 app.use("/api/targets", targetRoutes);
 app.use("/api/actuals", actualRoutes);
 app.use("/api/dashboard", dashboardRoutes);
+app.use("/api/admin", adminRoutes);
+app.use("/api/settings", settingsRoutes);
 
 // Generic error handler as a safety net for anything thrown above.
 app.use((err: any, _req: express.Request, res: express.Response, _next: express.NextFunction) => {

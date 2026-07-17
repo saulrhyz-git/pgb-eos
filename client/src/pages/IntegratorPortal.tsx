@@ -126,7 +126,7 @@ export default function IntegratorPortal() {
       <p className="mb-6 text-sm text-slate-500">
         {user?.role === "BU_INTEGRATOR"
           ? "Submit Revenue, Collections, and Expenses for the companies in your assigned Business Unit(s)."
-          : "As Group Integrator you can enter or override figures for any company."}
+          : "You can enter or override figures for any company."}
       </p>
 
       <form onSubmit={handleSubmit} className="flex flex-col gap-6 rounded-lg border border-slate-200 bg-white p-6 shadow-sm">

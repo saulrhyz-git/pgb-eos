@@ -1,9 +1,12 @@
 import type {
+  AdminUser,
   AuthUser,
   BusinessUnit,
   Company,
   DashboardResponse,
   Figures,
+  Role,
+  SmtpSettings,
   Year,
 } from "./types";
 
@@ -48,12 +51,17 @@ async function request<T>(path: string, options: RequestInit = {}): Promise<T> {
 }
 
 export const api = {
-  login: (email: string, password: string) =>
+  login: (identifier: string, password: string) =>
     request<{ token: string; user: AuthUser }>("/auth/login", {
       method: "POST",
-      body: JSON.stringify({ email, password }),
+      body: JSON.stringify({ identifier, password }),
     }),
   me: () => request<{ user: AuthUser }>("/auth/me"),
+  changePassword: (currentPassword: string, newPassword: string) =>
+    request<{ token: string; user: AuthUser }>("/auth/change-password", {
+      method: "POST",
+      body: JSON.stringify({ currentPassword, newPassword }),
+    }),
 
   years: () => request<Year[]>("/years"),
   createYear: (year: number) => request<Year>("/years", { method: "POST", body: JSON.stringify({ year }) }),
@@ -106,4 +114,51 @@ export const api = {
       method: "PATCH",
       body: JSON.stringify({ remarks }),
     }),
+
+  // ---------- Superadmin: Users ----------
+  adminUsers: () => request<AdminUser[]>("/admin/users"),
+  adminCreateUser: (payload: {
+    email: string;
+    username?: string;
+    name: string;
+    role: Role;
+    password: string;
+    businessUnitIds?: string[];
+  }) => request<AdminUser>("/admin/users", { method: "POST", body: JSON.stringify(payload) }),
+  adminUpdateUser: (
+    id: string,
+    payload: Partial<{
+      email: string;
+      username: string | null;
+      name: string;
+      role: Role;
+      businessUnitIds: string[];
+      password: string;
+    }>
+  ) => request<AdminUser>(`/admin/users/${id}`, { method: "PUT", body: JSON.stringify(payload) }),
+  adminDeleteUser: (id: string) => request<void>(`/admin/users/${id}`, { method: "DELETE" }),
+
+  // ---------- Superadmin: Business Units ----------
+  adminUpdateBusinessUnit: (id: string, name: string) =>
+    request<BusinessUnit>(`/admin/business-units/${id}`, { method: "PUT", body: JSON.stringify({ name }) }),
+  adminDeleteBusinessUnit: (id: string) => request<void>(`/admin/business-units/${id}`, { method: "DELETE" }),
+
+  // ---------- Superadmin: Companies ----------
+  adminUpdateCompany: (id: string, payload: Partial<{ name: string; businessUnitId: string }>) =>
+    request<Company>(`/admin/companies/${id}`, { method: "PUT", body: JSON.stringify(payload) }),
+  adminDeleteCompany: (id: string) => request<void>(`/admin/companies/${id}`, { method: "DELETE" }),
+
+  // ---------- Superadmin: SMTP settings ----------
+  getSmtpSettings: () => request<SmtpSettings | null>("/settings/smtp"),
+  putSmtpSettings: (payload: {
+    host: string;
+    port: number;
+    secure: boolean;
+    username?: string | null;
+    password?: string;
+    fromAddress: string;
+    fromName?: string | null;
+  }) => request<SmtpSettings>("/settings/smtp", { method: "PUT", body: JSON.stringify(payload) }),
+  testSmtpSettings: (to: string) =>
+    request<{ ok: true }>("/settings/smtp/test", { method: "POST", body: JSON.stringify({ to }) }),
 };

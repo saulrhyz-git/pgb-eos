@@ -1,5 +1,5 @@
 import { NavLink, Outlet } from "react-router-dom";
-import { LayoutDashboard, ClipboardEdit, Settings, LogOut, TrendingUp } from "lucide-react";
+import { LayoutDashboard, ClipboardEdit, Settings, LogOut, TrendingUp, ShieldCheck } from "lucide-react";
 import { useAuth } from "../contexts/AuthContext";
 
 export default function Layout() {
@@ -25,9 +25,14 @@ export default function Layout() {
             <NavLink to="/data-entry" className={linkClass}>
               <ClipboardEdit className="h-4 w-4" /> Data Entry
             </NavLink>
-            {user?.role === "GROUP_INTEGRATOR" && (
+            {(user?.role === "GROUP_INTEGRATOR" || user?.role === "SUPERADMIN") && (
               <NavLink to="/targets" className={linkClass}>
                 <Settings className="h-4 w-4" /> Target Setup
+              </NavLink>
+            )}
+            {user?.role === "SUPERADMIN" && (
+              <NavLink to="/admin" className={linkClass}>
+                <ShieldCheck className="h-4 w-4" /> Admin
               </NavLink>
             )}
           </nav>
@@ -35,7 +40,11 @@ export default function Layout() {
             <div className="text-right">
               <div className="text-sm font-medium text-slate-800">{user?.name}</div>
               <div className="text-xs text-slate-500">
-                {user?.role === "GROUP_INTEGRATOR" ? "Group Integrator" : "BU Integrator"}
+                {user?.role === "SUPERADMIN"
+                  ? "Superadmin"
+                  : user?.role === "GROUP_INTEGRATOR"
+                  ? "Group Integrator"
+                  : "BU Integrator"}
               </div>
             </div>
             <button

@@ -1,0 +1,118 @@
+import { Router } from "express";
+import nodemailer from "nodemailer";
+import { z } from "zod";
+import { prisma } from "../lib/prisma";
+import { blockPendingPasswordChange, requireAuth, requireRole } from "../middleware/auth";
+
+// SMTP configuration used to send email notifications, managed by the
+// superadmin. Stored as a single row keyed by a fixed id so GET/PUT always
+// operate on the same record.
+const SMTP_SETTINGS_ID = "default";
+
+const router = Router();
+router.use(requireAuth);
+router.use(blockPendingPasswordChange);
+router.use(requireRole("SUPERADMIN"));
+
+function serialize(settings: {
+  host: string;
+  port: number;
+  secure: boolean;
+  username: string | null;
+  password: string | null;
+  fromAddress: string;
+  fromName: string | null;
+  updatedAt: Date;
+} | null) {
+  if (!settings) return null;
+  return {
+    host: settings.host,
+    port: settings.port,
+    secure: settings.secure,
+    username: settings.username,
+    hasPassword: Boolean(settings.password),
+    fromAddress: settings.fromAddress,
+    fromName: settings.fromName,
+    updatedAt: settings.updatedAt,
+  };
+}
+
+router.get("/smtp", async (_req, res) => {
+  const settings = await prisma.smtpSettings.findUnique({ where: { id: SMTP_SETTINGS_ID } });
+  res.json(serialize(settings));
+});
+
+const smtpSchema = z.object({
+  host: z.string().min(1),
+  port: z.number().int().min(1).max(65535),
+  secure: z.boolean().default(false),
+  username: z.string().optional().nullable(),
+  // Optional: omit or leave blank to keep the currently stored password (e.g. when
+  // editing other fields without re-entering credentials).
+  password: z.string().optional(),
+  fromAddress: z.string().email(),
+  fromName: z.string().optional().nullable(),
+});
+
+router.put("/smtp", async (req, res) => {
+  const parsed = smtpSchema.safeParse(req.body);
+  if (!parsed.success) return res.status(400).json({ error: parsed.error.issues[0]?.message || "Invalid SMTP settings", details: parsed.error.issues });
+
+  const { host, port, secure, username, password, fromAddress, fromName } = parsed.data;
+  const existing = await prisma.smtpSettings.findUnique({ where: { id: SMTP_SETTINGS_ID } });
+
+  const settings = await prisma.smtpSettings.upsert({
+    where: { id: SMTP_SETTINGS_ID },
+    update: {
+      host,
+      port,
+      secure,
+      username: username ?? null,
+      password: password ? password : existing?.password ?? null,
+      fromAddress,
+      fromName: fromName ?? null,
+    },
+    create: {
+      id: SMTP_SETTINGS_ID,
+      host,
+      port,
+      secure,
+      username: username ?? null,
+      password: password ?? null,
+      fromAddress,
+      fromName: fromName ?? null,
+    },
+  });
+  res.json(serialize(settings));
+});
+
+const testSchema = z.object({ to: z.string().email() });
+
+router.post("/smtp/test", async (req, res) => {
+  const parsed = testSchema.safeParse(req.body);
+  if (!parsed.success) return res.status(400).json({ error: "A valid 'to' address is required" });
+
+  const settings = await prisma.smtpSettings.findUnique({ where: { id: SMTP_SETTINGS_ID } });
+  if (!settings) return res.status(400).json({ error: "SMTP settings have not been configured yet" });
+
+  const transporter = nodemailer.createTransport({
+    host: settings.host,
+    port: settings.port,
+    secure: settings.secure,
+    auth: settings.username ? { user: settings.username, pass: settings.password || "" } : undefined,
+  });
+
+  try {
+    await transporter.sendMail({
+      from: settings.fromName ? `"${settings.fromName}" <${settings.fromAddress}>` : settings.fromAddress,
+      to: parsed.data.to,
+      subject: "EOS Executive Dashboard - Test Email",
+      text: "This is a test email confirming your SMTP settings are working correctly.",
+    });
+    res.json({ ok: true });
+  } catch (err: any) {
+    res.status(502).json({ error: `Failed to send test email: ${err.message || "unknown error"}` });
+  }
+});
+
+export default router;
