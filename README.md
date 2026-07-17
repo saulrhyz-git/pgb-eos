@@ -79,7 +79,10 @@ real data — the app starts completely empty.
   `Rock`. **`AnnualTarget` and `QuarterTarget` belong to a `BusinessUnit`**
   (`@@unique([businessUnitId, yearId])` / `@@unique([businessUnitId, yearId,
   quarter])`) — a Business Unit has exactly one annual number and one number
-  per quarter, full stop. **`QuarterActual` still belongs to a `Company`**
+  per quarter, full stop. `AnnualTarget` additionally carries a `locked`
+  Boolean (default `false`) — every successful save sets it `true`; a BU
+  Integrator can't save an already-locked one, only a Group Integrator or
+  Superadmin can clear it back to `false`. **`QuarterActual` still belongs to a `Company`**
   (`@@unique([companyId, yearId, quarter])`) — each Company recognizes its
   own Revenue/Collections/Expenses per quarter, and those get summed across
   every Company in a Business Unit to compare against that BU's target. This
@@ -117,7 +120,11 @@ real data — the app starts completely empty.
   (Group Integrator or Superadmin), `server/src/routes/targets.ts` (Annual/
   Quarter target upserts keyed by `businessUnitId` + `yearId[+quarter]` —
   Group Integrator, Superadmin, or a BU Integrator scoped to their own
-  Business Unit(s)), `server/src/routes/actuals.ts` (quarterly actuals +
+  Business Unit(s); `PUT /targets/annual` 403s with `code:
+  "ANNUAL_TARGET_LOCKED"` if a BU Integrator tries to save an already-locked
+  one, and every successful save sets `locked: true`; a separate `PATCH
+  /targets/annual/unlock`, restricted to Group Integrator/Superadmin,
+  clears it), `server/src/routes/actuals.ts` (quarterly actuals +
   per-category remarks upserts keyed by `companyId` + `yearId` + `quarter`,
   BU Integrator scoped to their assigned BUs), a superadmin-only
   `server/src/routes/admin.ts` with full CRUD over Users/Companies/Business
@@ -159,7 +166,14 @@ real data — the app starts completely empty.
   Expenses has its own "One Total" vs "Internal / External" toggle there —
   Internal + External is always the figure that counts, so "One Total" is
   purely a data-entry shortcut that puts the whole number in Internal and
-  zeroes External; no schema or API change was needed for it; a **Rocks** page (`pages/Rocks.tsx`) with
+  zeroes External; no schema or API change was needed for it. Saving an
+  Annual Target locks it (`AnnualTarget.locked`) — a confirmation pop-up
+  says so, and from then on a BU Integrator can't edit that Business Unit's
+  annual target again (the form disables, showing an amber "locked" banner)
+  until a Group Integrator or Superadmin clicks Unlock. Group
+  Integrators/Superadmins always bypass the lock when saving, and every
+  save re-locks it — locking is specific to Annual Target, Quarter Target is
+  unaffected; a **Rocks** page (`pages/Rocks.tsx`) with
   its own Year/Quarter/BU/Company/Business Goal filter bar, five summary
   cards (Total Rocks, Target Met, On Track, At Risk / Pending, Avg
   Progress %) computed client-side from the filtered list, a "Manage
@@ -305,3 +319,15 @@ Company's *parent Business Unit's* full target, not a per-company slice of
 it — only that Company's own actual changes, which is the intended "each
 Company's contribution toward the shared BU target" view, not a per-Company
 attainment %.
+
+**Annual Target lock/unlock** is a schema change (`AnnualTarget.locked`)
+requiring `npm run prisma:migrate`, and is unverified end-to-end. Worth
+checking by hand: a BU Integrator saves a new annual target and sees the
+"Annual Target Locked" pop-up; their form for that Business Unit/Year is now
+disabled with an amber locked banner and no Unlock button; attempting the
+PUT directly (bypassing the UI) still 403s with `code:
+"ANNUAL_TARGET_LOCKED"`; a Group Integrator/Superadmin viewing the same
+locked target can still edit and save it freely, sees an Unlock button in
+the banner, and clicking it clears the lock so the BU Integrator can edit
+again; switching to Quarter Target is entirely unaffected by an annual
+lock.

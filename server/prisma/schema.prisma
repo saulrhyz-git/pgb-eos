@@ -103,10 +103,16 @@ model Year {
 // Company (see QuarterActual below) and roll up to compare against this
 // Business-Unit-level target — individual companies do not have their own
 // target.
+//
+// `locked`: every successful save locks the target — a BU Integrator can no
+// longer edit it once locked. Group Integrators/Superadmins always bypass
+// the lock when saving, and are the only roles who can explicitly unlock it
+// (PATCH /targets/annual/unlock) to let a BU Integrator edit it again.
 model AnnualTarget {
-  id             String @id @default(uuid())
+  id             String  @id @default(uuid())
   businessUnitId String
   yearId         String
+  locked         Boolean @default(false)
 
   revenueInternal     Decimal @default(0) @db.Decimal(14, 2)
   revenueExternal     Decimal @default(0) @db.Decimal(14, 2)

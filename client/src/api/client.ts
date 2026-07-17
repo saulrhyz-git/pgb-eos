@@ -92,6 +92,8 @@ export const api = {
   },
   putAnnualTarget: (payload: { businessUnitId: string; yearId: string } & Figures) =>
     request<any>("/targets/annual", { method: "PUT", body: JSON.stringify(payload) }),
+  unlockAnnualTarget: (businessUnitId: string, yearId: string) =>
+    request<any>("/targets/annual/unlock", { method: "PATCH", body: JSON.stringify({ businessUnitId, yearId }) }),
 
   quarterTargets: (yearId: string, quarter?: number, businessUnitId?: string) => {
     const qs = new URLSearchParams({ yearId });
