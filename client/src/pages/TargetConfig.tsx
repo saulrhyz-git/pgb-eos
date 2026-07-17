@@ -47,6 +47,7 @@ export default function TargetConfig() {
   const [yearId, setYearId] = useState("");
   const [quarter, setQuarter] = useState(1);
   const [businessUnitId, setBusinessUnitId] = useState("");
+  const [companyId, setCompanyId] = useState("");
   const [form, setForm] = useState(emptyForm);
   const [fieldModes, setFieldModes] = useState<Record<string, FieldMode>>(emptyFieldModes);
 
@@ -86,15 +87,19 @@ export default function TargetConfig() {
 
   useEffect(() => {
     if (!businessUnitId) return;
-    api.companies(businessUnitId).then(setCompanies);
+    api.companies(businessUnitId).then((cs) => {
+      setCompanies(cs);
+      setCompanyId((prev) => (prev && cs.some((c) => c.id === prev) ? prev : cs[0]?.id || ""));
+    });
   }, [businessUnitId]);
 
-  // Annual/Quarter targets belong to the Business Unit itself, so there's at
-  // most one existing row for the selected Year(+Quarter)/Business Unit.
+  // Annual/Quarter targets belong to the Company itself, so there's at most
+  // one existing row for the selected Year(+Quarter)/Company.
   useEffect(() => {
-    if (!yearId || !businessUnitId) return;
+    if (!yearId || !companyId) return;
     setSaved(false);
-    const loader = mode === "annual" ? api.annualTargets(yearId, businessUnitId) : api.quarterTargets(yearId, quarter, businessUnitId);
+    const loader =
+      mode === "annual" ? api.annualTargets({ yearId, companyId }) : api.quarterTargets({ yearId, quarter, companyId });
     loader.then((rows: any[]) => {
       const existing = rows[0];
       if (existing) {
@@ -121,13 +126,13 @@ export default function TargetConfig() {
         setAnnualLocked(false);
       }
     });
-  }, [mode, yearId, quarter, businessUnitId]);
+  }, [mode, yearId, quarter, companyId]);
 
   async function handleUnlock() {
     setUnlocking(true);
     setError("");
     try {
-      await api.unlockAnnualTarget(businessUnitId, yearId);
+      await api.unlockAnnualTarget(companyId, yearId);
       setAnnualLocked(false);
     } catch (err: any) {
       setError(err.message || "Failed to unlock annual target");
@@ -163,13 +168,13 @@ export default function TargetConfig() {
         expensesExternal: Number(form.expensesExternal) || 0,
       };
       if (mode === "annual") {
-        await api.putAnnualTarget({ businessUnitId, yearId, ...figures });
+        await api.putAnnualTarget({ companyId, yearId, ...figures });
         // Every successful save locks the annual target — reflect that
         // immediately rather than waiting on a re-fetch.
         setAnnualLocked(true);
         setShowLockedModal(true);
       } else {
-        await api.putQuarterTarget({ businessUnitId, yearId, quarter, ...figures });
+        await api.putQuarterTarget({ companyId, yearId, quarter, ...figures });
       }
       setSaved(true);
     } catch (err: any) {
@@ -208,8 +213,8 @@ export default function TargetConfig() {
         <h2 className="mb-1 text-lg font-semibold text-slate-800">Target Configuration</h2>
         <p className="text-sm text-slate-500">
           {canManageStructure
-            ? "Set up Annual and Quarterly targets per Business Unit at the start of a cycle, and manage Years / Business Units / Companies."
-            : "Set up Annual and Quarterly targets for your assigned Business Unit(s). Companies still recognize their own actuals in Data Entry — those roll up to compare against the target set here."}
+            ? "Set up Annual and Quarterly targets per Company at the start of a cycle — they roll up into their Business Unit's total — and manage Years / Business Units / Companies."
+            : "Set up Annual and Quarterly targets for the companies in your assigned Business Unit(s). Each Company's target rolls up into its Business Unit's total."}
         </p>
       </div>
 
@@ -286,7 +291,7 @@ export default function TargetConfig() {
           </button>
         </div>
 
-        <div className="grid grid-cols-2 gap-4 sm:grid-cols-3">
+        <div className="grid grid-cols-2 gap-4 sm:grid-cols-4">
           <div className="flex flex-col gap-1">
             <label className="text-xs font-medium text-slate-500">Year</label>
             <select className="rounded-md border border-slate-300 px-3 py-2 text-sm" value={yearId} onChange={(e) => setYearId(e.target.value)}>
@@ -323,13 +328,23 @@ export default function TargetConfig() {
               ))}
             </select>
           </div>
+          <div className="flex flex-col gap-1">
+            <label className="text-xs font-medium text-slate-500">Company</label>
+            <select className="rounded-md border border-slate-300 px-3 py-2 text-sm" value={companyId} onChange={(e) => setCompanyId(e.target.value)}>
+              {companies.map((c) => (
+                <option key={c.id} value={c.id}>
+                  {c.name}
+                </option>
+              ))}
+            </select>
+          </div>
         </div>
 
         {mode === "annual" && annualLocked && (
           <div className="flex flex-wrap items-center justify-between gap-2 rounded-md border border-amber-200 bg-amber-50 px-3 py-2 text-xs text-amber-800">
             <div className="flex items-center gap-1.5">
               <Lock className="h-3.5 w-3.5" />
-              This annual target is locked.
+              This Company's annual target is locked.
               {!canManageStructure && " Ask a Group Integrator or Superadmin to unlock it before making changes."}
             </div>
             {canManageStructure && (
@@ -343,13 +358,6 @@ export default function TargetConfig() {
                 {unlocking ? "Unlocking..." : "Unlock"}
               </button>
             )}
-          </div>
-        )}
-
-        {companies.length > 0 && (
-          <div className="text-xs text-slate-400">
-            Companies in this Business Unit: {companies.map((c) => c.name).join(", ")} — each recognizes its own
-            actuals in Data Entry, and those roll up to compare against the target below.
           </div>
         )}
 
@@ -429,7 +437,7 @@ export default function TargetConfig() {
 
         <button
           type="submit"
-          disabled={saving || !businessUnitId || !yearId || isLockedForMe}
+          disabled={saving || !companyId || !yearId || isLockedForMe}
           className="flex items-center justify-center gap-2 rounded-md bg-brand-500 px-4 py-2 text-sm font-medium text-white hover:bg-brand-600 disabled:opacity-50"
         >
           {saved ? <CheckCircle2 className="h-4 w-4" /> : <Save className="h-4 w-4" />}
@@ -454,8 +462,8 @@ export default function TargetConfig() {
               </button>
             </div>
             <p className="mb-5 text-sm text-slate-600">
-              This annual target has been saved and is now locked. A Business Integrator won't be able to edit it
-              again until a Group Integrator or Superadmin unlocks it.
+              This Company's annual target has been saved and is now locked. A Business Integrator won't be able to
+              edit it again until a Group Integrator or Superadmin unlocks it.
             </p>
             <button
               type="button"
