@@ -14,7 +14,7 @@ import {
 import { api } from "../api/client";
 import { useAuth } from "../contexts/AuthContext";
 import { attainmentColor } from "../utils/format";
-import type { BusinessUnit, Company, Goal, Rock, RockStatus, Year } from "../api/types";
+import type { BusinessGoal, BusinessUnit, Company, Rock, RockStatus, Year } from "../api/types";
 
 const STATUS_LABELS: Record<RockStatus, string> = {
   PENDING: "Pending",
@@ -34,12 +34,18 @@ const emptyRockForm = {
   id: "" as string | null,
   companyId: "",
   quarter: 1,
-  goalId: "",
+  businessGoalId: "",
   title: "",
   description: "",
+  remarks: "",
   ownerName: "",
   status: "PENDING" as RockStatus,
   progressPct: 0,
+};
+
+const emptyGoalForm = {
+  name: "",
+  businessUnitIds: [] as string[],
 };
 
 function KpiCard({ icon, label, value, sub }: { icon: React.ReactNode; label: string; value: string; sub?: string }) {
@@ -55,6 +61,32 @@ function KpiCard({ icon, label, value, sub }: { icon: React.ReactNode; label: st
   );
 }
 
+function BuChecklist({
+  businessUnits,
+  selected,
+  onToggle,
+}: {
+  businessUnits: BusinessUnit[];
+  selected: string[];
+  onToggle: (id: string) => void;
+}) {
+  return (
+    <div className="flex flex-wrap gap-2">
+      {businessUnits.map((bu) => (
+        <label
+          key={bu.id}
+          className={`flex cursor-pointer items-center gap-1.5 rounded-md border px-3 py-1.5 text-xs font-medium ${
+            selected.includes(bu.id) ? "border-brand-500 bg-brand-50 text-brand-700" : "border-slate-200 text-slate-600"
+          }`}
+        >
+          <input type="checkbox" className="hidden" checked={selected.includes(bu.id)} onChange={() => onToggle(bu.id)} />
+          {bu.name}
+        </label>
+      ))}
+    </div>
+  );
+}
+
 export default function Rocks() {
   const { user } = useAuth();
   const canManageStructure = user?.role === "GROUP_INTEGRATOR" || user?.role === "SUPERADMIN";
@@ -63,14 +95,14 @@ export default function Rocks() {
   const [years, setYears] = useState<Year[]>([]);
   const [businessUnits, setBusinessUnits] = useState<BusinessUnit[]>([]);
   const [companies, setCompanies] = useState<Company[]>([]);
-  const [goals, setGoals] = useState<Goal[]>([]);
+  const [businessGoals, setBusinessGoals] = useState<BusinessGoal[]>([]);
   const [rocks, setRocks] = useState<Rock[]>([]);
 
   const [yearId, setYearId] = useState("");
   const [quarter, setQuarter] = useState(0); // 0 = All Quarters
   const [businessUnitId, setBusinessUnitId] = useState("");
   const [companyId, setCompanyId] = useState("");
-  const [goalId, setGoalId] = useState("");
+  const [businessGoalId, setBusinessGoalId] = useState("");
 
   const [loading, setLoading] = useState(false);
   const [error, setError] = useState("");
@@ -82,11 +114,14 @@ export default function Rocks() {
   const [savingRock, setSavingRock] = useState(false);
   const [rockError, setRockError] = useState("");
 
-  const [newGoalName, setNewGoalName] = useState("");
+  const [newGoalForm, setNewGoalForm] = useState(emptyGoalForm);
   const [goalError, setGoalError] = useState("");
+  const [editingGoalId, setEditingGoalId] = useState<string | null>(null);
+  const [editGoalForm, setEditGoalForm] = useState(emptyGoalForm);
+  const [savingGoal, setSavingGoal] = useState(false);
 
   function refreshGoals() {
-    api.goals().then(setGoals);
+    api.businessGoals().then(setBusinessGoals);
   }
 
   useEffect(() => {
@@ -120,14 +155,19 @@ export default function Rocks() {
         quarter: quarter || undefined,
         businessUnitId: businessUnitId || undefined,
         companyId: companyId || undefined,
-        goalId: goalId || undefined,
+        businessGoalId: businessGoalId || undefined,
       })
       .then(setRocks)
       .catch((err) => setError(err.message || "Failed to load rocks"))
       .finally(() => setLoading(false));
   }
 
-  useEffect(loadRocks, [yearId, quarter, businessUnitId, companyId, goalId]);
+  useEffect(loadRocks, [yearId, quarter, businessUnitId, companyId, businessGoalId]);
+
+  // Business goals usable for a given Business Unit: global (no BU tags) or explicitly assigned to it.
+  function goalsForBu(buId: string) {
+    return businessGoals.filter((g) => g.businessUnits.length === 0 || g.businessUnits.some((b) => b.id === buId));
+  }
 
   function startAddRock() {
     setRockForm({ ...emptyRockForm, quarter: quarter || 1, companyId: companyId || "" });
@@ -141,9 +181,10 @@ export default function Rocks() {
       id: r.id,
       companyId: r.companyId,
       quarter: r.quarter,
-      goalId: r.goalId || "",
+      businessGoalId: r.businessGoalId || "",
       title: r.title,
       description: r.description,
+      remarks: r.remarks || "",
       ownerName: r.ownerName,
       status: r.status,
       progressPct: r.progressPct,
@@ -168,9 +209,10 @@ export default function Rocks() {
     try {
       const shared = {
         quarter: rockForm.quarter,
-        goalId: rockForm.goalId || null,
+        businessGoalId: rockForm.businessGoalId || null,
         title: rockForm.title.trim(),
         description: rockForm.description,
+        remarks: rockForm.remarks,
         ownerName: rockForm.ownerName,
         status: rockForm.status,
         progressPct: rockForm.progressPct,
@@ -209,27 +251,69 @@ export default function Rocks() {
     }
   }
 
+  function toggleNewGoalBu(id: string) {
+    setNewGoalForm((f) => ({
+      ...f,
+      businessUnitIds: f.businessUnitIds.includes(id) ? f.businessUnitIds.filter((x) => x !== id) : [...f.businessUnitIds, id],
+    }));
+  }
+
+  function toggleEditGoalBu(id: string) {
+    setEditGoalForm((f) => ({
+      ...f,
+      businessUnitIds: f.businessUnitIds.includes(id) ? f.businessUnitIds.filter((x) => x !== id) : [...f.businessUnitIds, id],
+    }));
+  }
+
   async function handleAddGoal(e: FormEvent) {
     e.preventDefault();
-    if (!newGoalName.trim()) return;
+    if (!newGoalForm.name.trim()) return;
     setGoalError("");
+    setSavingGoal(true);
     try {
-      await api.createGoal(newGoalName.trim());
-      setNewGoalName("");
+      await api.createBusinessGoal({ name: newGoalForm.name.trim(), businessUnitIds: newGoalForm.businessUnitIds });
+      setNewGoalForm(emptyGoalForm);
       refreshGoals();
     } catch (err: any) {
-      setGoalError(err.message || "Failed to add goal");
+      setGoalError(err.message || "Failed to add business goal");
+    } finally {
+      setSavingGoal(false);
     }
   }
 
-  async function handleDeleteGoal(g: Goal) {
-    if (!confirm(`Delete goal "${g.name}"? Rocks tagged with it will keep their data but lose the tag.`)) return;
+  function startEditGoal(g: BusinessGoal) {
+    setEditingGoalId(g.id);
+    setEditGoalForm({ name: g.name, businessUnitIds: g.businessUnits.map((b) => b.id) });
+    setGoalError("");
+  }
+
+  async function handleSaveGoalEdit(e: FormEvent) {
+    e.preventDefault();
+    if (!editingGoalId || !editGoalForm.name.trim()) return;
+    setGoalError("");
+    setSavingGoal(true);
     try {
-      await api.deleteGoal(g.id);
+      await api.updateBusinessGoal(editingGoalId, {
+        name: editGoalForm.name.trim(),
+        businessUnitIds: editGoalForm.businessUnitIds,
+      });
+      setEditingGoalId(null);
+      refreshGoals();
+    } catch (err: any) {
+      setGoalError(err.message || "Failed to update business goal");
+    } finally {
+      setSavingGoal(false);
+    }
+  }
+
+  async function handleDeleteGoal(g: BusinessGoal) {
+    if (!confirm(`Delete business goal "${g.name}"? Rocks tagged with it will keep their data but lose the tag.`)) return;
+    try {
+      await api.deleteBusinessGoal(g.id);
       refreshGoals();
       loadRocks();
     } catch (err: any) {
-      alert(err.message || "Failed to delete goal");
+      alert(err.message || "Failed to delete business goal");
     }
   }
 
@@ -238,6 +322,8 @@ export default function Rocks() {
   const onTrack = rocks.filter((r) => r.status === "ON_TRACK").length;
   const atRiskPending = rocks.filter((r) => r.status === "AT_RISK" || r.status === "PENDING").length;
   const avgProgress = total ? Math.round(rocks.reduce((sum, r) => sum + r.progressPct, 0) / total) : 0;
+
+  const formGoals = goalsForBu(formBusinessUnitId);
 
   return (
     <div className="flex flex-col gap-6">
@@ -313,14 +399,14 @@ export default function Rocks() {
           </select>
         </div>
         <div className="flex flex-col gap-1">
-          <label className="text-xs font-medium text-slate-500">Goal</label>
+          <label className="text-xs font-medium text-slate-500">Business Goal</label>
           <select
             className="min-w-[180px] rounded-md border border-slate-300 px-3 py-1.5 text-sm"
-            value={goalId}
-            onChange={(e) => setGoalId(e.target.value)}
+            value={businessGoalId}
+            onChange={(e) => setBusinessGoalId(e.target.value)}
           >
-            <option value="">All Goals</option>
-            {goals.map((g) => (
+            <option value="">All Business Goals</option>
+            {businessGoals.map((g) => (
               <option key={g.id} value={g.id}>
                 {g.name}
               </option>
@@ -347,32 +433,93 @@ export default function Rocks() {
 
       {canManageStructure && (
         <div className="rounded-lg border border-slate-200 bg-white p-4 shadow-sm">
-          <div className="mb-2 text-xs font-semibold uppercase text-slate-400">Manage Goals</div>
-          <form onSubmit={handleAddGoal} className="mb-3 flex gap-2">
+          <div className="mb-2 text-xs font-semibold uppercase text-slate-400">Manage Business Goals</div>
+          <form onSubmit={handleAddGoal} className="mb-3 flex flex-col gap-2">
             <input
               className="w-full max-w-xs rounded-md border border-slate-300 px-2 py-1.5 text-sm"
               placeholder="e.g. Improve Client Retention"
-              value={newGoalName}
-              onChange={(e) => setNewGoalName(e.target.value)}
+              value={newGoalForm.name}
+              onChange={(e) => setNewGoalForm((f) => ({ ...f, name: e.target.value }))}
             />
-            <button className="rounded-md bg-brand-500 p-2 text-white hover:bg-brand-600">
-              <Plus className="h-4 w-4" />
+            <div>
+              <div className="mb-1 text-xs text-slate-400">
+                Assign to Business Unit(s) — leave blank to make it available everywhere
+              </div>
+              <BuChecklist businessUnits={businessUnits} selected={newGoalForm.businessUnitIds} onToggle={toggleNewGoalBu} />
+            </div>
+            <button
+              type="submit"
+              disabled={savingGoal}
+              className="flex w-fit items-center gap-2 rounded-md bg-brand-500 px-3 py-1.5 text-xs font-medium text-white hover:bg-brand-600 disabled:opacity-50"
+            >
+              <Plus className="h-3.5 w-3.5" /> Add Business Goal
             </button>
           </form>
           {goalError && <div className="mb-2 text-sm text-red-600">{goalError}</div>}
-          <div className="flex flex-wrap gap-2">
-            {goals.map((g) => (
-              <span
-                key={g.id}
-                className="flex items-center gap-1.5 rounded-full border border-slate-200 px-3 py-1 text-xs text-slate-600"
-              >
-                {g.name}
-                <button onClick={() => handleDeleteGoal(g)} className="text-slate-400 hover:text-red-600" title="Delete goal">
-                  <X className="h-3 w-3" />
-                </button>
-              </span>
-            ))}
-            {goals.length === 0 && <span className="text-xs text-slate-400">No goals yet.</span>}
+          <div className="flex flex-col gap-2">
+            {businessGoals.map((g) =>
+              editingGoalId === g.id ? (
+                <form
+                  key={g.id}
+                  onSubmit={handleSaveGoalEdit}
+                  className="flex flex-col gap-2 rounded-md border border-brand-200 bg-brand-50/40 p-3"
+                >
+                  <input
+                    className="w-full max-w-xs rounded-md border border-slate-300 px-2 py-1.5 text-sm"
+                    value={editGoalForm.name}
+                    onChange={(e) => setEditGoalForm((f) => ({ ...f, name: e.target.value }))}
+                  />
+                  <BuChecklist businessUnits={businessUnits} selected={editGoalForm.businessUnitIds} onToggle={toggleEditGoalBu} />
+                  <div className="flex gap-2">
+                    <button
+                      type="submit"
+                      disabled={savingGoal}
+                      className="rounded-md bg-brand-500 px-3 py-1.5 text-xs font-medium text-white hover:bg-brand-600 disabled:opacity-50"
+                    >
+                      Save
+                    </button>
+                    <button
+                      type="button"
+                      onClick={() => setEditingGoalId(null)}
+                      className="rounded-md border border-slate-300 px-3 py-1.5 text-xs font-medium text-slate-600 hover:bg-slate-50"
+                    >
+                      Cancel
+                    </button>
+                  </div>
+                </form>
+              ) : (
+                <div
+                  key={g.id}
+                  className="flex flex-wrap items-center justify-between gap-2 rounded-md border border-slate-200 px-3 py-2 text-xs"
+                >
+                  <div className="flex flex-wrap items-center gap-2">
+                    <span className="font-medium text-slate-700">{g.name}</span>
+                    {g.businessUnits.length === 0 ? (
+                      <span className="rounded-full bg-slate-100 px-2 py-0.5 text-slate-500">Global</span>
+                    ) : (
+                      g.businessUnits.map((bu) => (
+                        <span key={bu.id} className="rounded-full bg-brand-50 px-2 py-0.5 text-brand-700">
+                          {bu.name}
+                        </span>
+                      ))
+                    )}
+                  </div>
+                  <div className="flex gap-1">
+                    <button onClick={() => startEditGoal(g)} className="rounded-md p-1 text-slate-400 hover:text-brand-600" title="Edit">
+                      <Pencil className="h-3.5 w-3.5" />
+                    </button>
+                    <button
+                      onClick={() => handleDeleteGoal(g)}
+                      className="rounded-md p-1 text-slate-400 hover:text-red-600"
+                      title="Delete goal"
+                    >
+                      <X className="h-3.5 w-3.5" />
+                    </button>
+                  </div>
+                </div>
+              )
+            )}
+            {businessGoals.length === 0 && <span className="text-xs text-slate-400">No business goals yet.</span>}
           </div>
         </div>
       )}
@@ -394,7 +541,7 @@ export default function Rocks() {
                 value={formBusinessUnitId}
                 onChange={(e) => {
                   setFormBusinessUnitId(e.target.value);
-                  setRockForm((f) => ({ ...f, companyId: "" }));
+                  setRockForm((f) => ({ ...f, companyId: "", businessGoalId: "" }));
                 }}
                 disabled={!!rockForm.id}
               >
@@ -438,14 +585,14 @@ export default function Rocks() {
               </select>
             </div>
             <div className="flex flex-col gap-1">
-              <label className="text-xs font-medium text-slate-500">Goal</label>
+              <label className="text-xs font-medium text-slate-500">Business Goal</label>
               <select
                 className="rounded-md border border-slate-300 px-3 py-2 text-sm"
-                value={rockForm.goalId}
-                onChange={(e) => setRockForm((f) => ({ ...f, goalId: e.target.value }))}
+                value={rockForm.businessGoalId}
+                onChange={(e) => setRockForm((f) => ({ ...f, businessGoalId: e.target.value }))}
               >
-                <option value="">No goal</option>
-                {goals.map((g) => (
+                <option value="">No business goal</option>
+                {formGoals.map((g) => (
                   <option key={g.id} value={g.id}>
                     {g.name}
                   </option>
@@ -471,6 +618,16 @@ export default function Rocks() {
               className="min-h-[70px] rounded-md border border-slate-300 px-3 py-2 text-sm"
               value={rockForm.description}
               onChange={(e) => setRockForm((f) => ({ ...f, description: e.target.value }))}
+            />
+          </div>
+
+          <div className="flex flex-col gap-1">
+            <label className="text-xs font-medium text-slate-500">Remarks (optional)</label>
+            <textarea
+              className="min-h-[60px] rounded-md border border-slate-300 px-3 py-2 text-sm"
+              placeholder="Notes on progress, blockers, updates..."
+              value={rockForm.remarks}
+              onChange={(e) => setRockForm((f) => ({ ...f, remarks: e.target.value }))}
             />
           </div>
 
@@ -534,13 +691,13 @@ export default function Rocks() {
 
       <div className="overflow-hidden rounded-lg border border-slate-200 bg-white shadow-sm">
         <div className="overflow-x-auto">
-          <table className="w-full min-w-[960px] text-sm">
+          <table className="w-full min-w-[1020px] text-sm">
             <thead className="bg-slate-50 text-left text-xs font-semibold uppercase text-slate-500">
               <tr>
                 <th className="px-4 py-3">Company</th>
                 <th className="px-4 py-3">Quarter</th>
                 <th className="px-4 py-3">Rock</th>
-                <th className="px-4 py-3">Goal</th>
+                <th className="px-4 py-3">Business Goal</th>
                 <th className="px-4 py-3">Owner</th>
                 <th className="px-4 py-3">Status</th>
                 <th className="px-4 py-3">Progress</th>
@@ -555,8 +712,11 @@ export default function Rocks() {
                   <td className="px-4 py-3 text-slate-700">
                     <div className="max-w-xs font-medium">{r.title}</div>
                     {r.description && <div className="mt-0.5 max-w-xs text-xs text-slate-400 line-clamp-2">{r.description}</div>}
+                    {r.remarks && (
+                      <div className="mt-0.5 max-w-xs text-xs italic text-slate-400 line-clamp-2">Remarks: {r.remarks}</div>
+                    )}
                   </td>
-                  <td className="px-4 py-3 text-slate-600">{r.goal?.name || "—"}</td>
+                  <td className="px-4 py-3 text-slate-600">{r.businessGoal?.name || "—"}</td>
                   <td className="px-4 py-3 text-slate-600">{r.ownerName || "—"}</td>
                   <td className="px-4 py-3">
                     <select

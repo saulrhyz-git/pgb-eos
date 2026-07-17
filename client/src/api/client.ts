@@ -1,11 +1,11 @@
 import type {
   AdminUser,
   AuthUser,
+  BusinessGoal,
   BusinessUnit,
   Company,
   DashboardResponse,
   Figures,
-  Goal,
   Rock,
   RockStatus,
   Role,
@@ -109,13 +109,26 @@ export const api = {
     if (params.companyId) qs.set("companyId", params.companyId);
     return request<any[]>(`/actuals?${qs.toString()}`);
   },
-  putActual: (payload: { companyId: string; yearId: string; quarter: number; remarks?: string } & Figures) =>
-    request<any>("/actuals", { method: "PUT", body: JSON.stringify(payload) }),
+  putActual: (
+    payload: {
+      companyId: string;
+      yearId: string;
+      quarter: number;
+      revenueRemarks?: string;
+      collectionsRemarks?: string;
+      expensesRemarks?: string;
+    } & Figures
+  ) => request<any>("/actuals", { method: "PUT", body: JSON.stringify(payload) }),
 
-  patchRemarks: (companyId: string, yearId: string, quarter: number, remarks: string) =>
+  patchRemarks: (
+    companyId: string,
+    yearId: string,
+    quarter: number,
+    payload: Partial<{ revenueRemarks: string; collectionsRemarks: string; expensesRemarks: string }>
+  ) =>
     request<any>(`/actuals/${companyId}/${yearId}/${quarter}/remarks`, {
       method: "PATCH",
-      body: JSON.stringify({ remarks }),
+      body: JSON.stringify(payload),
     }),
 
   // ---------- Superadmin: Users ----------
@@ -165,13 +178,13 @@ export const api = {
   testSmtpSettings: (to: string) =>
     request<{ ok: true }>("/settings/smtp/test", { method: "POST", body: JSON.stringify({ to }) }),
 
-  // ---------- Goals (Group Integrator / Superadmin manage; everyone reads) ----------
-  goals: () => request<Goal[]>("/goals"),
-  createGoal: (name: string, description?: string) =>
-    request<Goal>("/goals", { method: "POST", body: JSON.stringify({ name, description }) }),
-  updateGoal: (id: string, payload: Partial<{ name: string; description: string }>) =>
-    request<Goal>(`/goals/${id}`, { method: "PUT", body: JSON.stringify(payload) }),
-  deleteGoal: (id: string) => request<void>(`/goals/${id}`, { method: "DELETE" }),
+  // ---------- Business Goals (Group Integrator / Superadmin manage; everyone reads) ----------
+  businessGoals: () => request<BusinessGoal[]>("/business-goals"),
+  createBusinessGoal: (payload: { name: string; description?: string; businessUnitIds?: string[] }) =>
+    request<BusinessGoal>("/business-goals", { method: "POST", body: JSON.stringify(payload) }),
+  updateBusinessGoal: (id: string, payload: Partial<{ name: string; description: string; businessUnitIds: string[] }>) =>
+    request<BusinessGoal>(`/business-goals/${id}`, { method: "PUT", body: JSON.stringify(payload) }),
+  deleteBusinessGoal: (id: string) => request<void>(`/business-goals/${id}`, { method: "DELETE" }),
 
   // ---------- Rocks ----------
   rocks: (params: {
@@ -179,14 +192,14 @@ export const api = {
     quarter?: number;
     businessUnitId?: string;
     companyId?: string;
-    goalId?: string;
+    businessGoalId?: string;
     status?: RockStatus;
   }) => {
     const qs = new URLSearchParams({ yearId: params.yearId });
     if (params.quarter) qs.set("quarter", String(params.quarter));
     if (params.businessUnitId) qs.set("businessUnitId", params.businessUnitId);
     if (params.companyId) qs.set("companyId", params.companyId);
-    if (params.goalId) qs.set("goalId", params.goalId);
+    if (params.businessGoalId) qs.set("businessGoalId", params.businessGoalId);
     if (params.status) qs.set("status", params.status);
     return request<Rock[]>(`/rocks?${qs.toString()}`);
   },
@@ -194,9 +207,10 @@ export const api = {
     companyId: string;
     yearId: string;
     quarter: number;
-    goalId?: string | null;
+    businessGoalId?: string | null;
     title: string;
     description?: string;
+    remarks?: string;
     ownerName?: string;
     status?: RockStatus;
     progressPct?: number;
@@ -205,9 +219,10 @@ export const api = {
     id: string,
     payload: Partial<{
       quarter: number;
-      goalId: string | null;
+      businessGoalId: string | null;
       title: string;
       description: string;
+      remarks: string;
       ownerName: string;
       status: RockStatus;
       progressPct: number;

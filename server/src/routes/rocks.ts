@@ -24,13 +24,33 @@ const statusEnum = z.enum(["PENDING", "ON_TRACK", "AT_RISK", "TARGET_MET"]);
 
 const rockInclude = {
   company: { select: { id: true, name: true, businessUnitId: true } },
-  goal: { select: { id: true, name: true } },
+  businessGoal: { select: { id: true, name: true } },
   createdBy: { select: { id: true, name: true } },
   updatedBy: { select: { id: true, name: true } },
 } as const;
 
+// A Business Goal that's been assigned to specific Business Units can only be
+// used to tag Rocks belonging to companies in one of those units. A Business
+// Goal with no assignment is global and usable anywhere.
+async function assertBusinessGoalUsable(businessGoalId: string, businessUnitId: string) {
+  const goal = await prisma.businessGoal.findUnique({
+    where: { id: businessGoalId },
+    include: { businessUnits: { select: { businessUnitId: true } } },
+  });
+  if (!goal) {
+    const err = new Error("Business goal not found");
+    (err as any).status = 404;
+    throw err;
+  }
+  if (goal.businessUnits.length && !goal.businessUnits.some((b) => b.businessUnitId === businessUnitId)) {
+    const err = new Error("This business goal is not assigned to the selected company's Business Unit");
+    (err as any).status = 400;
+    throw err;
+  }
+}
+
 router.get("/", async (req, res) => {
-  const { yearId, quarter, businessUnitId, companyId, goalId, status } = req.query as Record<string, string | undefined>;
+  const { yearId, quarter, businessUnitId, companyId, businessGoalId, status } = req.query as Record<string, string | undefined>;
   if (!yearId) return res.status(400).json({ error: "yearId is required" });
 
   const user = req.user!;
@@ -42,7 +62,7 @@ router.get("/", async (req, res) => {
 
   const where: any = { yearId };
   if (quarter) where.quarter = Number(quarter);
-  if (goalId) where.goalId = goalId;
+  if (businessGoalId) where.businessGoalId = businessGoalId;
   if (status) {
     const parsedStatus = statusEnum.safeParse(status);
     if (!parsedStatus.success) return res.status(400).json({ error: "Invalid status filter" });
@@ -71,9 +91,10 @@ const createSchema = z.object({
   companyId: z.string().uuid(),
   yearId: z.string().uuid(),
   quarter: z.number().int().min(1).max(4),
-  goalId: z.string().uuid().optional().nullable(),
+  businessGoalId: z.string().uuid().optional().nullable(),
   title: z.string().min(1).max(300),
   description: z.string().max(4000).optional().default(""),
+  remarks: z.string().max(4000).optional().default(""),
   ownerName: z.string().max(200).optional().default(""),
   status: statusEnum.optional().default("PENDING"),
   progressPct: z.number().int().min(0).max(100).optional().default(0),
@@ -86,6 +107,7 @@ router.post("/", async (req, res) => {
   try {
     const businessUnitId = await resolveCompanyBusinessUnit(parsed.data.companyId);
     assertBusinessUnitAccess(req.user!, businessUnitId);
+    if (parsed.data.businessGoalId) await assertBusinessGoalUsable(parsed.data.businessGoalId, businessUnitId);
   } catch (err: any) {
     return res.status(err.status || 500).json({ error: err.message });
   }
@@ -99,9 +121,10 @@ router.post("/", async (req, res) => {
 
 const updateSchema = z.object({
   quarter: z.number().int().min(1).max(4).optional(),
-  goalId: z.string().uuid().nullable().optional(),
+  businessGoalId: z.string().uuid().nullable().optional(),
   title: z.string().min(1).max(300).optional(),
   description: z.string().max(4000).optional(),
+  remarks: z.string().max(4000).optional(),
   ownerName: z.string().max(200).optional(),
   status: statusEnum.optional(),
   progressPct: z.number().int().min(0).max(100).optional(),
@@ -117,6 +140,7 @@ router.put("/:id", async (req, res) => {
   try {
     const businessUnitId = await resolveCompanyBusinessUnit(existing.companyId);
     assertBusinessUnitAccess(req.user!, businessUnitId);
+    if (parsed.data.businessGoalId) await assertBusinessGoalUsable(parsed.data.businessGoalId, businessUnitId);
   } catch (err: any) {
     return res.status(err.status || 500).json({ error: err.message });
   }

@@ -20,7 +20,10 @@ const figuresSchema = z.object({
   collectionsExternal: z.number().min(0).default(0),
   expensesInternal: z.number().min(0).default(0),
   expensesExternal: z.number().min(0).default(0),
-  remarks: z.string().max(2000).optional().default(""),
+  // Split per category rather than one shared note for the whole quarter.
+  revenueRemarks: z.string().max(2000).optional().default(""),
+  collectionsRemarks: z.string().max(2000).optional().default(""),
+  expensesRemarks: z.string().max(2000).optional().default(""),
 });
 
 router.get("/", async (req, res) => {
@@ -80,10 +83,23 @@ router.put("/", async (req, res) => {
   res.json(actual);
 });
 
-// Lightweight endpoint for updating just the Remarks inline field from the operational grid.
+// Lightweight endpoint for updating just one or more of the per-category
+// Remarks fields inline from the operational grid, without resubmitting the
+// whole quarter's figures.
+const remarksPatchSchema = z
+  .object({
+    revenueRemarks: z.string().max(2000),
+    collectionsRemarks: z.string().max(2000),
+    expensesRemarks: z.string().max(2000),
+  })
+  .partial()
+  .refine((v) => Object.keys(v).length > 0, { message: "At least one remarks field is required" });
+
 router.patch("/:companyId/:yearId/:quarter/remarks", async (req, res) => {
-  const remarksParsed = z.object({ remarks: z.string().max(2000) }).safeParse(req.body);
-  if (!remarksParsed.success) return res.status(400).json({ error: "'remarks' is required" });
+  const remarksParsed = remarksPatchSchema.safeParse(req.body);
+  if (!remarksParsed.success) {
+    return res.status(400).json({ error: remarksParsed.error.issues[0]?.message || "Invalid remarks payload" });
+  }
 
   const { companyId, yearId } = req.params;
   const quarter = Number(req.params.quarter);
@@ -97,12 +113,12 @@ router.patch("/:companyId/:yearId/:quarter/remarks", async (req, res) => {
 
   const actual = await prisma.quarterActual.upsert({
     where: { companyId_yearId_quarter: { companyId, yearId, quarter } },
-    update: { remarks: remarksParsed.data.remarks, updatedById: req.user!.id },
+    update: { ...remarksParsed.data, updatedById: req.user!.id },
     create: {
       companyId,
       yearId,
       quarter,
-      remarks: remarksParsed.data.remarks,
+      ...remarksParsed.data,
       updatedById: req.user!.id,
     },
   });

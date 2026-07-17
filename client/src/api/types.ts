@@ -109,7 +109,9 @@ export interface OperationalGridRow {
   quarterAttainmentPct: number;
   ytdActual: number;
   ytdVsAnnualPct: number;
-  remarks: string;
+  revenueRemarks: string;
+  collectionsRemarks: string;
+  expensesRemarks: string;
 }
 
 export interface DashboardResponse {
@@ -122,11 +124,13 @@ export interface DashboardResponse {
 
 export type RockStatus = "PENDING" | "ON_TRACK" | "AT_RISK" | "TARGET_MET";
 
-export interface Goal {
+export interface BusinessGoal {
   id: string;
   name: string;
   description: string;
   createdAt: string;
+  // Empty = global (usable anywhere). Non-empty = scoped to just these BUs.
+  businessUnits: { id: string; name: string }[];
 }
 
 export interface Rock {
@@ -134,16 +138,17 @@ export interface Rock {
   companyId: string;
   yearId: string;
   quarter: number;
-  goalId: string | null;
+  businessGoalId: string | null;
   title: string;
   description: string;
+  remarks: string;
   ownerName: string;
   status: RockStatus;
   progressPct: number;
   createdAt: string;
   updatedAt: string;
   company: { id: string; name: string; businessUnitId: string };
-  goal: { id: string; name: string } | null;
+  businessGoal: { id: string; name: string } | null;
   createdBy: { id: string; name: string } | null;
   updatedBy: { id: string; name: string } | null;
 }

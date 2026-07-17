@@ -8,7 +8,7 @@ import actualRoutes from "./routes/actuals";
 import dashboardRoutes from "./routes/dashboard";
 import adminRoutes from "./routes/admin";
 import settingsRoutes from "./routes/settings";
-import goalRoutes from "./routes/goals";
+import businessGoalRoutes from "./routes/businessGoals";
 import rockRoutes from "./routes/rocks";
 
 const app = express();
@@ -24,7 +24,7 @@ app.use("/api/actuals", actualRoutes);
 app.use("/api/dashboard", dashboardRoutes);
 app.use("/api/admin", adminRoutes);
 app.use("/api/settings", settingsRoutes);
-app.use("/api/goals", goalRoutes);
+app.use("/api/business-goals", businessGoalRoutes);
 app.use("/api/rocks", rockRoutes);
 
 // Generic error handler as a safety net for anything thrown above.

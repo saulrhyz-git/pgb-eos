@@ -1,10 +1,13 @@
 # EOS Executive Dashboard
 
 Full-stack dashboard with two views: **Revenue** (Revenue, Collections, and
-Expenses — each split Internal / External, in Philippine Peso — across a
-Year → Business Unit → Member Company → Quarter hierarchy) and **Rocks**
-(EOS-style 90-day priorities tracked per Company/Year/Quarter, tagged against
-a shared Goals taxonomy). Role-based access is provided for a Superadmin
+Expenses — each split Internal / External, in Philippine Peso, each with its
+own Remarks field — across a Year → Business Unit → Member Company → Quarter
+hierarchy) and **Rocks** (EOS-style 90-day priorities tracked per
+Company/Year/Quarter, each with its own Remarks field, tagged against a
+shared Business Goals taxonomy that Superadmin/Group Integrator can assign
+to one or more Business Units, or leave global). Role-based access is
+provided for a Superadmin
 (full system access), a Group Integrator (global by default, but can
 optionally be scoped to one or more assigned Business Units), and BU
 Integrators (always tied to at least one assigned Business Unit, with data
@@ -68,13 +71,21 @@ real data — the app starts completely empty.
 - **Schema** (`server/prisma/schema.prisma`): `User` (now with `username`,
   `mustChangePassword`), `BusinessUnit`, `UserBusinessUnit` (many-to-many BU
   assignment), `Company`, `Year`, `AnnualTarget`, `QuarterTarget`,
-  `QuarterActual`, `SmtpSettings` (singleton row), `Goal`, and `Rock` — every
-  financial model splits Revenue/Collections/Expenses into Internal/External
-  columns, with compound-unique constraints (`companyId+yearId[+quarter]`) so
-  aggregation queries stay correct and indexed. A `Rock` belongs to a
-  Company + Year + Quarter, optionally tags a `Goal`, and carries `status`
-  (`PENDING` / `ON_TRACK` / `AT_RISK` / `TARGET_MET`) and `progressPct`
-  (0-100) that get updated over time like a project tracker.
+  `QuarterActual`, `SmtpSettings` (singleton row), `BusinessGoal`,
+  `BusinessGoalBusinessUnit` (many-to-many BU assignment for goals), and
+  `Rock` — every financial model splits Revenue/Collections/Expenses into
+  Internal/External columns, with compound-unique constraints
+  (`companyId+yearId[+quarter]`) so aggregation queries stay correct and
+  indexed. `QuarterActual` carries three independent remarks fields —
+  `revenueRemarks`, `collectionsRemarks`, `expensesRemarks` — instead of one
+  shared remarks field. A `Rock` belongs to a Company + Year + Quarter,
+  optionally tags a `BusinessGoal`, has its own `remarks` field, and carries
+  `status` (`PENDING` / `ON_TRACK` / `AT_RISK` / `TARGET_MET`) and
+  `progressPct` (0-100) that get updated over time like a project tracker. A
+  `BusinessGoal` with no `BusinessGoalBusinessUnit` rows is global (usable by
+  any Rock); assigning it to specific Business Units narrows which Rocks can
+  tag it, mirroring the same opt-in scoping pattern used for Group
+  Integrators.
 - **Roles**:
   - `SUPERADMIN` — always global. Full system access, including user/company/BU
     management and SMTP settings.
@@ -99,11 +110,15 @@ real data — the app starts completely empty.
   assigned BUs), a superadmin-only `server/src/routes/admin.ts` with full
   CRUD over Users/Companies/Business Units, a superadmin-only
   `server/src/routes/settings.ts` for SMTP configuration + test-send
-  (via `nodemailer`), `server/src/routes/goals.ts` (Goal CRUD — read is open
-  to everyone, write is Group Integrator + Superadmin, deliberately *not*
-  folded into the superadmin-only admin router since Group Integrators need
-  it too), `server/src/routes/rocks.ts` (Rock CRUD, BU-scoped the same way as
-  actuals/targets), and a single `/api/dashboard` endpoint that aggregates
+  (via `nodemailer`), `server/src/routes/businessGoals.ts` (Business Goal
+  CRUD — read is open to everyone, write is Group Integrator + Superadmin,
+  deliberately *not* folded into the superadmin-only admin router since
+  Group Integrators need it too; create/update validate any submitted
+  `businessUnitIds` against the caller's own BU access before assigning
+  them), `server/src/routes/rocks.ts` (Rock CRUD, BU-scoped the same way as
+  actuals/targets, plus `assertBusinessGoalUsable` which rejects tagging a
+  Rock with a Business Goal that's scoped to a different Business Unit than
+  the Rock's company), and a single `/api/dashboard` endpoint that aggregates
   company-level data up to BU or Group level on the fly (KPIs, chart series,
   target distribution matrix, operational grid).
 - **RBAC**: `assertBusinessUnitAccess` / `scopedBusinessUnitFilter` in
@@ -119,24 +134,29 @@ real data — the app starts completely empty.
   renamed in the nav from "Dashboard") with the global Year/BU/Company/Quarter
   filter bar, KPI cards with green/red attainment coloring, a Recharts
   bar+line combo chart with an Internal/External breakdown toggle, the Target
-  Distribution Matrix, and the expandable Operational Grid with
-  inline-editable Remarks; a **Rocks** page (`pages/Rocks.tsx`) with its own
-  Year/Quarter/BU/Company/Goal filter bar, five summary cards (Total Rocks,
-  Target Met, On Track, At Risk / Pending, Avg Progress %) computed
-  client-side from the filtered list, a Goals quick-manage panel (Group
-  Integrator/Superadmin only), an Add/Edit Rock form, and a table with
-  inline status + progress editing plus delete, project-tracker style; a
-  Data Entry page and a Target Setup page open to all three roles (each
-  scoped server-side; the Add Year/BU/Company quick-add forms on Target Setup
-  are only shown to Group Integrators/Superadmin), a forced Change Password
-  screen, and a Superadmin-only `/admin` section (`client/src/pages/admin`)
-  with tabs for Users (including the Business Unit assignment checklist),
-  Companies, Business Units, and SMTP Settings.
+  Distribution Matrix, and the expandable Operational Grid with three
+  independently inline-editable Remarks fields (Revenue/Collections/
+  Expenses) per company/quarter; a **Rocks** page (`pages/Rocks.tsx`) with
+  its own Year/Quarter/BU/Company/Business Goal filter bar, five summary
+  cards (Total Rocks, Target Met, On Track, At Risk / Pending, Avg
+  Progress %) computed client-side from the filtered list, a "Manage
+  Business Goals" panel (Group Integrator/Superadmin only) with a
+  Business-Unit-checklist per goal for assigning it to one or more BUs (or
+  leaving it unassigned/global), an Add/Edit Rock form with its own Remarks
+  field, and a table with inline status + progress editing plus delete,
+  project-tracker style; a Data Entry page and a Target Setup page open to
+  all three roles (each scoped server-side; the Add Year/BU/Company
+  quick-add forms on Target Setup are only shown to Group
+  Integrators/Superadmin), a forced Change Password screen, and a
+  Superadmin-only `/admin` section (`client/src/pages/admin`) with tabs for
+  Users (including the Business Unit assignment checklist), Companies,
+  Business Units, and SMTP Settings.
 
 - **Seed script** (`server/prisma/seed.ts`): a hard reset, not a passive
   seed. Every time you run `npm run seed` it wipes all Business Units,
-  Companies, Years, targets, actuals, Rocks, Goals, and any non-superadmin
-  users, then ensures the superadmin account exists. This is what to run if
+  Companies, Years, targets, actuals, Rocks, Business Goals, and any
+  non-superadmin users, then ensures the superadmin account exists. This is
+  what to run if
   sample/demo data from an earlier version of this project is still showing
   up in your database — re-run `npm run seed` and it will be removed. SMTP
   settings are left untouched.
@@ -192,3 +212,21 @@ only for companies in their own BU(s), and the summary cards (Total Rocks /
 Target Met / On Track / At Risk-Pending / Avg Progress) update correctly as
 you change status and progress inline in the table; filtering by Year,
 Quarter, Business Unit, Company, and Goal all narrow the list correctly.
+
+The Business Goals rename + per-category Remarks split (`Goal` → `BusinessGoal`,
+the new `BusinessGoalBusinessUnit` join table, `server/src/routes/goals.ts` →
+`server/src/routes/businessGoals.ts`, the `Rock.businessGoalId` rename +
+`Rock.remarks` addition, and `QuarterActual.remarks` splitting into
+`revenueRemarks`/`collectionsRemarks`/`expensesRemarks`) is a schema change
+and needs a fresh `npm run prisma:migrate` to pick up. It's also unverified
+end-to-end — worth checking by hand: a Group Integrator/Superadmin can create
+a Business Goal, leave it unassigned (global, usable by any Rock), or assign
+it to one or more specific Business Units; a Rock's Business Goal dropdown
+only offers goals that are global or assigned to the Rock's own Business
+Unit, and the server rejects (400) an attempt to tag a Rock with a goal
+scoped to a different BU; editing a Business Goal's BU assignment via the
+"Manage Business Goals" panel persists correctly; each of Revenue,
+Collections, and Expenses has its own independently-saving Remarks field on
+both the Operational Grid (inline, per company/quarter) and the Data Entry
+form, and a Rock's Remarks field saves and displays independently of its
+Description.

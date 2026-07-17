@@ -14,7 +14,8 @@ async function main() {
   console.log("Resetting EOS dashboard database (wiping all data except the superadmin)...");
 
   await prisma.rock.deleteMany({});
-  await prisma.goal.deleteMany({});
+  await prisma.businessGoalBusinessUnit.deleteMany({});
+  await prisma.businessGoal.deleteMany({});
   await prisma.quarterActual.deleteMany({});
   await prisma.quarterTarget.deleteMany({});
   await prisma.annualTarget.deleteMany({});
@@ -38,7 +39,7 @@ async function main() {
     },
   });
 
-  console.log("Reset complete. No Business Units, Companies, Years, Goals, Rocks, or non-superadmin users remain.");
+  console.log("Reset complete. No Business Units, Companies, Years, Business Goals, Rocks, or non-superadmin users remain.");
   console.log("");
   console.log("  Superadmin:  username 'saulrhyz' / password '0811837Sey@me7' (must change on first login)");
   console.log("");

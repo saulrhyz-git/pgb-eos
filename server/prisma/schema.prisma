@@ -65,8 +65,9 @@ model BusinessUnit {
   name      String   @unique
   createdAt DateTime @default(now())
 
-  companies Company[]
-  users     UserBusinessUnit[]
+  companies      Company[]
+  users          UserBusinessUnit[]
+  businessGoals  BusinessGoalBusinessUnit[]
 }
 
 model Company {
@@ -155,7 +156,10 @@ model QuarterActual {
   expensesInternal    Decimal @default(0) @db.Decimal(14, 2)
   expensesExternal    Decimal @default(0) @db.Decimal(14, 2)
 
-  remarks String @default("")
+  // Split per financial category rather than one shared note for the whole quarter.
+  revenueRemarks     String @default("")
+  collectionsRemarks String @default("")
+  expensesRemarks    String @default("")
 
   updatedById String?
   updatedAt   DateTime @updatedAt
@@ -177,15 +181,30 @@ enum RockStatus {
 }
 
 // A strategic objective / theme that Rocks can be tied to. Managed by
-// Group Integrators and Superadmins; shared across the whole org (not
-// scoped to a Business Unit) so it can be used as a cross-cutting filter.
-model Goal {
+// Group Integrators and Superadmins. A Business Goal with no Business Unit
+// assignment is global (visible/usable everywhere); assigning it to one or
+// more specific Business Units narrows it to just those units, the same
+// "opt-in scoping" pattern used for Group Integrators.
+model BusinessGoal {
   id          String   @id @default(uuid())
   name        String   @unique
   description String   @default("")
   createdAt   DateTime @default(now())
 
-  rocks Rock[]
+  businessUnits BusinessGoalBusinessUnit[]
+  rocks         Rock[]
+}
+
+// Join table: which Business Unit(s) a Business Goal has been assigned to.
+model BusinessGoalBusinessUnit {
+  businessGoalId String
+  businessUnitId String
+
+  businessGoal BusinessGoal @relation(fields: [businessGoalId], references: [id], onDelete: Cascade)
+  businessUnit BusinessUnit @relation(fields: [businessUnitId], references: [id], onDelete: Cascade)
+
+  @@id([businessGoalId, businessUnitId])
+  @@index([businessUnitId])
 }
 
 // A "Rock" is an EOS-style 90-day priority owned by a Member Company for a
@@ -193,29 +212,30 @@ model Goal {
 // their assigned Business Unit(s)); Group Integrators/Superadmins can manage
 // any Rock within their own scope, same as Quarter Actuals.
 model Rock {
-  id          String     @id @default(uuid())
-  companyId   String
-  yearId      String
-  quarter     Int // 1-4
-  goalId      String?
-  title       String
-  description String     @default("")
-  ownerName   String     @default("")
-  status      RockStatus @default(PENDING)
-  progressPct Int        @default(0)
+  id             String     @id @default(uuid())
+  companyId      String
+  yearId         String
+  quarter        Int // 1-4
+  businessGoalId String?
+  title          String
+  description    String     @default("")
+  remarks        String     @default("")
+  ownerName      String     @default("")
+  status         RockStatus @default(PENDING)
+  progressPct    Int        @default(0)
 
   createdById String?
   updatedById String?
   createdAt   DateTime @default(now())
   updatedAt   DateTime @updatedAt
 
-  company   Company @relation(fields: [companyId], references: [id], onDelete: Cascade)
-  year      Year    @relation(fields: [yearId], references: [id], onDelete: Cascade)
-  goal      Goal?   @relation(fields: [goalId], references: [id], onDelete: SetNull)
-  createdBy User?   @relation("RockCreatedBy", fields: [createdById], references: [id])
-  updatedBy User?   @relation("RockUpdatedBy", fields: [updatedById], references: [id])
+  company      Company       @relation(fields: [companyId], references: [id], onDelete: Cascade)
+  year         Year          @relation(fields: [yearId], references: [id], onDelete: Cascade)
+  businessGoal BusinessGoal? @relation(fields: [businessGoalId], references: [id], onDelete: SetNull)
+  createdBy    User?         @relation("RockCreatedBy", fields: [createdById], references: [id])
+  updatedBy    User?         @relation("RockUpdatedBy", fields: [updatedById], references: [id])
 
   @@index([companyId])
   @@index([yearId, quarter])
-  @@index([goalId])
+  @@index([businessGoalId])
 }

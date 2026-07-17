@@ -71,10 +71,17 @@ router.get("/", async (req, res) => {
   const qTargetByCompanyQuarter = new Map<string, Figures>();
   for (const t of quarterTargets) qTargetByCompanyQuarter.set(`${t.companyId}:${t.quarter}`, toFigures(t));
   const qActualByCompanyQuarter = new Map<string, Figures>();
-  const remarksByCompanyQuarter = new Map<string, string>();
+  const remarksByCompanyQuarter = new Map<
+    string,
+    { revenueRemarks: string; collectionsRemarks: string; expensesRemarks: string }
+  >();
   for (const a of quarterActuals) {
     qActualByCompanyQuarter.set(`${a.companyId}:${a.quarter}`, toFigures(a));
-    remarksByCompanyQuarter.set(`${a.companyId}:${a.quarter}`, a.remarks);
+    remarksByCompanyQuarter.set(`${a.companyId}:${a.quarter}`, {
+      revenueRemarks: a.revenueRemarks,
+      collectionsRemarks: a.collectionsRemarks,
+      expensesRemarks: a.expensesRemarks,
+    });
   }
 
   // ---------- Chart: quarterly revenue vs target across Q1-Q4 for the whole scope ----------
@@ -197,7 +204,11 @@ router.get("/", async (req, res) => {
       quarterAttainmentPct: pct(quarterActualTotalRow, quarterTargetTotalRow),
       ytdActual: ytdActualTotalRow,
       ytdVsAnnualPct: pct(ytdActualTotalRow, annualTotal),
-      remarks: remarksByCompanyQuarter.get(`${c.id}:${quarter}`) || "",
+      ...(remarksByCompanyQuarter.get(`${c.id}:${quarter}`) || {
+        revenueRemarks: "",
+        collectionsRemarks: "",
+        expensesRemarks: "",
+      }),
     };
   });
 

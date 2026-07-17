@@ -12,10 +12,12 @@ type FigureKey =
   | "expensesInternal"
   | "expensesExternal";
 
-const FIELD_GROUPS: { title: string; internal: FigureKey; external: FigureKey }[] = [
-  { title: "Revenue", internal: "revenueInternal", external: "revenueExternal" },
-  { title: "Collections", internal: "collectionsInternal", external: "collectionsExternal" },
-  { title: "Expenses", internal: "expensesInternal", external: "expensesExternal" },
+type RemarksKey = "revenueRemarks" | "collectionsRemarks" | "expensesRemarks";
+
+const FIELD_GROUPS: { title: string; internal: FigureKey; external: FigureKey; remarks: RemarksKey }[] = [
+  { title: "Revenue", internal: "revenueInternal", external: "revenueExternal", remarks: "revenueRemarks" },
+  { title: "Collections", internal: "collectionsInternal", external: "collectionsExternal", remarks: "collectionsRemarks" },
+  { title: "Expenses", internal: "expensesInternal", external: "expensesExternal", remarks: "expensesRemarks" },
 ];
 
 const emptyForm: Record<FigureKey, string> = {
@@ -25,6 +27,12 @@ const emptyForm: Record<FigureKey, string> = {
   collectionsExternal: "",
   expensesInternal: "",
   expensesExternal: "",
+};
+
+const emptyRemarks: Record<RemarksKey, string> = {
+  revenueRemarks: "",
+  collectionsRemarks: "",
+  expensesRemarks: "",
 };
 
 export default function IntegratorPortal() {
@@ -38,7 +46,7 @@ export default function IntegratorPortal() {
   const [businessUnitId, setBusinessUnitId] = useState("");
   const [companyId, setCompanyId] = useState("");
   const [form, setForm] = useState(emptyForm);
-  const [remarks, setRemarks] = useState("");
+  const [remarks, setRemarks] = useState(emptyRemarks);
 
   const [saving, setSaving] = useState(false);
   const [saved, setSaved] = useState(false);
@@ -81,15 +89,19 @@ export default function IntegratorPortal() {
             expensesInternal: String(existing.expensesInternal ?? ""),
             expensesExternal: String(existing.expensesExternal ?? ""),
           });
-          setRemarks(existing.remarks || "");
+          setRemarks({
+            revenueRemarks: existing.revenueRemarks || "",
+            collectionsRemarks: existing.collectionsRemarks || "",
+            expensesRemarks: existing.expensesRemarks || "",
+          });
         } else {
           setForm(emptyForm);
-          setRemarks("");
+          setRemarks(emptyRemarks);
         }
       })
       .catch(() => {
         setForm(emptyForm);
-        setRemarks("");
+        setRemarks(emptyRemarks);
       });
   }, [yearId, quarter, companyId, businessUnitId]);
 
@@ -103,7 +115,7 @@ export default function IntegratorPortal() {
         companyId,
         yearId,
         quarter,
-        remarks,
+        ...remarks,
         revenueInternal: Number(form.revenueInternal) || 0,
         revenueExternal: Number(form.revenueExternal) || 0,
         collectionsInternal: Number(form.collectionsInternal) || 0,
@@ -205,18 +217,17 @@ export default function IntegratorPortal() {
                   />
                 </div>
               </div>
+              <div className="mt-3 flex flex-col gap-1">
+                <label className="text-xs font-medium text-slate-500">{group.title} Remarks</label>
+                <textarea
+                  className="min-h-[60px] rounded-md border border-slate-300 px-3 py-2 text-sm"
+                  value={remarks[group.remarks]}
+                  onChange={(e) => setRemarks((r) => ({ ...r, [group.remarks]: e.target.value }))}
+                  placeholder={`Notes on this quarter's ${group.title.toLowerCase()}...`}
+                />
+              </div>
             </div>
           ))}
-        </div>
-
-        <div className="flex flex-col gap-1">
-          <label className="text-xs font-medium text-slate-500">Remarks</label>
-          <textarea
-            className="min-h-[80px] rounded-md border border-slate-300 px-3 py-2 text-sm"
-            value={remarks}
-            onChange={(e) => setRemarks(e.target.value)}
-            placeholder="Notes on this quarter's performance..."
-          />
         </div>
 
         {error && <div className="rounded-md bg-red-50 px-3 py-2 text-sm text-red-600">{error}</div>}
