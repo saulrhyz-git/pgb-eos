@@ -1,0 +1,149 @@
+// EOS Executive Dashboard - Prisma schema
+// Hierarchy: Year -> Business Unit -> Member Company -> Quarter
+// Every financial figure is split Internal / External.
+
+generator client {
+  provider = "prisma-client-js"
+}
+
+datasource db {
+  provider = "postgresql"
+  url      = env("DATABASE_URL")
+}
+
+enum Role {
+  GROUP_INTEGRATOR
+  BU_INTEGRATOR
+}
+
+model User {
+  id           String   @id @default(uuid())
+  email        String   @unique
+  passwordHash String
+  name         String
+  role         Role
+  createdAt    DateTime @default(now())
+
+  businessUnits UserBusinessUnit[]
+  actualEdits   QuarterActual[]    @relation("ActualEditedBy")
+
+  @@index([role])
+}
+
+// Join table: which BU(s) a BU Integrator is responsible for.
+model UserBusinessUnit {
+  userId        String
+  businessUnitId String
+  user         User         @relation(fields: [userId], references: [id], onDelete: Cascade)
+  businessUnit BusinessUnit @relation(fields: [businessUnitId], references: [id], onDelete: Cascade)
+
+  @@id([userId, businessUnitId])
+  @@index([businessUnitId])
+}
+
+model BusinessUnit {
+  id        String   @id @default(uuid())
+  name      String   @unique
+  createdAt DateTime @default(now())
+
+  companies Company[]
+  users     UserBusinessUnit[]
+}
+
+model Company {
+  id             String   @id @default(uuid())
+  name           String
+  businessUnitId String
+  createdAt      DateTime @default(now())
+
+  businessUnit  BusinessUnit    @relation(fields: [businessUnitId], references: [id], onDelete: Cascade)
+  annualTargets AnnualTarget[]
+  quarterTargets QuarterTarget[]
+  quarterActuals QuarterActual[]
+
+  @@unique([businessUnitId, name])
+  @@index([businessUnitId])
+}
+
+model Year {
+  id        String   @id @default(uuid())
+  year      Int      @unique
+  createdAt DateTime @default(now())
+
+  annualTargets  AnnualTarget[]
+  quarterTargets QuarterTarget[]
+  quarterActuals QuarterActual[]
+}
+
+// Annual target set once per company per year by the Group Integrator.
+model AnnualTarget {
+  id        String @id @default(uuid())
+  companyId String
+  yearId    String
+
+  revenueInternal     Decimal @default(0) @db.Decimal(14, 2)
+  revenueExternal     Decimal @default(0) @db.Decimal(14, 2)
+  collectionsInternal Decimal @default(0) @db.Decimal(14, 2)
+  collectionsExternal Decimal @default(0) @db.Decimal(14, 2)
+  expensesInternal    Decimal @default(0) @db.Decimal(14, 2)
+  expensesExternal    Decimal @default(0) @db.Decimal(14, 2)
+
+  updatedAt DateTime @updatedAt
+
+  company Company @relation(fields: [companyId], references: [id], onDelete: Cascade)
+  year    Year    @relation(fields: [yearId], references: [id], onDelete: Cascade)
+
+  @@unique([companyId, yearId])
+  @@index([yearId])
+}
+
+// Quarter target: how the annual goal is distributed across Q1-Q4. Set by Group Integrator.
+model QuarterTarget {
+  id        String @id @default(uuid())
+  companyId String
+  yearId    String
+  quarter   Int // 1-4
+
+  revenueInternal     Decimal @default(0) @db.Decimal(14, 2)
+  revenueExternal     Decimal @default(0) @db.Decimal(14, 2)
+  collectionsInternal Decimal @default(0) @db.Decimal(14, 2)
+  collectionsExternal Decimal @default(0) @db.Decimal(14, 2)
+  expensesInternal    Decimal @default(0) @db.Decimal(14, 2)
+  expensesExternal    Decimal @default(0) @db.Decimal(14, 2)
+
+  updatedAt DateTime @updatedAt
+
+  company Company @relation(fields: [companyId], references: [id], onDelete: Cascade)
+  year    Year    @relation(fields: [yearId], references: [id], onDelete: Cascade)
+
+  @@unique([companyId, yearId, quarter])
+  @@index([yearId, quarter])
+}
+
+// Quarter actual: entered by the BU Integrator (or overridden by Group Integrator).
+model QuarterActual {
+  id        String @id @default(uuid())
+  companyId String
+  yearId    String
+  quarter   Int // 1-4
+
+  revenueInternal     Decimal @default(0) @db.Decimal(14, 2)
+  revenueExternal     Decimal @default(0) @db.Decimal(14, 2)
+  collectionsInternal Decimal @default(0) @db.Decimal(14, 2)
+  collectionsExternal Decimal @default(0) @db.Decimal(14, 2)
+  expensesInternal    Decimal @default(0) @db.Decimal(14, 2)
+  expensesExternal    Decimal @default(0) @db.Decimal(14, 2)
+
+  remarks String @default("")
+
+  updatedById String?
+  updatedAt   DateTime @updatedAt
+
+  company   Company @relation(fields: [companyId], references: [id], onDelete: Cascade)
+  year      Year    @relation(fields: [yearId], references: [id], onDelete: Cascade)
+  updatedBy User?   @relation("ActualEditedBy", fields: [updatedById], references: [id])
+
+  @@unique([companyId, yearId, quarter])
+  @@index([yearId, quarter])
+  @@index([companyId])
+}
