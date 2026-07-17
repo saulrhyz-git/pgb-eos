@@ -182,6 +182,8 @@ router.delete("/users/:id", async (req, res) => {
 
   await prisma.$transaction([
     prisma.quarterActual.updateMany({ where: { updatedById: req.params.id }, data: { updatedById: null } }),
+    prisma.rock.updateMany({ where: { createdById: req.params.id }, data: { createdById: null } }),
+    prisma.rock.updateMany({ where: { updatedById: req.params.id }, data: { updatedById: null } }),
     prisma.user.delete({ where: { id: req.params.id } }),
   ]);
   res.status(204).send();

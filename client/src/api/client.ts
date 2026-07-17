@@ -5,6 +5,9 @@ import type {
   Company,
   DashboardResponse,
   Figures,
+  Goal,
+  Rock,
+  RockStatus,
   Role,
   SmtpSettings,
   Year,
@@ -161,4 +164,54 @@ export const api = {
   }) => request<SmtpSettings>("/settings/smtp", { method: "PUT", body: JSON.stringify(payload) }),
   testSmtpSettings: (to: string) =>
     request<{ ok: true }>("/settings/smtp/test", { method: "POST", body: JSON.stringify({ to }) }),
+
+  // ---------- Goals (Group Integrator / Superadmin manage; everyone reads) ----------
+  goals: () => request<Goal[]>("/goals"),
+  createGoal: (name: string, description?: string) =>
+    request<Goal>("/goals", { method: "POST", body: JSON.stringify({ name, description }) }),
+  updateGoal: (id: string, payload: Partial<{ name: string; description: string }>) =>
+    request<Goal>(`/goals/${id}`, { method: "PUT", body: JSON.stringify(payload) }),
+  deleteGoal: (id: string) => request<void>(`/goals/${id}`, { method: "DELETE" }),
+
+  // ---------- Rocks ----------
+  rocks: (params: {
+    yearId: string;
+    quarter?: number;
+    businessUnitId?: string;
+    companyId?: string;
+    goalId?: string;
+    status?: RockStatus;
+  }) => {
+    const qs = new URLSearchParams({ yearId: params.yearId });
+    if (params.quarter) qs.set("quarter", String(params.quarter));
+    if (params.businessUnitId) qs.set("businessUnitId", params.businessUnitId);
+    if (params.companyId) qs.set("companyId", params.companyId);
+    if (params.goalId) qs.set("goalId", params.goalId);
+    if (params.status) qs.set("status", params.status);
+    return request<Rock[]>(`/rocks?${qs.toString()}`);
+  },
+  createRock: (payload: {
+    companyId: string;
+    yearId: string;
+    quarter: number;
+    goalId?: string | null;
+    title: string;
+    description?: string;
+    ownerName?: string;
+    status?: RockStatus;
+    progressPct?: number;
+  }) => request<Rock>("/rocks", { method: "POST", body: JSON.stringify(payload) }),
+  updateRock: (
+    id: string,
+    payload: Partial<{
+      quarter: number;
+      goalId: string | null;
+      title: string;
+      description: string;
+      ownerName: string;
+      status: RockStatus;
+      progressPct: number;
+    }>
+  ) => request<Rock>(`/rocks/${id}`, { method: "PUT", body: JSON.stringify(payload) }),
+  deleteRock: (id: string) => request<void>(`/rocks/${id}`, { method: "DELETE" }),
 };

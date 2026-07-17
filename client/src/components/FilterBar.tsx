@@ -81,7 +81,7 @@ export default function FilterBar({ filters, onChange }: Props) {
           value={filters.businessUnitId}
           onChange={(e) => onChange({ ...filters, businessUnitId: e.target.value, companyId: "" })}
         >
-          {user?.role === "GROUP_INTEGRATOR" && <option value="">All Business Units</option>}
+          {(user?.role === "GROUP_INTEGRATOR" || user?.role === "SUPERADMIN") && <option value="">All Business Units</option>}
           {businessUnits.map((bu) => (
             <option key={bu.id} value={bu.id}>
               {bu.name}

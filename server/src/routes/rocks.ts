@@ -1,0 +1,147 @@
+import { Router } from "express";
+import { z } from "zod";
+import { prisma } from "../lib/prisma";
+import {
+  assertBusinessUnitAccess,
+  blockPendingPasswordChange,
+  requireAuth,
+  resolveCompanyBusinessUnit,
+  scopedBusinessUnitFilter,
+} from "../middleware/auth";
+
+// Rocks (EOS-style 90-day priorities) tracked per Company/Year/Quarter.
+// Read access follows the same Business-Unit scoping as the rest of the app;
+// write access follows the same pattern as Quarter Actuals — a BU Integrator
+// may only add/edit/delete Rocks for companies within their assigned
+// Business Unit(s), while Group Integrators/Superadmins can act on any Rock
+// within their own scope (which may itself be narrowed if a Group Integrator
+// has been assigned specific BUs).
+const router = Router();
+router.use(requireAuth);
+router.use(blockPendingPasswordChange);
+
+const statusEnum = z.enum(["PENDING", "ON_TRACK", "AT_RISK", "TARGET_MET"]);
+
+const rockInclude = {
+  company: { select: { id: true, name: true, businessUnitId: true } },
+  goal: { select: { id: true, name: true } },
+  createdBy: { select: { id: true, name: true } },
+  updatedBy: { select: { id: true, name: true } },
+} as const;
+
+router.get("/", async (req, res) => {
+  const { yearId, quarter, businessUnitId, companyId, goalId, status } = req.query as Record<string, string | undefined>;
+  if (!yearId) return res.status(400).json({ error: "yearId is required" });
+
+  const user = req.user!;
+  try {
+    if (companyId) assertBusinessUnitAccess(user, await resolveCompanyBusinessUnit(companyId));
+  } catch (err: any) {
+    return res.status(err.status || 500).json({ error: err.message });
+  }
+
+  const where: any = { yearId };
+  if (quarter) where.quarter = Number(quarter);
+  if (goalId) where.goalId = goalId;
+  if (status) {
+    const parsedStatus = statusEnum.safeParse(status);
+    if (!parsedStatus.success) return res.status(400).json({ error: "Invalid status filter" });
+    where.status = parsedStatus.data;
+  }
+  if (companyId) {
+    where.companyId = companyId;
+  } else {
+    try {
+      const buFilter = scopedBusinessUnitFilter(user, businessUnitId);
+      if (buFilter) where.company = { businessUnitId: buFilter };
+    } catch (err: any) {
+      return res.status(err.status || 500).json({ error: err.message });
+    }
+  }
+
+  const rocks = await prisma.rock.findMany({
+    where,
+    include: rockInclude,
+    orderBy: [{ quarter: "asc" }, { createdAt: "asc" }],
+  });
+  res.json(rocks);
+});
+
+const createSchema = z.object({
+  companyId: z.string().uuid(),
+  yearId: z.string().uuid(),
+  quarter: z.number().int().min(1).max(4),
+  goalId: z.string().uuid().optional().nullable(),
+  title: z.string().min(1).max(300),
+  description: z.string().max(4000).optional().default(""),
+  ownerName: z.string().max(200).optional().default(""),
+  status: statusEnum.optional().default("PENDING"),
+  progressPct: z.number().int().min(0).max(100).optional().default(0),
+});
+
+router.post("/", async (req, res) => {
+  const parsed = createSchema.safeParse(req.body);
+  if (!parsed.success) return res.status(400).json({ error: "Invalid rock payload", details: parsed.error.issues });
+
+  try {
+    const businessUnitId = await resolveCompanyBusinessUnit(parsed.data.companyId);
+    assertBusinessUnitAccess(req.user!, businessUnitId);
+  } catch (err: any) {
+    return res.status(err.status || 500).json({ error: err.message });
+  }
+
+  const rock = await prisma.rock.create({
+    data: { ...parsed.data, createdById: req.user!.id, updatedById: req.user!.id },
+    include: rockInclude,
+  });
+  res.status(201).json(rock);
+});
+
+const updateSchema = z.object({
+  quarter: z.number().int().min(1).max(4).optional(),
+  goalId: z.string().uuid().nullable().optional(),
+  title: z.string().min(1).max(300).optional(),
+  description: z.string().max(4000).optional(),
+  ownerName: z.string().max(200).optional(),
+  status: statusEnum.optional(),
+  progressPct: z.number().int().min(0).max(100).optional(),
+});
+
+router.put("/:id", async (req, res) => {
+  const parsed = updateSchema.safeParse(req.body);
+  if (!parsed.success) return res.status(400).json({ error: "Invalid rock payload", details: parsed.error.issues });
+
+  const existing = await prisma.rock.findUnique({ where: { id: req.params.id } });
+  if (!existing) return res.status(404).json({ error: "Rock not found" });
+
+  try {
+    const businessUnitId = await resolveCompanyBusinessUnit(existing.companyId);
+    assertBusinessUnitAccess(req.user!, businessUnitId);
+  } catch (err: any) {
+    return res.status(err.status || 500).json({ error: err.message });
+  }
+
+  const rock = await prisma.rock.update({
+    where: { id: req.params.id },
+    data: { ...parsed.data, updatedById: req.user!.id },
+    include: rockInclude,
+  });
+  res.json(rock);
+});
+
+router.delete("/:id", async (req, res) => {
+  const existing = await prisma.rock.findUnique({ where: { id: req.params.id } });
+  if (!existing) return res.status(404).json({ error: "Rock not found" });
+
+  try {
+    const businessUnitId = await resolveCompanyBusinessUnit(existing.companyId);
+    assertBusinessUnitAccess(req.user!, businessUnitId);
+  } catch (err: any) {
+    return res.status(err.status || 500).json({ error: err.message });
+  }
+
+  await prisma.rock.delete({ where: { id: req.params.id } });
+  res.status(204).send();
+});
+
+export default router;

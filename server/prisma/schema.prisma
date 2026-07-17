@@ -29,6 +29,8 @@ model User {
 
   businessUnits UserBusinessUnit[]
   actualEdits   QuarterActual[]    @relation("ActualEditedBy")
+  rockCreations Rock[]             @relation("RockCreatedBy")
+  rockEdits     Rock[]             @relation("RockUpdatedBy")
 
   @@index([role])
 }
@@ -77,6 +79,7 @@ model Company {
   annualTargets AnnualTarget[]
   quarterTargets QuarterTarget[]
   quarterActuals QuarterActual[]
+  rocks          Rock[]
 
   @@unique([businessUnitId, name])
   @@index([businessUnitId])
@@ -90,6 +93,7 @@ model Year {
   annualTargets  AnnualTarget[]
   quarterTargets QuarterTarget[]
   quarterActuals QuarterActual[]
+  rocks          Rock[]
 }
 
 // Annual target set once per company per year by the Group Integrator.
@@ -163,4 +167,55 @@ model QuarterActual {
   @@unique([companyId, yearId, quarter])
   @@index([yearId, quarter])
   @@index([companyId])
+}
+
+enum RockStatus {
+  PENDING
+  ON_TRACK
+  AT_RISK
+  TARGET_MET
+}
+
+// A strategic objective / theme that Rocks can be tied to. Managed by
+// Group Integrators and Superadmins; shared across the whole org (not
+// scoped to a Business Unit) so it can be used as a cross-cutting filter.
+model Goal {
+  id          String   @id @default(uuid())
+  name        String   @unique
+  description String   @default("")
+  createdAt   DateTime @default(now())
+
+  rocks Rock[]
+}
+
+// A "Rock" is an EOS-style 90-day priority owned by a Member Company for a
+// given Year/Quarter. Added and kept up to date by BU Integrators (scoped to
+// their assigned Business Unit(s)); Group Integrators/Superadmins can manage
+// any Rock within their own scope, same as Quarter Actuals.
+model Rock {
+  id          String     @id @default(uuid())
+  companyId   String
+  yearId      String
+  quarter     Int // 1-4
+  goalId      String?
+  title       String
+  description String     @default("")
+  ownerName   String     @default("")
+  status      RockStatus @default(PENDING)
+  progressPct Int        @default(0)
+
+  createdById String?
+  updatedById String?
+  createdAt   DateTime @default(now())
+  updatedAt   DateTime @updatedAt
+
+  company   Company @relation(fields: [companyId], references: [id], onDelete: Cascade)
+  year      Year    @relation(fields: [yearId], references: [id], onDelete: Cascade)
+  goal      Goal?   @relation(fields: [goalId], references: [id], onDelete: SetNull)
+  createdBy User?   @relation("RockCreatedBy", fields: [createdById], references: [id])
+  updatedBy User?   @relation("RockUpdatedBy", fields: [updatedById], references: [id])
+
+  @@index([companyId])
+  @@index([yearId, quarter])
+  @@index([goalId])
 }

@@ -119,3 +119,31 @@ export interface DashboardResponse {
   targetMatrix: TargetMatrixRow[];
   operationalGrid: OperationalGridRow[];
 }
+
+export type RockStatus = "PENDING" | "ON_TRACK" | "AT_RISK" | "TARGET_MET";
+
+export interface Goal {
+  id: string;
+  name: string;
+  description: string;
+  createdAt: string;
+}
+
+export interface Rock {
+  id: string;
+  companyId: string;
+  yearId: string;
+  quarter: number;
+  goalId: string | null;
+  title: string;
+  description: string;
+  ownerName: string;
+  status: RockStatus;
+  progressPct: number;
+  createdAt: string;
+  updatedAt: string;
+  company: { id: string; name: string; businessUnitId: string };
+  goal: { id: string; name: string } | null;
+  createdBy: { id: string; name: string } | null;
+  updatedBy: { id: string; name: string } | null;
+}
