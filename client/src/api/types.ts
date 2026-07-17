@@ -81,8 +81,6 @@ export interface ChartPoint {
 }
 
 export interface TargetMatrixRow {
-  companyId: string;
-  companyName: string;
   businessUnitId: string;
   businessUnitName: string;
   annualTarget: { revenueInternal: number; revenueExternal: number; total: number };
@@ -91,13 +89,11 @@ export interface TargetMatrixRow {
   varianceFromAnnual: number;
 }
 
-export interface OperationalGridRow {
+// A single Company's recognized actuals within its Business Unit — Companies
+// don't have their own target, only their parent Business Unit does.
+export interface OperationalGridCompanyRow {
   companyId: string;
   companyName: string;
-  businessUnitId: string;
-  businessUnitName: string;
-  annualTarget: number;
-  quarterTarget: number;
   quarterActual: {
     internal: number;
     external: number;
@@ -107,12 +103,24 @@ export interface OperationalGridRow {
     expensesInternal: number;
     expensesExternal: number;
   };
-  quarterAttainmentPct: number;
   ytdActual: number;
-  ytdVsAnnualPct: number;
   revenueRemarks: string;
   collectionsRemarks: string;
   expensesRemarks: string;
+}
+
+// A Business Unit's target vs its Companies' combined actuals, with each
+// contributing Company broken out underneath.
+export interface OperationalGridRow {
+  businessUnitId: string;
+  businessUnitName: string;
+  annualTarget: number;
+  quarterTarget: number;
+  quarterActual: number;
+  quarterAttainmentPct: number;
+  ytdActual: number;
+  ytdVsAnnualPct: number;
+  companies: OperationalGridCompanyRow[];
 }
 
 export interface DashboardResponse {

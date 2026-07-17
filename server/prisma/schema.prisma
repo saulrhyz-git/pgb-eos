@@ -68,6 +68,8 @@ model BusinessUnit {
   companies      Company[]
   users          UserBusinessUnit[]
   businessGoals  BusinessGoalBusinessUnit[]
+  annualTargets  AnnualTarget[]
+  quarterTargets QuarterTarget[]
 }
 
 model Company {
@@ -78,8 +80,6 @@ model Company {
   createdAt      DateTime @default(now())
 
   businessUnit  BusinessUnit    @relation(fields: [businessUnitId], references: [id], onDelete: Cascade)
-  annualTargets AnnualTarget[]
-  quarterTargets QuarterTarget[]
   quarterActuals QuarterActual[]
   rocks          Rock[]
 
@@ -98,11 +98,15 @@ model Year {
   rocks          Rock[]
 }
 
-// Annual target set once per company per year by the Group Integrator.
+// Annual target: set once per Business Unit per year by the Group Integrator
+// (or a BU Integrator scoped to their own BU). Actuals are recognized per
+// Company (see QuarterActual below) and roll up to compare against this
+// Business-Unit-level target — individual companies do not have their own
+// target.
 model AnnualTarget {
-  id        String @id @default(uuid())
-  companyId String
-  yearId    String
+  id             String @id @default(uuid())
+  businessUnitId String
+  yearId         String
 
   revenueInternal     Decimal @default(0) @db.Decimal(14, 2)
   revenueExternal     Decimal @default(0) @db.Decimal(14, 2)
@@ -113,19 +117,20 @@ model AnnualTarget {
 
   updatedAt DateTime @updatedAt
 
-  company Company @relation(fields: [companyId], references: [id], onDelete: Cascade)
-  year    Year    @relation(fields: [yearId], references: [id], onDelete: Cascade)
+  businessUnit BusinessUnit @relation(fields: [businessUnitId], references: [id], onDelete: Cascade)
+  year         Year         @relation(fields: [yearId], references: [id], onDelete: Cascade)
 
-  @@unique([companyId, yearId])
+  @@unique([businessUnitId, yearId])
   @@index([yearId])
 }
 
-// Quarter target: how the annual goal is distributed across Q1-Q4. Set by Group Integrator.
+// Quarter target: how a Business Unit's annual goal is distributed across
+// Q1-Q4. Set by Group Integrator (or a BU Integrator scoped to their own BU).
 model QuarterTarget {
-  id        String @id @default(uuid())
-  companyId String
-  yearId    String
-  quarter   Int // 1-4
+  id             String @id @default(uuid())
+  businessUnitId String
+  yearId         String
+  quarter        Int // 1-4
 
   revenueInternal     Decimal @default(0) @db.Decimal(14, 2)
   revenueExternal     Decimal @default(0) @db.Decimal(14, 2)
@@ -136,10 +141,10 @@ model QuarterTarget {
 
   updatedAt DateTime @updatedAt
 
-  company Company @relation(fields: [companyId], references: [id], onDelete: Cascade)
-  year    Year    @relation(fields: [yearId], references: [id], onDelete: Cascade)
+  businessUnit BusinessUnit @relation(fields: [businessUnitId], references: [id], onDelete: Cascade)
+  year         Year         @relation(fields: [yearId], references: [id], onDelete: Cascade)
 
-  @@unique([companyId, yearId, quarter])
+  @@unique([businessUnitId, yearId, quarter])
   @@index([yearId, quarter])
 }
 

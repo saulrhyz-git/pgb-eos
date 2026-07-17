@@ -3,7 +3,9 @@
 Full-stack dashboard with two views: **Revenue** (Revenue, Collections, and
 Expenses — each split Internal / External, in Philippine Peso, each with its
 own Remarks field — across a Year → Business Unit → Member Company → Quarter
-hierarchy) and **Rocks** (EOS-style 90-day priorities tracked per
+hierarchy; Annual and Quarter **targets are set once per Business Unit**,
+while **actuals are recognized per Company** and roll up to compare against
+their Business Unit's target) and **Rocks** (EOS-style 90-day priorities tracked per
 Company/Year/Quarter, each with its own Remarks field, tagged against a
 shared Business Goals taxonomy that Superadmin/Group Integrator can assign
 to one or more Business Units, or leave global). Role-based access is
@@ -74,10 +76,17 @@ real data — the app starts completely empty.
   on create and editable afterward), `Year`, `AnnualTarget`, `QuarterTarget`,
   `QuarterActual`, `SmtpSettings` (singleton row), `BusinessGoal`,
   `BusinessGoalBusinessUnit` (many-to-many BU assignment for goals), and
-  `Rock` — every financial model splits Revenue/Collections/Expenses into
-  Internal/External columns, with compound-unique constraints
-  (`companyId+yearId[+quarter]`) so aggregation queries stay correct and
-  indexed. `QuarterActual` carries three independent remarks fields —
+  `Rock`. **`AnnualTarget` and `QuarterTarget` belong to a `BusinessUnit`**
+  (`@@unique([businessUnitId, yearId])` / `@@unique([businessUnitId, yearId,
+  quarter])`) — a Business Unit has exactly one annual number and one number
+  per quarter, full stop. **`QuarterActual` still belongs to a `Company`**
+  (`@@unique([companyId, yearId, quarter])`) — each Company recognizes its
+  own Revenue/Collections/Expenses per quarter, and those get summed across
+  every Company in a Business Unit to compare against that BU's target. This
+  is intentional: individual Companies don't have targets of their own.
+  Every financial model splits Revenue/Collections/Expenses into
+  Internal/External columns. `QuarterActual` carries three independent
+  remarks fields —
   `revenueRemarks`, `collectionsRemarks`, `expensesRemarks` — instead of one
   shared remarks field. A `Rock` belongs to a Company + Year + Quarter,
   optionally tags a `BusinessGoal`, has its own `remarks` field, and carries
@@ -105,23 +114,27 @@ real data — the app starts completely empty.
   a `POST /api/auth/change-password` flow that's enforced whenever a user's
   `mustChangePassword` flag is set (e.g. the seeded superadmin's first
   login, or any account an admin resets), CRUD for Years/BUs/Companies
-  (Group Integrator or Superadmin), target upserts (Group Integrator,
-  Superadmin, or a BU Integrator scoped to their own Business Unit(s)),
-  quarterly actuals + remarks upserts (BU Integrator, scoped to their
-  assigned BUs), a superadmin-only `server/src/routes/admin.ts` with full
-  CRUD over Users/Companies/Business Units, a superadmin-only
-  `server/src/routes/settings.ts` for SMTP configuration + test-send
-  (via `nodemailer`), `server/src/routes/businessGoals.ts` (Business Goal
-  CRUD — read is open to everyone, write is Group Integrator + Superadmin,
-  deliberately *not* folded into the superadmin-only admin router since
-  Group Integrators need it too; create/update validate any submitted
-  `businessUnitIds` against the caller's own BU access before assigning
-  them), `server/src/routes/rocks.ts` (Rock CRUD, BU-scoped the same way as
-  actuals/targets, plus `assertBusinessGoalUsable` which rejects tagging a
-  Rock with a Business Goal that's scoped to a different Business Unit than
-  the Rock's company), and a single `/api/dashboard` endpoint that aggregates
-  company-level data up to BU or Group level on the fly (KPIs, chart series,
-  target distribution matrix, operational grid).
+  (Group Integrator or Superadmin), `server/src/routes/targets.ts` (Annual/
+  Quarter target upserts keyed by `businessUnitId` + `yearId[+quarter]` —
+  Group Integrator, Superadmin, or a BU Integrator scoped to their own
+  Business Unit(s)), `server/src/routes/actuals.ts` (quarterly actuals +
+  per-category remarks upserts keyed by `companyId` + `yearId` + `quarter`,
+  BU Integrator scoped to their assigned BUs), a superadmin-only
+  `server/src/routes/admin.ts` with full CRUD over Users/Companies/Business
+  Units, a superadmin-only `server/src/routes/settings.ts` for SMTP
+  configuration + test-send (via `nodemailer`), `server/src/routes/businessGoals.ts`
+  (Business Goal CRUD — read is open to everyone, write is Group Integrator +
+  Superadmin, deliberately *not* folded into the superadmin-only admin
+  router since Group Integrators need it too; create/update validate any
+  submitted `businessUnitIds` against the caller's own BU access before
+  assigning them), `server/src/routes/rocks.ts` (Rock CRUD, BU-scoped the
+  same way as actuals/targets, plus `assertBusinessGoalUsable` which rejects
+  tagging a Rock with a Business Goal that's scoped to a different Business
+  Unit than the Rock's company), and a single `/api/dashboard` endpoint that
+  fetches targets per Business Unit and actuals per Company, then aggregates
+  both up to whatever scope (BU, Group, or a single-Company drill-down) the
+  request asks for (KPIs, chart series, per-BU target distribution matrix,
+  per-BU operational grid with nested per-Company actuals).
 - **RBAC**: `assertBusinessUnitAccess` / `scopedBusinessUnitFilter` in
   `server/src/middleware/auth.ts` enforce that a scoped user (a BU Integrator,
   or a Group Integrator that's been assigned specific BUs) can never read or
@@ -134,10 +147,15 @@ real data — the app starts completely empty.
 - **Frontend** (`client/src`): a **Revenue** page (`pages/Dashboard.tsx`,
   renamed in the nav from "Dashboard") with the global Year/BU/Company/Quarter
   filter bar, KPI cards with green/red attainment coloring, a Recharts
-  bar+line combo chart with an Internal/External breakdown toggle, the Target
-  Distribution Matrix, and the expandable Operational Grid with three
+  bar+line combo chart with an Internal/External breakdown toggle, a Target
+  Distribution Matrix with one row per Business Unit (Annual vs each
+  Quarter's target), and an Operational Grid where each row is a Business
+  Unit (target vs its Companies' combined actual, attainment %, YTD)
+  expandable to show every contributing Company's own actuals plus three
   independently inline-editable Remarks fields (Revenue/Collections/
-  Expenses) per company/quarter; a **Rocks** page (`pages/Rocks.tsx`) with
+  Expenses); `pages/TargetConfig.tsx` ("Target Setup" in the nav) sets
+  Annual/Quarter targets by Year + Business Unit only — no Company picker,
+  since targets don't belong to a Company; a **Rocks** page (`pages/Rocks.tsx`) with
   its own Year/Quarter/BU/Company/Business Goal filter bar, five summary
   cards (Total Rocks, Target Met, On Track, At Risk / Pending, Avg
   Progress %) computed client-side from the filtered list, a "Manage
@@ -171,6 +189,25 @@ outbound mail server (host, port, TLS, credentials, from address/name) and
 send a test email. Settings are stored in the `SmtpSettings` table; no
 notifications are auto-triggered yet, this wires up the configuration and
 test-send capability for future use.
+
+## Troubleshooting
+
+**Dashboard is stuck on "Loading dashboard..." after login, nothing renders,
+no error message.** This means the `/api/dashboard` request never got a
+response at all (check your browser's Network tab: the request will show as
+still "pending"/stuck rather than a completed request with a status code).
+The near-certain cause is that the backend threw an error while querying the
+database — most commonly because `server/prisma/schema.prisma` has changed
+since you last ran migrations (e.g. a new field/table was added in a recent
+update to this app) but you haven't re-run `npm run prisma:migrate` in
+`server/`, so the live database is missing a column/table the code now
+expects. Fix: stop the backend, run `npm run prisma:generate` then
+`npm run prisma:migrate` inside `server/`, then `npm run dev` again — check
+the backend terminal for the actual Prisma error if it still hangs. As of
+this update the app also depends on `express-async-errors` (added to
+`server/package.json` — run `npm install` in `server/` if you haven't since
+this change) specifically so that this class of bug shows up as a proper
+error message on screen instead of an infinite spinner going forward.
 
 ## Note on this build
 
@@ -239,3 +276,28 @@ also a schema change requiring `npm run prisma:migrate`. Worth checking by
 hand: adding a company with a description saves and displays it in the Admin
 Companies table, leaving it blank works fine (defaults to empty string), and
 editing a company's description in place persists after refresh.
+
+**Targets moved from Company to Business Unit** — this is the biggest
+structural change so far and is unverified end-to-end. `AnnualTarget` and
+`QuarterTarget` dropped their `companyId` column entirely in favor of
+`businessUnitId`; this is not an additive migration, it changes what the
+unique key means, so `npm run prisma:migrate` will want to drop and recreate
+those two tables (any previously entered per-company target data does not
+carry over — it has to be re-entered at the Business Unit level, which fits
+this project's existing pattern of treating pre-launch data as disposable).
+`QuarterActual` (recognized/reported actuals) is untouched and still belongs
+to a Company. Worth checking by hand: Target Setup no longer shows a Company
+picker for Annual/Quarter Target (only Year + Business Unit), and saving a
+target there is visible immediately; the Revenue dashboard's Target
+Distribution Matrix now has one row per Business Unit instead of per
+Company; the Operational Grid's top-level rows are now Business Units
+(showing that BU's target vs the combined actual of every Company inside
+it, with attainment % and YTD), and expanding a Business Unit row shows each
+of its Companies' own actuals and per-category Remarks nested underneath,
+still inline-editable exactly as before; a Business Unit with no Companies
+yet still shows up (with zero actual) if it has a target set; drilling the
+dashboard down to a single Company (via the Company filter) still shows that
+Company's *parent Business Unit's* full target, not a per-company slice of
+it — only that Company's own actual changes, which is the intended "each
+Company's contribution toward the shared BU target" view, not a per-Company
+attainment %.

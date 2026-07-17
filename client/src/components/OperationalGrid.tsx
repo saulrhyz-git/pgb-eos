@@ -1,6 +1,6 @@
 import { Fragment, useState } from "react";
 import { ChevronDown, ChevronRight, Loader2, MessageSquare } from "lucide-react";
-import type { OperationalGridRow } from "../api/types";
+import type { OperationalGridCompanyRow, OperationalGridRow } from "../api/types";
 import { api } from "../api/client";
 import { attainmentColor, formatCurrency, formatPct } from "../utils/format";
 
@@ -18,10 +18,10 @@ export default function OperationalGrid({ rows, yearId, quarter, onRemarksSaved 
   const [drafts, setDrafts] = useState<Record<string, string>>({});
   const [saving, setSaving] = useState<Record<string, boolean>>({});
 
-  function toggle(companyId: string) {
+  function toggle(businessUnitId: string) {
     setExpanded((prev) => {
       const next = new Set(prev);
-      next.has(companyId) ? next.delete(companyId) : next.add(companyId);
+      next.has(businessUnitId) ? next.delete(businessUnitId) : next.add(businessUnitId);
       return next;
     });
   }
@@ -37,7 +37,7 @@ export default function OperationalGrid({ rows, yearId, quarter, onRemarksSaved 
     }
   }
 
-  function RemarksInput({ row, field, label }: { row: OperationalGridRow; field: RemarksField; label: string }) {
+  function RemarksInput({ row, field, label }: { row: OperationalGridCompanyRow; field: RemarksField; label: string }) {
     const key = `${row.companyId}:${field}`;
     const draft = drafts[key] ?? row[field];
     return (
@@ -62,12 +62,16 @@ export default function OperationalGrid({ rows, yearId, quarter, onRemarksSaved 
   return (
     <div className="rounded-lg border border-slate-200 bg-white p-4 shadow-sm">
       <h3 className="mb-4 text-sm font-semibold text-slate-700">Business Unit Operational Grid</h3>
+      <p className="mb-4 text-xs text-slate-400">
+        Annual/Quarter targets are set per Business Unit. Expand a Business Unit to see each Company's own recognized
+        actuals and remarks, which roll up into the totals below.
+      </p>
       <div className="overflow-x-auto">
         <table className="w-full min-w-[880px] text-sm">
           <thead>
             <tr className="border-b border-slate-200 text-left text-xs font-medium uppercase text-slate-400">
               <th className="py-2 pr-3 w-6"></th>
-              <th className="py-2 pr-3">Company</th>
+              <th className="py-2 pr-3">Business Unit</th>
               <th className="py-2 pr-3 text-right">Annual Target</th>
               <th className="py-2 pr-3 text-right">Q{quarter} Target</th>
               <th className="py-2 pr-3 text-right">Q{quarter} Actual</th>
@@ -78,25 +82,25 @@ export default function OperationalGrid({ rows, yearId, quarter, onRemarksSaved 
           </thead>
           <tbody>
             {rows.map((row) => {
-              const isOpen = expanded.has(row.companyId);
-              const hasRemarks = Boolean(row.revenueRemarks || row.collectionsRemarks || row.expensesRemarks);
+              const isOpen = expanded.has(row.businessUnitId);
+              const hasRemarks = row.companies.some((c) => c.revenueRemarks || c.collectionsRemarks || c.expensesRemarks);
               return (
-                <Fragment key={row.companyId}>
+                <Fragment key={row.businessUnitId}>
                   <tr className="border-b border-slate-100">
                     <td className="py-2 pr-3">
                       <button
-                        onClick={() => toggle(row.companyId)}
+                        onClick={() => toggle(row.businessUnitId)}
                         className="flex items-center gap-1 text-slate-400 hover:text-slate-700"
-                        title={hasRemarks ? "Has remarks" : "Expand for detail & remarks"}
+                        title={hasRemarks ? "Has remarks" : "Expand for per-company detail & remarks"}
                       >
                         {isOpen ? <ChevronDown className="h-4 w-4" /> : <ChevronRight className="h-4 w-4" />}
                         {hasRemarks && !isOpen && <MessageSquare className="h-3 w-3 text-brand-500" />}
                       </button>
                     </td>
-                    <td className="py-2 pr-3 font-medium text-slate-700">{row.companyName}</td>
+                    <td className="py-2 pr-3 font-medium text-slate-700">{row.businessUnitName}</td>
                     <td className="py-2 pr-3 text-right">{formatCurrency(row.annualTarget)}</td>
                     <td className="py-2 pr-3 text-right">{formatCurrency(row.quarterTarget)}</td>
-                    <td className="py-2 pr-3 text-right">{formatCurrency(row.quarterActual.total)}</td>
+                    <td className="py-2 pr-3 text-right">{formatCurrency(row.quarterActual)}</td>
                     <td className={`py-2 pr-3 text-right font-semibold ${attainmentColor(row.quarterAttainmentPct)}`}>
                       {formatPct(row.quarterAttainmentPct)}
                     </td>
@@ -109,36 +113,50 @@ export default function OperationalGrid({ rows, yearId, quarter, onRemarksSaved 
                     <tr className="border-b border-slate-100 bg-slate-50/60">
                       <td></td>
                       <td colSpan={7} className="py-3 pr-3">
-                        <div className="mb-4 grid grid-cols-2 gap-x-8 gap-y-1 text-xs text-slate-600 sm:grid-cols-4">
-                          <div>
-                            <span className="font-medium text-slate-500">Revenue Internal:</span>{" "}
-                            {formatCurrency(row.quarterActual.internal)}
-                          </div>
-                          <div>
-                            <span className="font-medium text-slate-500">Revenue External:</span>{" "}
-                            {formatCurrency(row.quarterActual.external)}
-                          </div>
-                          <div>
-                            <span className="font-medium text-slate-500">Collections Internal:</span>{" "}
-                            {formatCurrency(row.quarterActual.collectionsInternal)}
-                          </div>
-                          <div>
-                            <span className="font-medium text-slate-500">Collections External:</span>{" "}
-                            {formatCurrency(row.quarterActual.collectionsExternal)}
-                          </div>
-                          <div>
-                            <span className="font-medium text-slate-500">Expenses Internal:</span>{" "}
-                            {formatCurrency(row.quarterActual.expensesInternal)}
-                          </div>
-                          <div>
-                            <span className="font-medium text-slate-500">Expenses External:</span>{" "}
-                            {formatCurrency(row.quarterActual.expensesExternal)}
-                          </div>
-                        </div>
-                        <div className="grid grid-cols-1 gap-3 sm:grid-cols-3">
-                          <RemarksInput row={row} field="revenueRemarks" label="Revenue Remarks" />
-                          <RemarksInput row={row} field="collectionsRemarks" label="Collections Remarks" />
-                          <RemarksInput row={row} field="expensesRemarks" label="Expenses Remarks" />
+                        {row.companies.length === 0 && (
+                          <div className="text-xs text-slate-400">No companies in this Business Unit yet.</div>
+                        )}
+                        <div className="flex flex-col gap-4">
+                          {row.companies.map((c) => (
+                            <div key={c.companyId} className="rounded-md border border-slate-200 bg-white p-3">
+                              <div className="mb-2 text-xs font-semibold text-slate-600">{c.companyName}</div>
+                              <div className="mb-3 grid grid-cols-2 gap-x-8 gap-y-1 text-xs text-slate-600 sm:grid-cols-4">
+                                <div>
+                                  <span className="font-medium text-slate-500">Revenue Internal:</span>{" "}
+                                  {formatCurrency(c.quarterActual.internal)}
+                                </div>
+                                <div>
+                                  <span className="font-medium text-slate-500">Revenue External:</span>{" "}
+                                  {formatCurrency(c.quarterActual.external)}
+                                </div>
+                                <div>
+                                  <span className="font-medium text-slate-500">Collections Internal:</span>{" "}
+                                  {formatCurrency(c.quarterActual.collectionsInternal)}
+                                </div>
+                                <div>
+                                  <span className="font-medium text-slate-500">Collections External:</span>{" "}
+                                  {formatCurrency(c.quarterActual.collectionsExternal)}
+                                </div>
+                                <div>
+                                  <span className="font-medium text-slate-500">Expenses Internal:</span>{" "}
+                                  {formatCurrency(c.quarterActual.expensesInternal)}
+                                </div>
+                                <div>
+                                  <span className="font-medium text-slate-500">Expenses External:</span>{" "}
+                                  {formatCurrency(c.quarterActual.expensesExternal)}
+                                </div>
+                                <div>
+                                  <span className="font-medium text-slate-500">YTD Actual:</span>{" "}
+                                  {formatCurrency(c.ytdActual)}
+                                </div>
+                              </div>
+                              <div className="grid grid-cols-1 gap-3 sm:grid-cols-3">
+                                <RemarksInput row={c} field="revenueRemarks" label="Revenue Remarks" />
+                                <RemarksInput row={c} field="collectionsRemarks" label="Collections Remarks" />
+                                <RemarksInput row={c} field="expensesRemarks" label="Expenses Remarks" />
+                              </div>
+                            </div>
+                          ))}
                         </div>
                       </td>
                     </tr>
@@ -149,7 +167,7 @@ export default function OperationalGrid({ rows, yearId, quarter, onRemarksSaved 
             {rows.length === 0 && (
               <tr>
                 <td colSpan={8} className="py-6 text-center text-slate-400">
-                  No company data for this scope yet.
+                  No Business Unit data for this scope yet.
                 </td>
               </tr>
             )}

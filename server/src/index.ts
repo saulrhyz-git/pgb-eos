@@ -1,4 +1,13 @@
 import "dotenv/config";
+// Must be imported before any routers are created: it patches Express so
+// that a rejected promise / thrown error inside an `async (req, res) => {}`
+// route handler is forwarded to the error-handling middleware below, instead
+// of becoming an unhandled rejection that leaves the request hanging forever
+// (which is what happened here: an out-of-sync Prisma Client/DB threw inside
+// an async handler and, without this patch, Express 4 never sent a response
+// at all — the client's fetch just sat there, showing "Loading..." forever
+// instead of a clean error).
+import "express-async-errors";
 import express from "express";
 import cors from "cors";
 import authRoutes from "./routes/auth";

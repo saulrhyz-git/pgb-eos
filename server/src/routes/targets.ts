@@ -1,13 +1,7 @@
 import { Router } from "express";
 import { z } from "zod";
 import { prisma } from "../lib/prisma";
-import {
-  assertBusinessUnitAccess,
-  blockPendingPasswordChange,
-  requireAuth,
-  resolveCompanyBusinessUnit,
-  scopedBusinessUnitFilter,
-} from "../middleware/auth";
+import { assertBusinessUnitAccess, blockPendingPasswordChange, requireAuth, scopedBusinessUnitFilter } from "../middleware/auth";
 
 const router = Router();
 router.use(requireAuth);
@@ -22,92 +16,72 @@ const figuresSchema = z.object({
   expensesExternal: z.number().min(0).default(0),
 });
 
-// ---------- Annual Targets (Group Integrator / Superadmin, or a BU
-// Integrator scoped to their own assigned Business Unit(s)) ----------
+// ---------- Annual Targets ----------
+// Targets are set once per Business Unit per Year (Group Integrator /
+// Superadmin, or a BU Integrator scoped to their own assigned Business
+// Unit(s)). Actuals are recognized per Company and roll up to compare
+// against these Business-Unit-level numbers — see routes/actuals.ts and
+// routes/dashboard.ts.
 
 router.get("/annual", async (req, res) => {
-  const { yearId, businessUnitId, companyId } = req.query as Record<string, string | undefined>;
+  const { yearId, businessUnitId } = req.query as Record<string, string | undefined>;
   if (!yearId) return res.status(400).json({ error: "yearId is required" });
 
-  const user = req.user!;
+  const where: any = { yearId };
   try {
-    if (companyId) assertBusinessUnitAccess(user, await resolveCompanyBusinessUnit(companyId));
+    const buFilter = scopedBusinessUnitFilter(req.user!, businessUnitId);
+    if (buFilter) where.businessUnitId = buFilter;
   } catch (err: any) {
     return res.status(err.status || 500).json({ error: err.message });
   }
 
-  const where: any = { yearId };
-  if (companyId) {
-    where.companyId = companyId;
-  } else {
-    try {
-      const buFilter = scopedBusinessUnitFilter(user, businessUnitId);
-      if (buFilter) where.company = { businessUnitId: buFilter };
-    } catch (err: any) {
-      return res.status(err.status || 500).json({ error: err.message });
-    }
-  }
-
   const targets = await prisma.annualTarget.findMany({
     where,
-    include: { company: { select: { id: true, name: true, businessUnitId: true } } },
+    include: { businessUnit: { select: { id: true, name: true } } },
   });
   res.json(targets);
 });
 
 router.put("/annual", async (req, res) => {
   const parsed = z
-    .object({ companyId: z.string().uuid(), yearId: z.string().uuid() })
+    .object({ businessUnitId: z.string().uuid(), yearId: z.string().uuid() })
     .merge(figuresSchema)
     .safeParse(req.body);
   if (!parsed.success) return res.status(400).json({ error: "Invalid annual target payload", details: parsed.error.issues });
 
   try {
-    const businessUnitId = await resolveCompanyBusinessUnit(parsed.data.companyId);
-    assertBusinessUnitAccess(req.user!, businessUnitId);
+    assertBusinessUnitAccess(req.user!, parsed.data.businessUnitId);
   } catch (err: any) {
     return res.status(err.status || 500).json({ error: err.message });
   }
 
-  const { companyId, yearId, ...figures } = parsed.data;
+  const { businessUnitId, yearId, ...figures } = parsed.data;
   const target = await prisma.annualTarget.upsert({
-    where: { companyId_yearId: { companyId, yearId } },
+    where: { businessUnitId_yearId: { businessUnitId, yearId } },
     update: figures,
-    create: { companyId, yearId, ...figures },
+    create: { businessUnitId, yearId, ...figures },
   });
   res.json(target);
 });
 
-// ---------- Quarter Targets (Group Integrator / Superadmin, or a BU
-// Integrator scoped to their own assigned Business Unit(s)) ----------
+// ---------- Quarter Targets ----------
 
 router.get("/quarter", async (req, res) => {
-  const { yearId, quarter, businessUnitId, companyId } = req.query as Record<string, string | undefined>;
+  const { yearId, quarter, businessUnitId } = req.query as Record<string, string | undefined>;
   if (!yearId) return res.status(400).json({ error: "yearId is required" });
 
-  const user = req.user!;
+  const where: any = { yearId };
+  if (quarter) where.quarter = Number(quarter);
   try {
-    if (companyId) assertBusinessUnitAccess(user, await resolveCompanyBusinessUnit(companyId));
+    const buFilter = scopedBusinessUnitFilter(req.user!, businessUnitId);
+    if (buFilter) where.businessUnitId = buFilter;
   } catch (err: any) {
     return res.status(err.status || 500).json({ error: err.message });
   }
 
-  const where: any = { yearId };
-  if (quarter) where.quarter = Number(quarter);
-  if (companyId) {
-    where.companyId = companyId;
-  } else {
-    try {
-      const buFilter = scopedBusinessUnitFilter(user, businessUnitId);
-      if (buFilter) where.company = { businessUnitId: buFilter };
-    } catch (err: any) {
-      return res.status(err.status || 500).json({ error: err.message });
-    }
-  }
-
   const targets = await prisma.quarterTarget.findMany({
     where,
-    include: { company: { select: { id: true, name: true, businessUnitId: true } } },
+    include: { businessUnit: { select: { id: true, name: true } } },
     orderBy: { quarter: "asc" },
   });
   res.json(targets);
@@ -115,23 +89,22 @@ router.get("/quarter", async (req, res) => {
 
 router.put("/quarter", async (req, res) => {
   const parsed = z
-    .object({ companyId: z.string().uuid(), yearId: z.string().uuid(), quarter: z.number().int().min(1).max(4) })
+    .object({ businessUnitId: z.string().uuid(), yearId: z.string().uuid(), quarter: z.number().int().min(1).max(4) })
     .merge(figuresSchema)
     .safeParse(req.body);
   if (!parsed.success) return res.status(400).json({ error: "Invalid quarter target payload", details: parsed.error.issues });
 
   try {
-    const businessUnitId = await resolveCompanyBusinessUnit(parsed.data.companyId);
-    assertBusinessUnitAccess(req.user!, businessUnitId);
+    assertBusinessUnitAccess(req.user!, parsed.data.businessUnitId);
   } catch (err: any) {
     return res.status(err.status || 500).json({ error: err.message });
   }
 
-  const { companyId, yearId, quarter, ...figures } = parsed.data;
+  const { businessUnitId, yearId, quarter, ...figures } = parsed.data;
   const target = await prisma.quarterTarget.upsert({
-    where: { companyId_yearId_quarter: { companyId, yearId, quarter } },
+    where: { businessUnitId_yearId_quarter: { businessUnitId, yearId, quarter } },
     update: figures,
-    create: { companyId, yearId, quarter, ...figures },
+    create: { businessUnitId, yearId, quarter, ...figures },
   });
   res.json(target);
 });

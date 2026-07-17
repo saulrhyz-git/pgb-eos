@@ -90,7 +90,7 @@ export const api = {
     if (businessUnitId) qs.set("businessUnitId", businessUnitId);
     return request<any[]>(`/targets/annual?${qs.toString()}`);
   },
-  putAnnualTarget: (payload: { companyId: string; yearId: string } & Figures) =>
+  putAnnualTarget: (payload: { businessUnitId: string; yearId: string } & Figures) =>
     request<any>("/targets/annual", { method: "PUT", body: JSON.stringify(payload) }),
 
   quarterTargets: (yearId: string, quarter?: number, businessUnitId?: string) => {
@@ -99,7 +99,7 @@ export const api = {
     if (businessUnitId) qs.set("businessUnitId", businessUnitId);
     return request<any[]>(`/targets/quarter?${qs.toString()}`);
   },
-  putQuarterTarget: (payload: { companyId: string; yearId: string; quarter: number } & Figures) =>
+  putQuarterTarget: (payload: { businessUnitId: string; yearId: string; quarter: number } & Figures) =>
     request<any>("/targets/quarter", { method: "PUT", body: JSON.stringify(payload) }),
 
   actuals: (params: { yearId: string; quarter?: number; businessUnitId?: string; companyId?: string }) => {

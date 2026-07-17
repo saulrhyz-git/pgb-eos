@@ -40,7 +40,6 @@ export default function TargetConfig() {
   const [yearId, setYearId] = useState("");
   const [quarter, setQuarter] = useState(1);
   const [businessUnitId, setBusinessUnitId] = useState("");
-  const [companyId, setCompanyId] = useState("");
   const [form, setForm] = useState(emptyForm);
 
   const [newYear, setNewYear] = useState(new Date().getFullYear() + 1);
@@ -73,18 +72,17 @@ export default function TargetConfig() {
 
   useEffect(() => {
     if (!businessUnitId) return;
-    api.companies(businessUnitId).then((cs) => {
-      setCompanies(cs);
-      setCompanyId(cs[0]?.id || "");
-    });
+    api.companies(businessUnitId).then(setCompanies);
   }, [businessUnitId]);
 
+  // Annual/Quarter targets belong to the Business Unit itself, so there's at
+  // most one existing row for the selected Year(+Quarter)/Business Unit.
   useEffect(() => {
-    if (!yearId || !companyId) return;
+    if (!yearId || !businessUnitId) return;
     setSaved(false);
     const loader = mode === "annual" ? api.annualTargets(yearId, businessUnitId) : api.quarterTargets(yearId, quarter, businessUnitId);
     loader.then((rows: any[]) => {
-      const existing = rows.find((r) => r.companyId === companyId);
+      const existing = rows[0];
       if (existing) {
         setForm({
           revenueInternal: String(existing.revenueInternal ?? ""),
@@ -98,7 +96,7 @@ export default function TargetConfig() {
         setForm(emptyForm);
       }
     });
-  }, [mode, yearId, quarter, companyId, businessUnitId]);
+  }, [mode, yearId, quarter, businessUnitId]);
 
   async function handleSubmit(e: FormEvent) {
     e.preventDefault();
@@ -115,9 +113,9 @@ export default function TargetConfig() {
         expensesExternal: Number(form.expensesExternal) || 0,
       };
       if (mode === "annual") {
-        await api.putAnnualTarget({ companyId, yearId, ...figures });
+        await api.putAnnualTarget({ businessUnitId, yearId, ...figures });
       } else {
-        await api.putQuarterTarget({ companyId, yearId, quarter, ...figures });
+        await api.putQuarterTarget({ businessUnitId, yearId, quarter, ...figures });
       }
       setSaved(true);
     } catch (err: any) {
@@ -154,8 +152,8 @@ export default function TargetConfig() {
         <h2 className="mb-1 text-lg font-semibold text-slate-800">Target Configuration</h2>
         <p className="text-sm text-slate-500">
           {canManageStructure
-            ? "Set up Annual and Quarterly targets at the start of a cycle, and manage Years / Business Units / Companies."
-            : "Set up Annual and Quarterly targets for the companies in your assigned Business Unit(s)."}
+            ? "Set up Annual and Quarterly targets per Business Unit at the start of a cycle, and manage Years / Business Units / Companies."
+            : "Set up Annual and Quarterly targets for your assigned Business Unit(s). Companies still recognize their own actuals in Data Entry — those roll up to compare against the target set here."}
         </p>
       </div>
 
@@ -232,7 +230,7 @@ export default function TargetConfig() {
           </button>
         </div>
 
-        <div className="grid grid-cols-2 gap-4 sm:grid-cols-4">
+        <div className="grid grid-cols-2 gap-4 sm:grid-cols-3">
           <div className="flex flex-col gap-1">
             <label className="text-xs font-medium text-slate-500">Year</label>
             <select className="rounded-md border border-slate-300 px-3 py-2 text-sm" value={yearId} onChange={(e) => setYearId(e.target.value)}>
@@ -269,17 +267,14 @@ export default function TargetConfig() {
               ))}
             </select>
           </div>
-          <div className="flex flex-col gap-1">
-            <label className="text-xs font-medium text-slate-500">Company</label>
-            <select className="rounded-md border border-slate-300 px-3 py-2 text-sm" value={companyId} onChange={(e) => setCompanyId(e.target.value)}>
-              {companies.map((c) => (
-                <option key={c.id} value={c.id}>
-                  {c.name}
-                </option>
-              ))}
-            </select>
-          </div>
         </div>
+
+        {companies.length > 0 && (
+          <div className="text-xs text-slate-400">
+            Companies in this Business Unit: {companies.map((c) => c.name).join(", ")} — each recognizes its own
+            actuals in Data Entry, and those roll up to compare against the target below.
+          </div>
+        )}
 
         <div className="grid grid-cols-1 gap-4">
           {FIELD_GROUPS.map((group) => (
@@ -317,7 +312,7 @@ export default function TargetConfig() {
 
         <button
           type="submit"
-          disabled={saving || !companyId || !yearId}
+          disabled={saving || !businessUnitId || !yearId}
           className="flex items-center justify-center gap-2 rounded-md bg-brand-500 px-4 py-2 text-sm font-medium text-white hover:bg-brand-600 disabled:opacity-50"
         >
           {saved ? <CheckCircle2 className="h-4 w-4" /> : <Save className="h-4 w-4" />}
