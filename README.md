@@ -1,9 +1,10 @@
 # EOS Executive Dashboard
 
 Full-stack dashboard for tracking Revenue, Collections, and Expenses (each split
-Internal / External) across a Year → Business Unit → Member Company → Quarter
-hierarchy, with role-based access for a Group Integrator (global admin) and
-BU Integrators (scoped to their assigned Business Unit(s)).
+Internal / External, in Philippine Peso) across a Year → Business Unit →
+Member Company → Quarter hierarchy, with role-based access for a Superadmin
+(full system access), a Group Integrator (global admin), and BU Integrators
+(scoped to their assigned Business Unit(s)).
 
 **Stack:** React (Vite) + Tailwind + Recharts + Lucide on the front end;
 Express + TypeScript + Prisma + PostgreSQL on the back end.
@@ -31,20 +32,16 @@ cp .env.example .env      # edit DATABASE_URL / JWT_SECRET if needed
 npm install
 npm run prisma:generate
 npm run prisma:migrate     # creates all tables from prisma/schema.prisma
-npm run seed                # loads 2 years x 3 BUs x ~3-4 companies of demo data
+npm run seed                # creates only the superadmin account, no sample data
 npm run dev                 # starts the API on http://localhost:4000
 ```
 
-Seeded login accounts (password for all: `password123`, except the superadmin):
+The seed script creates a single account and nothing else — no sample Business
+Units, Companies, Years, targets, or actuals:
 
-| Role | Email / Username | Scope |
-|---|---|---|
-| Superadmin | username `saulrhyz` (password `0811837Sey@me7`, must be changed on first login) | Full system access |
-| Group Integrator | group.integrator@pgb.com | All Business Units |
-| BU Integrator | bu.services@pgb.com | Professional Services |
-| BU Integrator | bu.manufacturing@pgb.com | Manufacturing |
-| BU Integrator | bu.tech@pgb.com | Technology |
-| BU Integrator | bu.multi@pgb.com | Manufacturing + Technology |
+| Role | Username | Password | Scope |
+|---|---|---|---|
+| Superadmin | `saulrhyz` | `0811837Sey@me7` (must be changed on first login) | Full system access |
 
 The login form accepts either an email address or a username in the same field.
 
@@ -57,7 +54,10 @@ npm install
 npm run dev                 # starts Vite on http://localhost:5173
 ```
 
-Open http://localhost:5173 and log in with any account above.
+Open http://localhost:5173 and log in as the superadmin above. You'll be
+required to set a new password immediately, then use Admin → Business Units /
+Companies / Users (and Target Setup → Add Year) to populate the system with
+real data — the app starts completely empty.
 
 ## What's included
 
@@ -99,6 +99,13 @@ Open http://localhost:5173 and log in with any account above.
   (`client/src/pages/admin`) with tabs for Users, Companies, Business Units,
   and SMTP Settings.
 
+- **Seed script** (`server/prisma/seed.ts`): creates only the superadmin
+  account. No sample Business Units, Companies, Years, targets, or actuals
+  are generated — everything is added for real through the Admin console and
+  Target Setup page after first login.
+- **Currency**: all figures are formatted as Philippine Peso (₱) via
+  `client/src/utils/format.ts` (`Intl.NumberFormat("en-PH", { currency: "PHP" })`).
+
 ## SMTP / email notifications
 
 Log in as the superadmin and go to Admin -> SMTP Settings to configure the
@@ -106,11 +113,6 @@ outbound mail server (host, port, TLS, credentials, from address/name) and
 send a test email. Settings are stored in the `SmtpSettings` table; no
 notifications are auto-triggered yet, this wires up the configuration and
 test-send capability for future use.
-- **Seed script** (`server/prisma/seed.ts`): deterministic pseudo-random
-  generator producing realistic quarterly figures with intentional
-  over/under-target variance so the dashboard's attainment coloring and
-  charts have something interesting to show immediately. The current year is
-  only seeded through Q2 so you can try the Data Entry workflow for Q3/Q4.
 
 ## Note on this build
 

@@ -6,8 +6,8 @@ import { useAuth } from "../contexts/AuthContext";
 export default function Login() {
   const { login } = useAuth();
   const navigate = useNavigate();
-  const [identifier, setIdentifier] = useState("group.integrator@pgb.com");
-  const [password, setPassword] = useState("password123");
+  const [identifier, setIdentifier] = useState("");
+  const [password, setPassword] = useState("");
   const [error, setError] = useState("");
   const [submitting, setSubmitting] = useState(false);
 
@@ -63,8 +63,7 @@ export default function Login() {
           </button>
         </form>
         <p className="mt-6 text-xs text-slate-400">
-          Seeded demo accounts use password <code>password123</code> (e.g. group.integrator@pgb.com, bu.services@pgb.com).
-          Superadmin: username <code>saulrhyz</code>.
+          First time here? Log in as the superadmin with username <code>saulrhyz</code>.
         </p>
       </div>
     </div>
