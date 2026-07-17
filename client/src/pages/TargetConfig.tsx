@@ -27,6 +27,13 @@ const FIELD_GROUPS: { title: string; internal: FigureKey; external: FigureKey }[
   { title: "Expenses", internal: "expensesInternal", external: "expensesExternal" },
 ];
 
+// A target's total is always Internal + External under the hood — "Combined"
+// is purely a data-entry convenience that writes the whole figure into the
+// Internal field and zeroes External, so no schema/API change is needed to
+// support it.
+type FieldMode = "split" | "combined";
+const emptyFieldModes: Record<string, FieldMode> = { Revenue: "combined", Collections: "combined", Expenses: "combined" };
+
 type Mode = "annual" | "quarter";
 
 export default function TargetConfig() {
@@ -41,6 +48,7 @@ export default function TargetConfig() {
   const [quarter, setQuarter] = useState(1);
   const [businessUnitId, setBusinessUnitId] = useState("");
   const [form, setForm] = useState(emptyForm);
+  const [fieldModes, setFieldModes] = useState<Record<string, FieldMode>>(emptyFieldModes);
 
   const [newYear, setNewYear] = useState(new Date().getFullYear() + 1);
   const [newBuName, setNewBuName] = useState("");
@@ -92,11 +100,32 @@ export default function TargetConfig() {
           expensesInternal: String(existing.expensesInternal ?? ""),
           expensesExternal: String(existing.expensesExternal ?? ""),
         });
+        // Infer how this was originally entered: a nonzero External means it
+        // was (or should be treated as) split; otherwise default to the
+        // simpler single-total view.
+        const modes: Record<string, FieldMode> = {};
+        for (const group of FIELD_GROUPS) {
+          modes[group.title] = Number(existing[group.external] ?? 0) !== 0 ? "split" : "combined";
+        }
+        setFieldModes(modes);
       } else {
         setForm(emptyForm);
+        setFieldModes(emptyFieldModes);
       }
     });
   }, [mode, yearId, quarter, businessUnitId]);
+
+  function setCombinedMode(title: string, internal: FigureKey, external: FigureKey) {
+    setFieldModes((m) => ({ ...m, [title]: "combined" }));
+    setForm((f) => {
+      const total = (Number(f[internal]) || 0) + (Number(f[external]) || 0);
+      return { ...f, [internal]: total ? String(total) : "", [external]: "0" };
+    });
+  }
+
+  function setSplitMode(title: string) {
+    setFieldModes((m) => ({ ...m, [title]: "split" }));
+  }
 
   async function handleSubmit(e: FormEvent) {
     e.preventDefault();
@@ -277,35 +306,70 @@ export default function TargetConfig() {
         )}
 
         <div className="grid grid-cols-1 gap-4">
-          {FIELD_GROUPS.map((group) => (
-            <div key={group.title} className="rounded-md border border-slate-100 bg-slate-50/60 p-4">
-              <div className="mb-2 text-sm font-semibold text-slate-700">{group.title}</div>
-              <div className="grid grid-cols-2 gap-4">
-                <div className="flex flex-col gap-1">
-                  <label className="text-xs font-medium text-slate-500">Internal</label>
-                  <input
-                    type="number"
-                    min={0}
-                    step="0.01"
-                    className="rounded-md border border-slate-300 px-3 py-2 text-sm"
-                    value={form[group.internal]}
-                    onChange={(e) => setForm((f) => ({ ...f, [group.internal]: e.target.value }))}
-                  />
+          {FIELD_GROUPS.map((group) => {
+            const isCombined = fieldModes[group.title] !== "split";
+            return (
+              <div key={group.title} className="rounded-md border border-slate-100 bg-slate-50/60 p-4">
+                <div className="mb-2 flex items-center justify-between">
+                  <div className="text-sm font-semibold text-slate-700">{group.title}</div>
+                  <div className="flex rounded-md border border-slate-200 p-0.5 text-[11px]">
+                    <button
+                      type="button"
+                      onClick={() => setCombinedMode(group.title, group.internal, group.external)}
+                      className={`rounded px-2 py-1 font-medium ${isCombined ? "bg-brand-500 text-white" : "text-slate-500"}`}
+                    >
+                      One Total
+                    </button>
+                    <button
+                      type="button"
+                      onClick={() => setSplitMode(group.title)}
+                      className={`rounded px-2 py-1 font-medium ${!isCombined ? "bg-brand-500 text-white" : "text-slate-500"}`}
+                    >
+                      Internal / External
+                    </button>
+                  </div>
                 </div>
-                <div className="flex flex-col gap-1">
-                  <label className="text-xs font-medium text-slate-500">External</label>
-                  <input
-                    type="number"
-                    min={0}
-                    step="0.01"
-                    className="rounded-md border border-slate-300 px-3 py-2 text-sm"
-                    value={form[group.external]}
-                    onChange={(e) => setForm((f) => ({ ...f, [group.external]: e.target.value }))}
-                  />
-                </div>
+                {isCombined ? (
+                  <div className="flex flex-col gap-1">
+                    <label className="text-xs font-medium text-slate-500">Total</label>
+                    <input
+                      type="number"
+                      min={0}
+                      step="0.01"
+                      className="rounded-md border border-slate-300 px-3 py-2 text-sm"
+                      value={form[group.internal]}
+                      onChange={(e) => setForm((f) => ({ ...f, [group.internal]: e.target.value, [group.external]: "0" }))}
+                    />
+                  </div>
+                ) : (
+                  <div className="grid grid-cols-2 gap-4">
+                    <div className="flex flex-col gap-1">
+                      <label className="text-xs font-medium text-slate-500">Internal</label>
+                      <input
+                        type="number"
+                        min={0}
+                        step="0.01"
+                        className="rounded-md border border-slate-300 px-3 py-2 text-sm"
+                        value={form[group.internal]}
+                        onChange={(e) => setForm((f) => ({ ...f, [group.internal]: e.target.value }))}
+                      />
+                    </div>
+                    <div className="flex flex-col gap-1">
+                      <label className="text-xs font-medium text-slate-500">External</label>
+                      <input
+                        type="number"
+                        min={0}
+                        step="0.01"
+                        className="rounded-md border border-slate-300 px-3 py-2 text-sm"
+                        value={form[group.external]}
+                        onChange={(e) => setForm((f) => ({ ...f, [group.external]: e.target.value }))}
+                      />
+                    </div>
+                  </div>
+                )}
               </div>
-            </div>
-          ))}
+            );
+          })}
         </div>
 
         {error && <div className="rounded-md bg-red-50 px-3 py-2 text-sm text-red-600">{error}</div>}

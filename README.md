@@ -155,7 +155,11 @@ real data — the app starts completely empty.
   independently inline-editable Remarks fields (Revenue/Collections/
   Expenses); `pages/TargetConfig.tsx` ("Target Setup" in the nav) sets
   Annual/Quarter targets by Year + Business Unit only — no Company picker,
-  since targets don't belong to a Company; a **Rocks** page (`pages/Rocks.tsx`) with
+  since targets don't belong to a Company. Each of Revenue/Collections/
+  Expenses has its own "One Total" vs "Internal / External" toggle there —
+  Internal + External is always the figure that counts, so "One Total" is
+  purely a data-entry shortcut that puts the whole number in Internal and
+  zeroes External; no schema or API change was needed for it; a **Rocks** page (`pages/Rocks.tsx`) with
   its own Year/Quarter/BU/Company/Business Goal filter bar, five summary
   cards (Total Rocks, Target Met, On Track, At Risk / Pending, Avg
   Progress %) computed client-side from the filtered list, a "Manage
