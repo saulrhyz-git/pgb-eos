@@ -73,6 +73,7 @@ model BusinessUnit {
 model Company {
   id             String   @id @default(uuid())
   name           String
+  description    String   @default("")
   businessUnitId String
   createdAt      DateTime @default(now())
 

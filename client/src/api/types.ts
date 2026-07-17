@@ -46,6 +46,7 @@ export interface BusinessUnit {
 export interface Company {
   id: string;
   name: string;
+  description: string;
   businessUnitId: string;
 }
 

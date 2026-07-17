@@ -46,6 +46,7 @@ export default function TargetConfig() {
   const [newYear, setNewYear] = useState(new Date().getFullYear() + 1);
   const [newBuName, setNewBuName] = useState("");
   const [newCompanyName, setNewCompanyName] = useState("");
+  const [newCompanyDescription, setNewCompanyDescription] = useState("");
 
   const [saving, setSaving] = useState(false);
   const [saved, setSaved] = useState(false);
@@ -141,8 +142,9 @@ export default function TargetConfig() {
   async function handleAddCompany(e: FormEvent) {
     e.preventDefault();
     if (!newCompanyName.trim() || !businessUnitId) return;
-    await api.createCompany(newCompanyName.trim(), businessUnitId);
+    await api.createCompany(newCompanyName.trim(), businessUnitId, newCompanyDescription.trim());
     setNewCompanyName("");
+    setNewCompanyDescription("");
     api.companies(businessUnitId).then(setCompanies);
   }
 
@@ -189,16 +191,24 @@ export default function TargetConfig() {
           </form>
           <form onSubmit={handleAddCompany} className="rounded-lg border border-slate-200 bg-white p-4 shadow-sm">
             <div className="mb-2 text-xs font-semibold uppercase text-slate-400">Add Company (to selected BU)</div>
-            <div className="flex gap-2">
+            <div className="flex flex-col gap-2">
+              <div className="flex gap-2">
+                <input
+                  className="w-full rounded-md border border-slate-300 px-2 py-1.5 text-sm"
+                  placeholder="Company name"
+                  value={newCompanyName}
+                  onChange={(e) => setNewCompanyName(e.target.value)}
+                />
+                <button className="rounded-md bg-brand-500 p-2 text-white hover:bg-brand-600">
+                  <Plus className="h-4 w-4" />
+                </button>
+              </div>
               <input
                 className="w-full rounded-md border border-slate-300 px-2 py-1.5 text-sm"
-                placeholder="Company name"
-                value={newCompanyName}
-                onChange={(e) => setNewCompanyName(e.target.value)}
+                placeholder="Description (optional)"
+                value={newCompanyDescription}
+                onChange={(e) => setNewCompanyDescription(e.target.value)}
               />
-              <button className="rounded-md bg-brand-500 p-2 text-white hover:bg-brand-600">
-                <Plus className="h-4 w-4" />
-              </button>
             </div>
           </form>
         </div>

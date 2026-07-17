@@ -70,7 +70,8 @@ real data — the app starts completely empty.
 
 - **Schema** (`server/prisma/schema.prisma`): `User` (now with `username`,
   `mustChangePassword`), `BusinessUnit`, `UserBusinessUnit` (many-to-many BU
-  assignment), `Company`, `Year`, `AnnualTarget`, `QuarterTarget`,
+  assignment), `Company` (with an optional free-text `description` field, set
+  on create and editable afterward), `Year`, `AnnualTarget`, `QuarterTarget`,
   `QuarterActual`, `SmtpSettings` (singleton row), `BusinessGoal`,
   `BusinessGoalBusinessUnit` (many-to-many BU assignment for goals), and
   `Rock` — every financial model splits Revenue/Collections/Expenses into
@@ -230,3 +231,11 @@ Collections, and Expenses has its own independently-saving Remarks field on
 both the Operational Grid (inline, per company/quarter) and the Data Entry
 form, and a Rock's Remarks field saves and displays independently of its
 Description.
+
+The `Company.description` addition (schema field, `POST /api/companies` and
+`PUT /api/admin/companies/:id` accepting it, and description inputs on both
+the Admin → Companies page and the Target Setup "Add Company" quick-add) is
+also a schema change requiring `npm run prisma:migrate`. Worth checking by
+hand: adding a company with a description saves and displays it in the Admin
+Companies table, leaving it blank works fine (defaults to empty string), and
+editing a company's description in place persists after refresh.

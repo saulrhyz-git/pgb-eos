@@ -75,8 +75,8 @@ export const api = {
 
   companies: (businessUnitId?: string) =>
     request<Company[]>(`/companies${businessUnitId ? `?businessUnitId=${businessUnitId}` : ""}`),
-  createCompany: (name: string, businessUnitId: string) =>
-    request<Company>("/companies", { method: "POST", body: JSON.stringify({ name, businessUnitId }) }),
+  createCompany: (name: string, businessUnitId: string, description?: string) =>
+    request<Company>("/companies", { method: "POST", body: JSON.stringify({ name, businessUnitId, description }) }),
 
   dashboard: (params: { yearId: string; quarter: number; businessUnitId?: string; companyId?: string }) => {
     const qs = new URLSearchParams({ yearId: params.yearId, quarter: String(params.quarter) });
@@ -160,7 +160,7 @@ export const api = {
   adminDeleteBusinessUnit: (id: string) => request<void>(`/admin/business-units/${id}`, { method: "DELETE" }),
 
   // ---------- Superadmin: Companies ----------
-  adminUpdateCompany: (id: string, payload: Partial<{ name: string; businessUnitId: string }>) =>
+  adminUpdateCompany: (id: string, payload: Partial<{ name: string; businessUnitId: string; description: string }>) =>
     request<Company>(`/admin/companies/${id}`, { method: "PUT", body: JSON.stringify(payload) }),
   adminDeleteCompany: (id: string) => request<void>(`/admin/companies/${id}`, { method: "DELETE" }),
 

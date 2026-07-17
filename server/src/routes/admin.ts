@@ -218,7 +218,11 @@ router.delete("/business-units/:id", async (req, res) => {
 
 router.put("/companies/:id", async (req, res) => {
   const parsed = z
-    .object({ name: z.string().min(1).optional(), businessUnitId: z.string().uuid().optional() })
+    .object({
+      name: z.string().min(1).optional(),
+      businessUnitId: z.string().uuid().optional(),
+      description: z.string().max(2000).optional(),
+    })
     .safeParse(req.body);
   if (!parsed.success) return res.status(400).json({ error: "Invalid company payload" });
   try {

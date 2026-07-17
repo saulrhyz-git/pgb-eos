@@ -8,9 +8,11 @@ export default function AdminCompanies() {
   const [businessUnits, setBusinessUnits] = useState<BusinessUnit[]>([]);
   const [newName, setNewName] = useState("");
   const [newBuId, setNewBuId] = useState("");
+  const [newDescription, setNewDescription] = useState("");
   const [editingId, setEditingId] = useState<string | null>(null);
   const [editingName, setEditingName] = useState("");
   const [editingBuId, setEditingBuId] = useState("");
+  const [editingDescription, setEditingDescription] = useState("");
   const [error, setError] = useState("");
 
   function refresh() {
@@ -29,8 +31,9 @@ export default function AdminCompanies() {
     if (!newName.trim() || !newBuId) return;
     setError("");
     try {
-      await api.createCompany(newName.trim(), newBuId);
+      await api.createCompany(newName.trim(), newBuId, newDescription.trim());
       setNewName("");
+      setNewDescription("");
       refresh();
     } catch (err: any) {
       setError(err.message || "Failed to add company");
@@ -41,13 +44,18 @@ export default function AdminCompanies() {
     setEditingId(c.id);
     setEditingName(c.name);
     setEditingBuId(c.businessUnitId);
+    setEditingDescription(c.description || "");
     setError("");
   }
 
   async function saveEdit(id: string) {
     if (!editingName.trim() || !editingBuId) return;
     try {
-      await api.adminUpdateCompany(id, { name: editingName.trim(), businessUnitId: editingBuId });
+      await api.adminUpdateCompany(id, {
+        name: editingName.trim(),
+        businessUnitId: editingBuId,
+        description: editingDescription.trim(),
+      });
       setEditingId(null);
       refresh();
     } catch (err: any) {
@@ -71,7 +79,7 @@ export default function AdminCompanies() {
         <h3 className="text-base font-semibold text-slate-800">Companies</h3>
       </div>
 
-      <form onSubmit={handleAdd} className="flex flex-wrap gap-2 rounded-lg border border-slate-200 bg-white p-4 shadow-sm">
+      <form onSubmit={handleAdd} className="flex flex-wrap items-start gap-2 rounded-lg border border-slate-200 bg-white p-4 shadow-sm">
         <input
           className="w-full max-w-xs rounded-md border border-slate-300 px-3 py-2 text-sm"
           placeholder="Company name"
@@ -89,6 +97,12 @@ export default function AdminCompanies() {
             </option>
           ))}
         </select>
+        <input
+          className="w-full max-w-sm rounded-md border border-slate-300 px-3 py-2 text-sm"
+          placeholder="Description (optional)"
+          value={newDescription}
+          onChange={(e) => setNewDescription(e.target.value)}
+        />
         <button className="flex items-center gap-2 rounded-md bg-brand-500 px-3 py-2 text-sm font-medium text-white hover:bg-brand-600">
           <Plus className="h-4 w-4" /> Add
         </button>
@@ -101,6 +115,7 @@ export default function AdminCompanies() {
           <thead className="bg-slate-50 text-left text-xs font-semibold uppercase text-slate-500">
             <tr>
               <th className="px-4 py-3">Name</th>
+              <th className="px-4 py-3">Description</th>
               <th className="px-4 py-3">Business Unit</th>
               <th className="px-4 py-3 text-right">Actions</th>
             </tr>
@@ -118,6 +133,18 @@ export default function AdminCompanies() {
                     />
                   ) : (
                     c.name
+                  )}
+                </td>
+                <td className="px-4 py-3 text-slate-500">
+                  {editingId === c.id ? (
+                    <input
+                      className="w-full max-w-xs rounded-md border border-slate-300 px-2 py-1 text-sm"
+                      placeholder="Description (optional)"
+                      value={editingDescription}
+                      onChange={(e) => setEditingDescription(e.target.value)}
+                    />
+                  ) : (
+                    <span className="line-clamp-2 max-w-xs">{c.description || "—"}</span>
                   )}
                 </td>
                 <td className="px-4 py-3 text-slate-600">
@@ -168,7 +195,7 @@ export default function AdminCompanies() {
             ))}
             {companies.length === 0 && (
               <tr>
-                <td colSpan={3} className="px-4 py-6 text-center text-slate-400">
+                <td colSpan={4} className="px-4 py-6 text-center text-slate-400">
                   No companies yet.
                 </td>
               </tr>

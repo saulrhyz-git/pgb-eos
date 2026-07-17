@@ -82,7 +82,11 @@ router.get("/companies", async (req, res) => {
 
 router.post("/companies", requireRole("GROUP_INTEGRATOR", "SUPERADMIN"), async (req, res) => {
   const parsed = z
-    .object({ name: z.string().min(1), businessUnitId: z.string().uuid() })
+    .object({
+      name: z.string().min(1),
+      businessUnitId: z.string().uuid(),
+      description: z.string().max(2000).optional().default(""),
+    })
     .safeParse(req.body);
   if (!parsed.success) return res.status(400).json({ error: "'name' and 'businessUnitId' are required" });
   const company = await prisma.company.create({ data: parsed.data });
