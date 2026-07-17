@@ -65,13 +65,29 @@ export function blockPendingPasswordChange(req: Request, res: Response, next: Ne
 }
 
 /**
- * Ensures a BU Integrator only ever touches business units they are assigned to.
- * Group Integrators and Superadmins bypass this check entirely (global access).
- * businessUnitId is resolved by the caller (either directly from the request,
- * or derived from a companyId lookup) before calling this helper.
+ * Superadmins always have global Business Unit access. Group Integrators are
+ * global by default (backward-compatible), but an admin can now optionally
+ * assign a Group Integrator to one or more specific Business Units — once
+ * assigned, that Group Integrator is scoped to just those BUs instead of
+ * everything. BU Integrators are always scoped to their assignment(s) and
+ * are required to have at least one.
+ */
+function hasGlobalBusinessUnitAccess(user: AuthUser): boolean {
+  if (user.role === "SUPERADMIN") return true;
+  if (user.role === "GROUP_INTEGRATOR") return user.businessUnitIds.length === 0;
+  return false;
+}
+
+/**
+ * Ensures a scoped user (a BU Integrator, or a Group Integrator that has been
+ * assigned specific Business Units) only ever touches Business Units they're
+ * assigned to. Superadmins, and Group Integrators with no explicit BU
+ * assignment, bypass this check entirely (global access). businessUnitId is
+ * resolved by the caller (either directly from the request, or derived from
+ * a companyId lookup) before calling this helper.
  */
 export function assertBusinessUnitAccess(user: AuthUser, businessUnitId: string) {
-  if (user.role === "GROUP_INTEGRATOR" || user.role === "SUPERADMIN") return;
+  if (hasGlobalBusinessUnitAccess(user)) return;
   if (!user.businessUnitIds.includes(businessUnitId)) {
     const err = new Error("You are not assigned to this Business Unit");
     (err as any).status = 403;
@@ -83,18 +99,18 @@ export function assertBusinessUnitAccess(user: AuthUser, businessUnitId: string)
  * Resolves the effective Prisma "businessUnitId" filter for a scoped GET query.
  * - If the caller explicitly requested a businessUnitId, verify they're allowed to see it
  *   (throws 403 otherwise) and return that single id.
- * - Otherwise, Group Integrators and Superadmins see everything (no filter); BU
- *   Integrators are implicitly restricted to their assigned business units.
+ * - Otherwise, users with global access (Superadmins, and Group Integrators with
+ *   no explicit BU assignment) see everything (no filter); BU Integrators and
+ *   BU-assigned Group Integrators are implicitly restricted to their assigned
+ *   business units (which may be more than one).
  */
 export function scopedBusinessUnitFilter(user: AuthUser, businessUnitId?: string): string | { in: string[] } | undefined {
   if (businessUnitId) {
     assertBusinessUnitAccess(user, businessUnitId);
     return businessUnitId;
   }
-  if (user.role === "BU_INTEGRATOR") {
-    return { in: user.businessUnitIds };
-  }
-  return undefined;
+  if (hasGlobalBusinessUnitAccess(user)) return undefined;
+  return { in: user.businessUnitIds };
 }
 
 export async function resolveCompanyBusinessUnit(companyId: string): Promise<string> {

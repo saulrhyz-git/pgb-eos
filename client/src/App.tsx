@@ -27,12 +27,6 @@ function RequireChangePassword({ children }: { children: JSX.Element }) {
   return children;
 }
 
-function RequireGroupIntegrator({ children }: { children: JSX.Element }) {
-  const { user } = useAuth();
-  if (user?.role !== "GROUP_INTEGRATOR" && user?.role !== "SUPERADMIN") return <Navigate to="/" replace />;
-  return children;
-}
-
 function RequireSuperAdmin({ children }: { children: JSX.Element }) {
   const { user } = useAuth();
   if (user?.role !== "SUPERADMIN") return <Navigate to="/" replace />;
@@ -61,14 +55,7 @@ export default function App() {
       >
         <Route index element={<Dashboard />} />
         <Route path="data-entry" element={<IntegratorPortal />} />
-        <Route
-          path="targets"
-          element={
-            <RequireGroupIntegrator>
-              <TargetConfig />
-            </RequireGroupIntegrator>
-          }
-        />
+        <Route path="targets" element={<TargetConfig />} />
         <Route
           path="admin"
           element={

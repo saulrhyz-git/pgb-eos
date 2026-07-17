@@ -1,7 +1,7 @@
 import { Router } from "express";
 import { z } from "zod";
 import { prisma } from "../lib/prisma";
-import { blockPendingPasswordChange, requireAuth, requireRole } from "../middleware/auth";
+import { blockPendingPasswordChange, requireAuth, requireRole, scopedBusinessUnitFilter } from "../middleware/auth";
 
 const router = Router();
 router.use(requireAuth);
@@ -29,7 +29,13 @@ router.post("/years", requireRole("GROUP_INTEGRATOR", "SUPERADMIN"), async (req,
 
 router.get("/business-units", async (req, res) => {
   const user = req.user!;
-  const where = user.role === "GROUP_INTEGRATOR" || user.role === "SUPERADMIN" ? {} : { id: { in: user.businessUnitIds } };
+  let where: any = {};
+  try {
+    const buFilter = scopedBusinessUnitFilter(user);
+    if (buFilter) where = { id: buFilter };
+  } catch (err: any) {
+    return res.status(err.status || 500).json({ error: err.message });
+  }
   const bus = await prisma.businessUnit.findMany({
     where,
     include: { companies: { select: { id: true, name: true } } },
@@ -62,13 +68,13 @@ router.get("/companies", async (req, res) => {
   const user = req.user!;
   const businessUnitId = req.query.businessUnitId as string | undefined;
 
-  if (businessUnitId && user.role === "BU_INTEGRATOR" && !user.businessUnitIds.includes(businessUnitId)) {
-    return res.status(403).json({ error: "You are not assigned to this Business Unit" });
-  }
-
   const where: any = {};
-  if (businessUnitId) where.businessUnitId = businessUnitId;
-  else if (user.role === "BU_INTEGRATOR") where.businessUnitId = { in: user.businessUnitIds };
+  try {
+    const buFilter = scopedBusinessUnitFilter(user, businessUnitId);
+    if (buFilter) where.businessUnitId = buFilter;
+  } catch (err: any) {
+    return res.status(err.status || 500).json({ error: err.message });
+  }
 
   const companies = await prisma.company.findMany({ where, orderBy: { name: "asc" } });
   res.json(companies);

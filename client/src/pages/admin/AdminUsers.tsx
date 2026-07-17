@@ -68,6 +68,10 @@ export default function AdminUsers() {
   async function handleSubmit(e: FormEvent) {
     e.preventDefault();
     setError("");
+    if (form.role === "BU_INTEGRATOR" && form.businessUnitIds.length === 0) {
+      setError("A BU Integrator must be assigned to at least one Business Unit");
+      return;
+    }
     setSaving(true);
     try {
       if (form.id) {
@@ -191,9 +195,11 @@ export default function AdminUsers() {
             </div>
           </div>
 
-          {form.role === "BU_INTEGRATOR" && (
+          {(form.role === "BU_INTEGRATOR" || form.role === "GROUP_INTEGRATOR") && (
             <div className="flex flex-col gap-2">
-              <label className="text-xs font-medium text-slate-500">Assigned Business Units</label>
+              <label className="text-xs font-medium text-slate-500">
+                {form.role === "BU_INTEGRATOR" ? "Assigned Business Units (required)" : "Assigned Business Units (optional)"}
+              </label>
               <div className="flex flex-wrap gap-2">
                 {businessUnits.map((bu) => (
                   <label
@@ -214,6 +220,11 @@ export default function AdminUsers() {
                   </label>
                 ))}
               </div>
+              <span className="text-xs text-slate-400">
+                {form.role === "BU_INTEGRATOR"
+                  ? "A BU Integrator must be tied to at least one Business Unit."
+                  : "Leave none selected for global access to all Business Units, or select one or more to scope this Group Integrator to just those."}
+              </span>
             </div>
           )}
 
@@ -260,7 +271,11 @@ export default function AdminUsers() {
                 </td>
                 <td className="px-4 py-3 text-slate-600">{ROLE_LABELS[u.role]}</td>
                 <td className="px-4 py-3 text-slate-600">
-                  {u.businessUnits.length ? u.businessUnits.map((b) => b.name).join(", ") : "—"}
+                  {u.businessUnits.length
+                    ? u.businessUnits.map((b) => b.name).join(", ")
+                    : u.role === "GROUP_INTEGRATOR"
+                    ? "All (global)"
+                    : "—"}
                 </td>
                 <td className="px-4 py-3">
                   {u.mustChangePassword ? (

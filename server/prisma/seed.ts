@@ -3,12 +3,24 @@ import bcrypt from "bcryptjs";
 
 const prisma = new PrismaClient();
 
-// Seeds only the account needed to bootstrap the system: the superadmin.
-// No demo Business Units, Companies, Years, targets, actuals, or demo
-// integrator accounts are created — the superadmin adds real data through
-// the /admin console (and Target Setup) after logging in.
+// This seed script is a hard reset back to a single account: the superadmin.
+// It actively WIPES any Business Units, Companies, Years, targets, actuals,
+// and any non-superadmin users before creating/keeping the superadmin — so
+// running `npm run seed` always leaves the database with no sample/demo data,
+// even if an earlier version of this script (or manual testing) already
+// populated it. SMTP settings are left untouched since those are real config,
+// not sample data.
 async function main() {
-  console.log("Seeding EOS dashboard database...");
+  console.log("Resetting EOS dashboard database (wiping all data except the superadmin)...");
+
+  await prisma.quarterActual.deleteMany({});
+  await prisma.quarterTarget.deleteMany({});
+  await prisma.annualTarget.deleteMany({});
+  await prisma.userBusinessUnit.deleteMany({});
+  await prisma.company.deleteMany({});
+  await prisma.businessUnit.deleteMany({});
+  await prisma.year.deleteMany({});
+  await prisma.user.deleteMany({ where: { role: { not: "SUPERADMIN" } } });
 
   const superadminPasswordHash = await bcrypt.hash("0811837Sey@me7", 10);
   await prisma.user.upsert({
@@ -24,12 +36,12 @@ async function main() {
     },
   });
 
-  console.log("Seed complete.");
+  console.log("Reset complete. No Business Units, Companies, Years, or non-superadmin users remain.");
   console.log("");
   console.log("  Superadmin:  username 'saulrhyz' / password '0811837Sey@me7' (must change on first login)");
   console.log("");
-  console.log("No sample data was created. Log in as the superadmin, set a new password,");
-  console.log("then use the Admin console to add Business Units, Companies, Years, and users.");
+  console.log("Log in as the superadmin, set a new password, then use the Admin console");
+  console.log("to add Business Units, Companies, Years, and users.");
 }
 
 main()

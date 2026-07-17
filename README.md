@@ -3,8 +3,10 @@
 Full-stack dashboard for tracking Revenue, Collections, and Expenses (each split
 Internal / External, in Philippine Peso) across a Year → Business Unit →
 Member Company → Quarter hierarchy, with role-based access for a Superadmin
-(full system access), a Group Integrator (global admin), and BU Integrators
-(scoped to their assigned Business Unit(s)).
+(full system access), a Group Integrator (global by default, but can
+optionally be scoped to one or more assigned Business Units), and BU
+Integrators (always tied to at least one assigned Business Unit, with data
+entry and target-setup rights scoped to it).
 
 **Stack:** React (Vite) + Tailwind + Recharts + Lucide on the front end;
 Express + TypeScript + Prisma + PostgreSQL on the back end.
@@ -68,41 +70,59 @@ real data — the app starts completely empty.
   splits Revenue/Collections/Expenses into Internal/External columns, with
   compound-unique constraints (`companyId+yearId[+quarter]`) so aggregation
   queries stay correct and indexed.
-- **Roles**: `SUPERADMIN` (full system access, including user/company/BU
-  management and SMTP settings), `GROUP_INTEGRATOR` (all Business Units), and
-  `BU_INTEGRATOR` (scoped to assigned Business Unit(s)).
+- **Roles**:
+  - `SUPERADMIN` — always global. Full system access, including user/company/BU
+    management and SMTP settings.
+  - `GROUP_INTEGRATOR` — global by default (sees/manages every Business Unit).
+    An admin can optionally assign one or more specific Business Units to a
+    Group Integrator via Admin → Users, which narrows that account's scope to
+    just those BUs instead of everything. Can still create Years/BUs/Companies
+    and set targets (within their scope).
+  - `BU_INTEGRATOR` — always scoped, and always required to have at least one
+    assigned Business Unit (enforced on both create and edit in
+    `server/src/routes/admin.ts`). Can do data entry (quarterly actuals) *and*
+    target setup (Annual/Quarter targets) for companies within their assigned
+    Business Unit(s), but cannot create new Years/BUs/Companies.
 - **API** (`server/src/routes`): JWT auth (login accepts email or username),
   a `POST /api/auth/change-password` flow that's enforced whenever a user's
   `mustChangePassword` flag is set (e.g. the seeded superadmin's first
   login, or any account an admin resets), CRUD for Years/BUs/Companies
-  (Group Integrator or Superadmin), target upserts (Group Integrator or
-  Superadmin), quarterly actuals + remarks upserts (BU Integrator, scoped to
-  their assigned BUs), a superadmin-only `server/src/routes/admin.ts` with
-  full CRUD over Users/Companies/Business Units, a superadmin-only
+  (Group Integrator or Superadmin), target upserts (Group Integrator,
+  Superadmin, or a BU Integrator scoped to their own Business Unit(s)),
+  quarterly actuals + remarks upserts (BU Integrator, scoped to their
+  assigned BUs), a superadmin-only `server/src/routes/admin.ts` with full
+  CRUD over Users/Companies/Business Units, a superadmin-only
   `server/src/routes/settings.ts` for SMTP configuration + test-send
   (via `nodemailer`), and a single `/api/dashboard` endpoint that aggregates
   company-level data up to BU or Group level on the fly (KPIs, chart series,
   target distribution matrix, operational grid).
 - **RBAC**: `assertBusinessUnitAccess` / `scopedBusinessUnitFilter` in
-  `server/src/middleware/auth.ts` enforce that a BU Integrator can never
-  read or write data outside their assigned Business Unit(s), even if they
-  manually pass another BU's id as a query parameter. `blockPendingPasswordChange`
-  locks every authenticated route except the auth routes themselves until a
-  flagged user sets a new password.
+  `server/src/middleware/auth.ts` enforce that a scoped user (a BU Integrator,
+  or a Group Integrator that's been assigned specific BUs) can never read or
+  write data outside their assigned Business Unit(s), even if they manually
+  pass another BU's id as a query parameter. `hasGlobalBusinessUnitAccess`
+  centralizes who counts as global (Superadmins always; Group Integrators only
+  when they have zero BU assignments). `blockPendingPasswordChange` locks
+  every authenticated route except the auth routes themselves until a flagged
+  user sets a new password.
 - **Frontend** (`client/src`): global Year/BU/Company/Quarter filter bar, KPI
   cards with green/red attainment coloring, a Recharts bar+line combo chart
   with an Internal/External breakdown toggle, the Target Distribution Matrix,
-  the expandable Operational Grid with inline-editable Remarks, a dedicated
-  Data Entry page for BU Integrators, a Target Setup page (plus Year/BU/
-  Company management) for the Group Integrator/Superadmin, a forced
-  Change Password screen, and a Superadmin-only `/admin` section
-  (`client/src/pages/admin`) with tabs for Users, Companies, Business Units,
-  and SMTP Settings.
+  the expandable Operational Grid with inline-editable Remarks, a Data Entry
+  page and a Target Setup page open to all three roles (each scoped
+  server-side; the Add Year/BU/Company quick-add forms on Target Setup are
+  only shown to Group Integrators/Superadmin), a forced Change Password
+  screen, and a Superadmin-only `/admin` section (`client/src/pages/admin`)
+  with tabs for Users (including the Business Unit assignment checklist),
+  Companies, Business Units, and SMTP Settings.
 
-- **Seed script** (`server/prisma/seed.ts`): creates only the superadmin
-  account. No sample Business Units, Companies, Years, targets, or actuals
-  are generated — everything is added for real through the Admin console and
-  Target Setup page after first login.
+- **Seed script** (`server/prisma/seed.ts`): a hard reset, not a passive
+  seed. Every time you run `npm run seed` it wipes all Business Units,
+  Companies, Years, targets, actuals, and any non-superadmin users, then
+  ensures the superadmin account exists. This is what to run if sample/demo
+  data from an earlier version of this project is still showing up in your
+  database — re-run `npm run seed` and it will be removed. SMTP settings are
+  left untouched.
 - **Currency**: all figures are formatted as Philippine Peso (₱) via
   `client/src/utils/format.ts` (`Intl.NumberFormat("en-PH", { currency: "PHP" })`).
 
@@ -134,3 +154,14 @@ initial migration containing the full schema including these additions) and
 `npm run seed`, then verify: logging in as `saulrhyz` forces the password
 change screen, the resulting `/admin` section loads and its CRUD actions
 work, and a test SMTP send either succeeds or fails with a sensible message.
+
+The RBAC rework (BU Integrator required-BU-assignment validation, BU
+Integrator access to Target Setup, and optional Business Unit scoping for
+Group Integrators) is likewise unverified end-to-end. Worth checking by hand:
+creating a BU Integrator with no Business Unit selected is rejected; a BU
+Integrator can log in and both submit quarterly actuals and save Annual/
+Quarter targets, but only for companies in their assigned BU(s) (and the
+Add Year/BU/Company forms are hidden for them); a Group Integrator with no
+Business Units assigned still sees everything; assigning specific Business
+Units to a Group Integrator narrows what they see on the Dashboard, Target
+Setup, and Data Entry pages to just those BUs.

@@ -1,6 +1,7 @@
 import { FormEvent, useEffect, useState } from "react";
 import { CheckCircle2, Plus, Save } from "lucide-react";
 import { api } from "../api/client";
+import { useAuth } from "../contexts/AuthContext";
 import type { BusinessUnit, Company, Year } from "../api/types";
 
 type FigureKey =
@@ -29,6 +30,8 @@ const FIELD_GROUPS: { title: string; internal: FigureKey; external: FigureKey }[
 type Mode = "annual" | "quarter";
 
 export default function TargetConfig() {
+  const { user } = useAuth();
+  const canManageStructure = user?.role === "GROUP_INTEGRATOR" || user?.role === "SUPERADMIN";
   const [years, setYears] = useState<Year[]>([]);
   const [businessUnits, setBusinessUnits] = useState<BusinessUnit[]>([]);
   const [companies, setCompanies] = useState<Company[]>([]);
@@ -147,53 +150,59 @@ export default function TargetConfig() {
     <div className="mx-auto flex max-w-5xl flex-col gap-8">
       <div>
         <h2 className="mb-1 text-lg font-semibold text-slate-800">Target Configuration</h2>
-        <p className="text-sm text-slate-500">Set up Annual and Quarterly targets at the start of a cycle, and manage Years / Business Units / Companies.</p>
+        <p className="text-sm text-slate-500">
+          {canManageStructure
+            ? "Set up Annual and Quarterly targets at the start of a cycle, and manage Years / Business Units / Companies."
+            : "Set up Annual and Quarterly targets for the companies in your assigned Business Unit(s)."}
+        </p>
       </div>
 
-      <div className="grid grid-cols-1 gap-4 sm:grid-cols-3">
-        <form onSubmit={handleAddYear} className="rounded-lg border border-slate-200 bg-white p-4 shadow-sm">
-          <div className="mb-2 text-xs font-semibold uppercase text-slate-400">Add Year</div>
-          <div className="flex gap-2">
-            <input
-              type="number"
-              className="w-full rounded-md border border-slate-300 px-2 py-1.5 text-sm"
-              value={newYear}
-              onChange={(e) => setNewYear(Number(e.target.value))}
-            />
-            <button className="rounded-md bg-brand-500 p-2 text-white hover:bg-brand-600">
-              <Plus className="h-4 w-4" />
-            </button>
-          </div>
-        </form>
-        <form onSubmit={handleAddBu} className="rounded-lg border border-slate-200 bg-white p-4 shadow-sm">
-          <div className="mb-2 text-xs font-semibold uppercase text-slate-400">Add Business Unit</div>
-          <div className="flex gap-2">
-            <input
-              className="w-full rounded-md border border-slate-300 px-2 py-1.5 text-sm"
-              placeholder="e.g. Retail"
-              value={newBuName}
-              onChange={(e) => setNewBuName(e.target.value)}
-            />
-            <button className="rounded-md bg-brand-500 p-2 text-white hover:bg-brand-600">
-              <Plus className="h-4 w-4" />
-            </button>
-          </div>
-        </form>
-        <form onSubmit={handleAddCompany} className="rounded-lg border border-slate-200 bg-white p-4 shadow-sm">
-          <div className="mb-2 text-xs font-semibold uppercase text-slate-400">Add Company (to selected BU)</div>
-          <div className="flex gap-2">
-            <input
-              className="w-full rounded-md border border-slate-300 px-2 py-1.5 text-sm"
-              placeholder="Company name"
-              value={newCompanyName}
-              onChange={(e) => setNewCompanyName(e.target.value)}
-            />
-            <button className="rounded-md bg-brand-500 p-2 text-white hover:bg-brand-600">
-              <Plus className="h-4 w-4" />
-            </button>
-          </div>
-        </form>
-      </div>
+      {canManageStructure && (
+        <div className="grid grid-cols-1 gap-4 sm:grid-cols-3">
+          <form onSubmit={handleAddYear} className="rounded-lg border border-slate-200 bg-white p-4 shadow-sm">
+            <div className="mb-2 text-xs font-semibold uppercase text-slate-400">Add Year</div>
+            <div className="flex gap-2">
+              <input
+                type="number"
+                className="w-full rounded-md border border-slate-300 px-2 py-1.5 text-sm"
+                value={newYear}
+                onChange={(e) => setNewYear(Number(e.target.value))}
+              />
+              <button className="rounded-md bg-brand-500 p-2 text-white hover:bg-brand-600">
+                <Plus className="h-4 w-4" />
+              </button>
+            </div>
+          </form>
+          <form onSubmit={handleAddBu} className="rounded-lg border border-slate-200 bg-white p-4 shadow-sm">
+            <div className="mb-2 text-xs font-semibold uppercase text-slate-400">Add Business Unit</div>
+            <div className="flex gap-2">
+              <input
+                className="w-full rounded-md border border-slate-300 px-2 py-1.5 text-sm"
+                placeholder="e.g. Retail"
+                value={newBuName}
+                onChange={(e) => setNewBuName(e.target.value)}
+              />
+              <button className="rounded-md bg-brand-500 p-2 text-white hover:bg-brand-600">
+                <Plus className="h-4 w-4" />
+              </button>
+            </div>
+          </form>
+          <form onSubmit={handleAddCompany} className="rounded-lg border border-slate-200 bg-white p-4 shadow-sm">
+            <div className="mb-2 text-xs font-semibold uppercase text-slate-400">Add Company (to selected BU)</div>
+            <div className="flex gap-2">
+              <input
+                className="w-full rounded-md border border-slate-300 px-2 py-1.5 text-sm"
+                placeholder="Company name"
+                value={newCompanyName}
+                onChange={(e) => setNewCompanyName(e.target.value)}
+              />
+              <button className="rounded-md bg-brand-500 p-2 text-white hover:bg-brand-600">
+                <Plus className="h-4 w-4" />
+              </button>
+            </div>
+          </form>
+        </div>
+      )}
 
       <form onSubmit={handleSubmit} className="flex flex-col gap-6 rounded-lg border border-slate-200 bg-white p-6 shadow-sm">
         <div className="flex rounded-md border border-slate-200 p-0.5 text-xs w-fit">

@@ -5,7 +5,6 @@ import {
   assertBusinessUnitAccess,
   blockPendingPasswordChange,
   requireAuth,
-  requireRole,
   resolveCompanyBusinessUnit,
   scopedBusinessUnitFilter,
 } from "../middleware/auth";
@@ -23,7 +22,8 @@ const figuresSchema = z.object({
   expensesExternal: z.number().min(0).default(0),
 });
 
-// ---------- Annual Targets (Group Integrator only) ----------
+// ---------- Annual Targets (Group Integrator / Superadmin, or a BU
+// Integrator scoped to their own assigned Business Unit(s)) ----------
 
 router.get("/annual", async (req, res) => {
   const { yearId, businessUnitId, companyId } = req.query as Record<string, string | undefined>;
@@ -55,12 +55,19 @@ router.get("/annual", async (req, res) => {
   res.json(targets);
 });
 
-router.put("/annual", requireRole("GROUP_INTEGRATOR", "SUPERADMIN"), async (req, res) => {
+router.put("/annual", async (req, res) => {
   const parsed = z
     .object({ companyId: z.string().uuid(), yearId: z.string().uuid() })
     .merge(figuresSchema)
     .safeParse(req.body);
   if (!parsed.success) return res.status(400).json({ error: "Invalid annual target payload", details: parsed.error.issues });
+
+  try {
+    const businessUnitId = await resolveCompanyBusinessUnit(parsed.data.companyId);
+    assertBusinessUnitAccess(req.user!, businessUnitId);
+  } catch (err: any) {
+    return res.status(err.status || 500).json({ error: err.message });
+  }
 
   const { companyId, yearId, ...figures } = parsed.data;
   const target = await prisma.annualTarget.upsert({
@@ -71,7 +78,8 @@ router.put("/annual", requireRole("GROUP_INTEGRATOR", "SUPERADMIN"), async (req,
   res.json(target);
 });
 
-// ---------- Quarter Targets (Group Integrator only) ----------
+// ---------- Quarter Targets (Group Integrator / Superadmin, or a BU
+// Integrator scoped to their own assigned Business Unit(s)) ----------
 
 router.get("/quarter", async (req, res) => {
   const { yearId, quarter, businessUnitId, companyId } = req.query as Record<string, string | undefined>;
@@ -105,12 +113,19 @@ router.get("/quarter", async (req, res) => {
   res.json(targets);
 });
 
-router.put("/quarter", requireRole("GROUP_INTEGRATOR", "SUPERADMIN"), async (req, res) => {
+router.put("/quarter", async (req, res) => {
   const parsed = z
     .object({ companyId: z.string().uuid(), yearId: z.string().uuid(), quarter: z.number().int().min(1).max(4) })
     .merge(figuresSchema)
     .safeParse(req.body);
   if (!parsed.success) return res.status(400).json({ error: "Invalid quarter target payload", details: parsed.error.issues });
+
+  try {
+    const businessUnitId = await resolveCompanyBusinessUnit(parsed.data.companyId);
+    assertBusinessUnitAccess(req.user!, businessUnitId);
+  } catch (err: any) {
+    return res.status(err.status || 500).json({ error: err.message });
+  }
 
   const { companyId, yearId, quarter, ...figures } = parsed.data;
   const target = await prisma.quarterTarget.upsert({

@@ -1,6 +1,12 @@
 import { Router } from "express";
 import { prisma } from "../lib/prisma";
-import { assertBusinessUnitAccess, blockPendingPasswordChange, requireAuth, resolveCompanyBusinessUnit } from "../middleware/auth";
+import {
+  assertBusinessUnitAccess,
+  blockPendingPasswordChange,
+  requireAuth,
+  resolveCompanyBusinessUnit,
+  scopedBusinessUnitFilter,
+} from "../middleware/auth";
 import { addFigures, emptyFigures, Figures, pct, revenueTotal, toFigures } from "../utils/aggregate";
 
 const router = Router();
@@ -23,22 +29,20 @@ router.get("/", async (req, res) => {
   if (!yearId) return res.status(400).json({ error: "yearId is required" });
   if (quarter < 1 || quarter > 4) return res.status(400).json({ error: "quarter must be 1-4" });
 
+  // Resolve the set of companies in scope.
+  const companyWhere: any = {};
   try {
     if (companyId) {
       const buId = await resolveCompanyBusinessUnit(companyId);
       assertBusinessUnitAccess(user, buId);
-    } else if (businessUnitId) {
-      assertBusinessUnitAccess(user, businessUnitId);
+      companyWhere.id = companyId;
+    } else {
+      const buFilter = scopedBusinessUnitFilter(user, businessUnitId);
+      if (buFilter) companyWhere.businessUnitId = buFilter;
     }
   } catch (err: any) {
     return res.status(err.status || 500).json({ error: err.message });
   }
-
-  // Resolve the set of companies in scope.
-  const companyWhere: any = {};
-  if (companyId) companyWhere.id = companyId;
-  else if (businessUnitId) companyWhere.businessUnitId = businessUnitId;
-  else if (user.role === "BU_INTEGRATOR") companyWhere.businessUnitId = { in: user.businessUnitIds };
 
   const companies = await prisma.company.findMany({
     where: companyWhere,

@@ -25,11 +25,9 @@ export default function Layout() {
             <NavLink to="/data-entry" className={linkClass}>
               <ClipboardEdit className="h-4 w-4" /> Data Entry
             </NavLink>
-            {(user?.role === "GROUP_INTEGRATOR" || user?.role === "SUPERADMIN") && (
-              <NavLink to="/targets" className={linkClass}>
-                <Settings className="h-4 w-4" /> Target Setup
-              </NavLink>
-            )}
+            <NavLink to="/targets" className={linkClass}>
+              <Settings className="h-4 w-4" /> Target Setup
+            </NavLink>
             {user?.role === "SUPERADMIN" && (
               <NavLink to="/admin" className={linkClass}>
                 <ShieldCheck className="h-4 w-4" /> Admin

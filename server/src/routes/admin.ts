@@ -51,14 +51,27 @@ router.get("/users", async (_req, res) => {
   res.json(users.map(serializeUser));
 });
 
-const createUserSchema = z.object({
-  email: z.string().email(),
-  username: z.string().min(3).max(50).optional(),
-  name: z.string().min(1),
-  role: roleSchema,
-  password: passwordSchema,
-  businessUnitIds: z.array(z.string().uuid()).optional().default([]),
-});
+const createUserSchema = z
+  .object({
+    email: z.string().email(),
+    username: z.string().min(3).max(50).optional(),
+    name: z.string().min(1),
+    role: roleSchema,
+    password: passwordSchema,
+    businessUnitIds: z.array(z.string().uuid()).optional().default([]),
+  })
+  .superRefine((data, ctx) => {
+    // A BU Integrator must always be tied to at least one Business Unit.
+    // (Group Integrators may optionally be assigned one or more BUs to
+    // narrow their scope, but it's not required — unassigned means global.)
+    if (data.role === "BU_INTEGRATOR" && data.businessUnitIds.length === 0) {
+      ctx.addIssue({
+        code: z.ZodIssueCode.custom,
+        path: ["businessUnitIds"],
+        message: "A BU Integrator must be assigned to at least one Business Unit",
+      });
+    }
+  });
 
 router.post("/users", async (req, res) => {
   const parsed = createUserSchema.safeParse(req.body);
@@ -109,6 +122,19 @@ router.put("/users/:id", async (req, res) => {
   if (role && role !== "SUPERADMIN" && existing.role === "SUPERADMIN") {
     const superadminCount = await prisma.user.count({ where: { role: "SUPERADMIN" } });
     if (superadminCount <= 1) return res.status(400).json({ error: "Cannot demote the last remaining superadmin" });
+  }
+
+  // A BU Integrator must always be tied to at least one Business Unit —
+  // check the effective post-update state (new role/assignment if provided,
+  // otherwise whatever's already on the record).
+  const effectiveRole = role ?? existing.role;
+  if (effectiveRole === "BU_INTEGRATOR") {
+    const effectiveBuCount = businessUnitIds
+      ? businessUnitIds.length
+      : await prisma.userBusinessUnit.count({ where: { userId: existing.id } });
+    if (effectiveBuCount === 0) {
+      return res.status(400).json({ error: "A BU Integrator must be assigned to at least one Business Unit" });
+    }
   }
 
   const data: any = {};
