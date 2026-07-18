@@ -79,7 +79,8 @@ export const api = {
     request<Company>("/companies", { method: "POST", body: JSON.stringify({ name, businessUnitId, description }) }),
 
   dashboard: (params: { yearId: string; quarter: number; businessUnitId?: string; companyId?: string }) => {
-    const qs = new URLSearchParams({ yearId: params.yearId, quarter: String(params.quarter) });
+    // quarter === 0 means "All Quarters" (full year) in the UI.
+    const qs = new URLSearchParams({ yearId: params.yearId, quarter: params.quarter === 0 ? "all" : String(params.quarter) });
     if (params.businessUnitId) qs.set("businessUnitId", params.businessUnitId);
     if (params.companyId) qs.set("companyId", params.companyId);
     return request<DashboardResponse>(`/dashboard?${qs.toString()}`);

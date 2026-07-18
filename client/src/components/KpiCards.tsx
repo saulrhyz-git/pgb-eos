@@ -1,4 +1,4 @@
-import { DollarSign, Target, TrendingUp, CalendarRange } from "lucide-react";
+import { PhilippinePeso, Target, TrendingUp, CalendarRange } from "lucide-react";
 import type { Kpis } from "../api/types";
 import { attainmentColor, formatCurrency, formatPct } from "../utils/format";
 
@@ -22,7 +22,7 @@ function Card({
 }) {
   return (
     <div className="rounded-lg border border-slate-200 bg-white p-4 shadow-sm">
-      <div className="flex items-center gap-2 text-slate-400">
+      <div className="flex items-center gap-2 text-slate-500">
         {icon}
         <span className="text-xs font-medium uppercase tracking-wide">{label}</span>
       </div>
@@ -33,19 +33,19 @@ function Card({
 }
 
 export default function KpiCards({ kpis, quarter }: Props) {
+  // quarter === 0 means "All Quarters" (full year) was selected in the filter bar.
+  const periodLabel = quarter === 0 ? "Full Year" : `Q${quarter}`;
   return (
     <div className="grid grid-cols-1 gap-4 sm:grid-cols-2 lg:grid-cols-4">
       <Card
-        icon={<DollarSign className="h-4 w-4" />}
-        label="Total Revenue (YTD)"
-        value={formatCurrency(kpis.ytdActual)}
-        sub={`${formatPct(kpis.ytdAttainmentPct)} of YTD target`}
-        subColor={attainmentColor(kpis.ytdAttainmentPct)}
+        icon={<PhilippinePeso className="h-4 w-4" />}
+        label="Annual Target"
+        value={formatCurrency(kpis.annualTarget)}
       />
-      <Card icon={<Target className="h-4 w-4" />} label={`Q${quarter} Target`} value={formatCurrency(kpis.quarterTarget)} />
+      <Card icon={<Target className="h-4 w-4" />} label={`${periodLabel} Target`} value={formatCurrency(kpis.quarterTarget)} />
       <Card
         icon={<TrendingUp className="h-4 w-4" />}
-        label={`Q${quarter} Actual`}
+        label={`${periodLabel} Actual`}
         value={formatCurrency(kpis.quarterActual)}
         sub={`${formatPct(kpis.attainmentPct)} attainment`}
         subColor={attainmentColor(kpis.attainmentPct)}
@@ -54,7 +54,8 @@ export default function KpiCards({ kpis, quarter }: Props) {
         icon={<CalendarRange className="h-4 w-4" />}
         label="Year-to-Date Actual"
         value={formatCurrency(kpis.ytdActual)}
-        sub={`Annual target ${formatCurrency(kpis.annualTarget)}`}
+        sub={`${formatPct(kpis.ytdAttainmentPct)} of YTD target`}
+        subColor={attainmentColor(kpis.ytdAttainmentPct)}
       />
     </div>
   );

@@ -70,7 +70,7 @@ export default function ChangePassword() {
               minLength={8}
               required
             />
-            <span className="text-xs text-slate-400">At least 8 characters, with letters and numbers.</span>
+            <span className="text-xs text-slate-500">At least 8 characters, with letters and numbers.</span>
           </div>
           <div className="flex flex-col gap-1">
             <label className="text-sm font-medium text-slate-600">Confirm new password</label>
@@ -91,7 +91,7 @@ export default function ChangePassword() {
           >
             {submitting ? "Saving..." : "Save password"}
           </button>
-          <button type="button" onClick={logout} className="text-xs text-slate-400 hover:text-slate-600">
+          <button type="button" onClick={logout} className="text-xs text-slate-500 hover:text-slate-600">
             Log out instead
           </button>
         </form>

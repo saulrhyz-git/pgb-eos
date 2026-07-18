@@ -130,7 +130,7 @@ export default function AdminSmtp() {
           </div>
           <div className="flex flex-col gap-1">
             <label className="text-xs font-medium text-slate-500">
-              SMTP Password {hasPassword && <span className="text-slate-400">(leave blank to keep current)</span>}
+              SMTP Password {hasPassword && <span className="text-slate-500">(leave blank to keep current)</span>}
             </label>
             <input
               type="password"
@@ -162,7 +162,7 @@ export default function AdminSmtp() {
         </div>
 
         {error && <div className="rounded-md bg-red-50 px-3 py-2 text-sm text-red-600">{error}</div>}
-        {updatedAt && <div className="text-xs text-slate-400">Last saved {new Date(updatedAt).toLocaleString()}</div>}
+        {updatedAt && <div className="text-xs text-slate-500">Last saved {new Date(updatedAt).toLocaleString()}</div>}
 
         <button
           type="submit"

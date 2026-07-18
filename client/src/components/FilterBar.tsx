@@ -5,7 +5,7 @@ import { useAuth } from "../contexts/AuthContext";
 
 export interface DashboardFilters {
   yearId: string;
-  quarter: number;
+  quarter: number; // 0 = "All Quarters" (full year), otherwise 1-4
   businessUnitId: string; // "" means "all" (Group Integrator only)
   companyId: string; // "" means "all companies in scope"
 }
@@ -66,6 +66,7 @@ export default function FilterBar({ filters, onChange }: Props) {
           value={filters.quarter}
           onChange={(e) => onChange({ ...filters, quarter: Number(e.target.value) })}
         >
+          <option value={0}>All Quarters</option>
           {[1, 2, 3, 4].map((q) => (
             <option key={q} value={q}>
               Q{q}

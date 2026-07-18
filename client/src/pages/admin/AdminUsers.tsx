@@ -129,7 +129,7 @@ export default function AdminUsers() {
         <form onSubmit={handleSubmit} className="flex flex-col gap-4 rounded-lg border border-slate-200 bg-white p-6 shadow-sm">
           <div className="flex items-center justify-between">
             <div className="text-sm font-semibold text-slate-700">{form.id ? "Edit User" : "New User"}</div>
-            <button type="button" onClick={() => setShowForm(false)} className="text-slate-400 hover:text-slate-600">
+            <button type="button" onClick={() => setShowForm(false)} className="text-slate-500 hover:text-slate-600">
               <X className="h-4 w-4" />
             </button>
           </div>
@@ -187,7 +187,7 @@ export default function AdminUsers() {
                 minLength={8}
                 required={!form.id}
               />
-              <span className="text-xs text-slate-400">
+              <span className="text-xs text-slate-500">
                 {form.id
                   ? "Setting a new password will require the user to change it again on next login."
                   : "User will be required to change this password on first login."}
@@ -220,7 +220,7 @@ export default function AdminUsers() {
                   </label>
                 ))}
               </div>
-              <span className="text-xs text-slate-400">
+              <span className="text-xs text-slate-500">
                 {form.role === "BU_INTEGRATOR"
                   ? "A BU Integrator must be tied to at least one Business Unit."
                   : "Leave none selected for global access to all Business Units, or select one or more to scope this Group Integrator to just those."}
@@ -267,7 +267,7 @@ export default function AdminUsers() {
                 <td className="px-4 py-3 font-medium text-slate-800">{u.name}</td>
                 <td className="px-4 py-3 text-slate-600">
                   <div>{u.email}</div>
-                  {u.username && <div className="text-xs text-slate-400">@{u.username}</div>}
+                  {u.username && <div className="text-xs text-slate-500">@{u.username}</div>}
                 </td>
                 <td className="px-4 py-3 text-slate-600">{ROLE_LABELS[u.role]}</td>
                 <td className="px-4 py-3 text-slate-600">
@@ -305,7 +305,7 @@ export default function AdminUsers() {
             ))}
             {users.length === 0 && (
               <tr>
-                <td colSpan={6} className="px-4 py-6 text-center text-slate-400">
+                <td colSpan={6} className="px-4 py-6 text-center text-slate-500">
                   No users yet.
                 </td>
               </tr>

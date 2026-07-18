@@ -154,10 +154,17 @@ real data — the app starts completely empty.
   user sets a new password.
 - **Frontend** (`client/src`): a **Revenue** page (`pages/Dashboard.tsx`,
   renamed in the nav from "Dashboard") with the global Year/BU/Company/Quarter
-  filter bar, KPI cards with green/red attainment coloring, a Recharts
-  bar+line combo chart with an Internal/External breakdown toggle, a Target
-  Distribution Matrix with one row per Business Unit (Annual vs each
-  Quarter's target, computed by summing that BU's Companies' own targets),
+  filter bar (Quarter includes an "All Quarters" option — sends `quarter=all`
+  to the API — which turns the "Q_ Target/Actual" KPIs and the Operational
+  Grid's "Q_ Target/Actual" columns into full-year sums instead of a single
+  quarter's figures; per-quarter Remarks are hidden in that mode since a
+  remark belongs to one specific quarter), KPI cards (Annual Target with a
+  Peso-sign icon leads, followed by the selected-period Target/Actual and
+  Year-to-Date Actual, all in ₱ via `Intl.NumberFormat("en-PH", { currency:
+  "PHP" })`) with green/red attainment coloring, a Recharts bar+line combo
+  chart with an Internal/External breakdown toggle, a Target Distribution
+  Matrix with one row per Business Unit (Annual vs each Quarter's target,
+  computed by summing that BU's Companies' own targets),
   and an Operational Grid where each row is a Business Unit (target vs its
   Companies' combined actual, attainment %, YTD) expandable to show every
   contributing Company's own actuals plus three independently

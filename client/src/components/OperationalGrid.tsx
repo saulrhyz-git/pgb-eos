@@ -17,6 +17,9 @@ export default function OperationalGrid({ rows, yearId, quarter, onRemarksSaved 
   const [expanded, setExpanded] = useState<Set<string>>(new Set());
   const [drafts, setDrafts] = useState<Record<string, string>>({});
   const [saving, setSaving] = useState<Record<string, boolean>>({});
+  // quarter === 0 means "All Quarters" (full year) was selected in the filter bar.
+  const isAllQuarters = quarter === 0;
+  const periodLabel = isAllQuarters ? "Full Year" : `Q${quarter}`;
 
   function toggle(businessUnitId: string) {
     setExpanded((prev) => {
@@ -53,7 +56,7 @@ export default function OperationalGrid({ rows, yearId, quarter, onRemarksSaved 
               if (e.target.value !== row[field]) saveRemarks(row.companyId, field, e.target.value);
             }}
           />
-          {saving[key] && <Loader2 className="h-3 w-3 animate-spin text-slate-400" />}
+          {saving[key] && <Loader2 className="h-3 w-3 animate-spin text-slate-500" />}
         </div>
       </div>
     );
@@ -62,19 +65,19 @@ export default function OperationalGrid({ rows, yearId, quarter, onRemarksSaved 
   return (
     <div className="rounded-lg border border-slate-200 bg-white p-4 shadow-sm">
       <h3 className="mb-4 text-sm font-semibold text-slate-700">Business Unit Operational Grid</h3>
-      <p className="mb-4 text-xs text-slate-400">
-        Annual/Quarter targets are set per Business Unit. Expand a Business Unit to see each Company's own recognized
-        actuals and remarks, which roll up into the totals below.
+      <p className="mb-4 text-xs text-slate-500">
+        Annual/Quarter targets are set per Company and roll up into their Business Unit's total. Expand a Business
+        Unit to see each Company's own recognized actuals and remarks, which roll up into the totals below.
       </p>
       <div className="overflow-x-auto">
         <table className="w-full min-w-[880px] text-sm">
           <thead>
-            <tr className="border-b border-slate-200 text-left text-xs font-medium uppercase text-slate-400">
+            <tr className="border-b border-slate-200 text-left text-xs font-medium uppercase text-slate-500">
               <th className="py-2 pr-3 w-6"></th>
               <th className="py-2 pr-3">Business Unit</th>
               <th className="py-2 pr-3 text-right">Annual Target</th>
-              <th className="py-2 pr-3 text-right">Q{quarter} Target</th>
-              <th className="py-2 pr-3 text-right">Q{quarter} Actual</th>
+              <th className="py-2 pr-3 text-right">{periodLabel} Target</th>
+              <th className="py-2 pr-3 text-right">{periodLabel} Actual</th>
               <th className="py-2 pr-3 text-right">Attainment %</th>
               <th className="py-2 pr-3 text-right">YTD Actual</th>
               <th className="py-2 pr-3 text-right">YTD vs Annual %</th>
@@ -90,7 +93,7 @@ export default function OperationalGrid({ rows, yearId, quarter, onRemarksSaved 
                     <td className="py-2 pr-3">
                       <button
                         onClick={() => toggle(row.businessUnitId)}
-                        className="flex items-center gap-1 text-slate-400 hover:text-slate-700"
+                        className="flex items-center gap-1 text-slate-500 hover:text-slate-700"
                         title={hasRemarks ? "Has remarks" : "Expand for per-company detail & remarks"}
                       >
                         {isOpen ? <ChevronDown className="h-4 w-4" /> : <ChevronRight className="h-4 w-4" />}
@@ -114,7 +117,7 @@ export default function OperationalGrid({ rows, yearId, quarter, onRemarksSaved 
                       <td></td>
                       <td colSpan={7} className="py-3 pr-3">
                         {row.companies.length === 0 && (
-                          <div className="text-xs text-slate-400">No companies in this Business Unit yet.</div>
+                          <div className="text-xs text-slate-500">No companies in this Business Unit yet.</div>
                         )}
                         <div className="flex flex-col gap-4">
                           {row.companies.map((c) => (
@@ -150,11 +153,17 @@ export default function OperationalGrid({ rows, yearId, quarter, onRemarksSaved 
                                   {formatCurrency(c.ytdActual)}
                                 </div>
                               </div>
-                              <div className="grid grid-cols-1 gap-3 sm:grid-cols-3">
-                                <RemarksInput row={c} field="revenueRemarks" label="Revenue Remarks" />
-                                <RemarksInput row={c} field="collectionsRemarks" label="Collections Remarks" />
-                                <RemarksInput row={c} field="expensesRemarks" label="Expenses Remarks" />
-                              </div>
+                              {isAllQuarters ? (
+                                <p className="text-xs italic text-slate-500">
+                                  Remarks are logged per quarter — select a specific quarter to view or edit them.
+                                </p>
+                              ) : (
+                                <div className="grid grid-cols-1 gap-3 sm:grid-cols-3">
+                                  <RemarksInput row={c} field="revenueRemarks" label="Revenue Remarks" />
+                                  <RemarksInput row={c} field="collectionsRemarks" label="Collections Remarks" />
+                                  <RemarksInput row={c} field="expensesRemarks" label="Expenses Remarks" />
+                                </div>
+                              )}
                             </div>
                           ))}
                         </div>
@@ -166,7 +175,7 @@ export default function OperationalGrid({ rows, yearId, quarter, onRemarksSaved 
             })}
             {rows.length === 0 && (
               <tr>
-                <td colSpan={8} className="py-6 text-center text-slate-400">
+                <td colSpan={8} className="py-6 text-center text-slate-500">
                   No Business Unit data for this scope yet.
                 </td>
               </tr>

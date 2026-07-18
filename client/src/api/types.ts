@@ -89,8 +89,7 @@ export interface TargetMatrixRow {
   varianceFromAnnual: number;
 }
 
-// A single Company's recognized actuals within its Business Unit — Companies
-// don't have their own target, only their parent Business Unit does.
+// A single Company's recognized actuals within its Business Unit.
 export interface OperationalGridCompanyRow {
   companyId: string;
   companyName: string;
@@ -109,8 +108,9 @@ export interface OperationalGridCompanyRow {
   expensesRemarks: string;
 }
 
-// A Business Unit's target vs its Companies' combined actuals, with each
-// contributing Company broken out underneath.
+// A Business Unit's target (the sum of its Companies' own targets) vs its
+// Companies' combined actuals, with each contributing Company broken out
+// underneath.
 export interface OperationalGridRow {
   businessUnitId: string;
   businessUnitName: string;
@@ -124,7 +124,7 @@ export interface OperationalGridRow {
 }
 
 export interface DashboardResponse {
-  scope: { yearId: string; quarter: number; businessUnitId: string | null; companyId: string | null };
+  scope: { yearId: string; quarter: number; allQuarters: boolean; businessUnitId: string | null; companyId: string | null };
   kpis: Kpis;
   chart: ChartPoint[];
   targetMatrix: TargetMatrixRow[];

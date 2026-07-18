@@ -62,7 +62,7 @@ export default function Login() {
             {submitting ? "Signing in..." : "Sign in"}
           </button>
         </form>
-        <p className="mt-6 text-xs text-slate-400">
+        <p className="mt-6 text-xs text-slate-500">
           First time here? Log in as the superadmin with username <code>saulrhyz</code>.
         </p>
       </div>

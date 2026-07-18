@@ -53,7 +53,7 @@ export default function Dashboard() {
         </>
       )}
 
-      {loading && !data && <div className="py-12 text-center text-slate-400">Loading dashboard...</div>}
+      {loading && !data && <div className="py-12 text-center text-slate-500">Loading dashboard...</div>}
     </div>
   );
 }

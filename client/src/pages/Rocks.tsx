@@ -51,7 +51,7 @@ const emptyGoalForm = {
 function KpiCard({ icon, label, value, sub }: { icon: React.ReactNode; label: string; value: string; sub?: string }) {
   return (
     <div className="rounded-lg border border-slate-200 bg-white p-4 shadow-sm">
-      <div className="flex items-center gap-2 text-slate-400">
+      <div className="flex items-center gap-2 text-slate-500">
         {icon}
         <span className="text-xs font-medium uppercase tracking-wide">{label}</span>
       </div>
@@ -433,7 +433,7 @@ export default function Rocks() {
 
       {canManageStructure && (
         <div className="rounded-lg border border-slate-200 bg-white p-4 shadow-sm">
-          <div className="mb-2 text-xs font-semibold uppercase text-slate-400">Manage Business Goals</div>
+          <div className="mb-2 text-xs font-semibold uppercase text-slate-500">Manage Business Goals</div>
           <form onSubmit={handleAddGoal} className="mb-3 flex flex-col gap-2">
             <input
               className="w-full max-w-xs rounded-md border border-slate-300 px-2 py-1.5 text-sm"
@@ -442,7 +442,7 @@ export default function Rocks() {
               onChange={(e) => setNewGoalForm((f) => ({ ...f, name: e.target.value }))}
             />
             <div>
-              <div className="mb-1 text-xs text-slate-400">
+              <div className="mb-1 text-xs text-slate-500">
                 Assign to Business Unit(s) — leave blank to make it available everywhere
               </div>
               <BuChecklist businessUnits={businessUnits} selected={newGoalForm.businessUnitIds} onToggle={toggleNewGoalBu} />
@@ -505,12 +505,12 @@ export default function Rocks() {
                     )}
                   </div>
                   <div className="flex gap-1">
-                    <button onClick={() => startEditGoal(g)} className="rounded-md p-1 text-slate-400 hover:text-brand-600" title="Edit">
+                    <button onClick={() => startEditGoal(g)} className="rounded-md p-1 text-slate-500 hover:text-brand-600" title="Edit">
                       <Pencil className="h-3.5 w-3.5" />
                     </button>
                     <button
                       onClick={() => handleDeleteGoal(g)}
-                      className="rounded-md p-1 text-slate-400 hover:text-red-600"
+                      className="rounded-md p-1 text-slate-500 hover:text-red-600"
                       title="Delete goal"
                     >
                       <X className="h-3.5 w-3.5" />
@@ -519,7 +519,7 @@ export default function Rocks() {
                 </div>
               )
             )}
-            {businessGoals.length === 0 && <span className="text-xs text-slate-400">No business goals yet.</span>}
+            {businessGoals.length === 0 && <span className="text-xs text-slate-500">No business goals yet.</span>}
           </div>
         </div>
       )}
@@ -528,7 +528,7 @@ export default function Rocks() {
         <form onSubmit={handleRockSubmit} className="flex flex-col gap-4 rounded-lg border border-slate-200 bg-white p-6 shadow-sm">
           <div className="flex items-center justify-between">
             <div className="text-sm font-semibold text-slate-700">{rockForm.id ? "Edit Rock" : "New Rock"}</div>
-            <button type="button" onClick={() => setShowRockForm(false)} className="text-slate-400 hover:text-slate-600">
+            <button type="button" onClick={() => setShowRockForm(false)} className="text-slate-500 hover:text-slate-600">
               <X className="h-4 w-4" />
             </button>
           </div>
@@ -711,9 +711,9 @@ export default function Rocks() {
                   <td className="px-4 py-3 text-slate-600">Q{r.quarter}</td>
                   <td className="px-4 py-3 text-slate-700">
                     <div className="max-w-xs font-medium">{r.title}</div>
-                    {r.description && <div className="mt-0.5 max-w-xs text-xs text-slate-400 line-clamp-2">{r.description}</div>}
+                    {r.description && <div className="mt-0.5 max-w-xs text-xs text-slate-500 line-clamp-2">{r.description}</div>}
                     {r.remarks && (
-                      <div className="mt-0.5 max-w-xs text-xs italic text-slate-400 line-clamp-2">Remarks: {r.remarks}</div>
+                      <div className="mt-0.5 max-w-xs text-xs italic text-slate-500 line-clamp-2">Remarks: {r.remarks}</div>
                     )}
                   </td>
                   <td className="px-4 py-3 text-slate-600">{r.businessGoal?.name || "—"}</td>
@@ -765,7 +765,7 @@ export default function Rocks() {
               ))}
               {rocks.length === 0 && !loading && (
                 <tr>
-                  <td colSpan={8} className="px-4 py-6 text-center text-slate-400">
+                  <td colSpan={8} className="px-4 py-6 text-center text-slate-500">
                     No Rocks for this scope yet.
                   </td>
                 </tr>
@@ -774,7 +774,7 @@ export default function Rocks() {
           </table>
         </div>
         {loading && (
-          <div className="flex items-center justify-center gap-2 py-4 text-sm text-slate-400">
+          <div className="flex items-center justify-center gap-2 py-4 text-sm text-slate-500">
             <Loader2 className="h-4 w-4 animate-spin" /> Loading...
           </div>
         )}

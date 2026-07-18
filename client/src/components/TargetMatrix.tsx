@@ -12,7 +12,7 @@ export default function TargetMatrix({ rows }: Props) {
       <div className="overflow-x-auto">
         <table className="w-full min-w-[720px] text-sm">
           <thead>
-            <tr className="border-b border-slate-200 text-left text-xs font-medium uppercase text-slate-400">
+            <tr className="border-b border-slate-200 text-left text-xs font-medium uppercase text-slate-500">
               <th className="py-2 pr-3">Business Unit</th>
               <th className="py-2 pr-3 text-right">Annual Target</th>
               <th className="py-2 pr-3 text-right">Q1</th>
@@ -36,7 +36,7 @@ export default function TargetMatrix({ rows }: Props) {
                 <td className="py-2 pr-3 text-right text-slate-600">{formatCurrency(row.distributedTotal)}</td>
                 <td
                   className={`py-2 text-right font-medium ${
-                    Math.abs(row.varianceFromAnnual) < 1 ? "text-slate-400" : "text-amber-600"
+                    Math.abs(row.varianceFromAnnual) < 1 ? "text-slate-500" : "text-amber-600"
                   }`}
                 >
                   {row.varianceFromAnnual === 0 ? "—" : formatCurrency(row.varianceFromAnnual)}
@@ -45,7 +45,7 @@ export default function TargetMatrix({ rows }: Props) {
             ))}
             {rows.length === 0 && (
               <tr>
-                <td colSpan={8} className="py-6 text-center text-slate-400">
+                <td colSpan={8} className="py-6 text-center text-slate-500">
                   No target data for this scope yet.
                 </td>
               </tr>

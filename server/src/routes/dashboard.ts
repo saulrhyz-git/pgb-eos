@@ -15,21 +15,30 @@ router.use(blockPendingPasswordChange);
 
 /**
  * GET /api/dashboard
- * Query params: yearId (required), quarter (1-4, default 4 = full year to date),
+ * Query params: yearId (required), quarter (1-4, or "all" for the full year, default 4),
  *               businessUnitId (optional scope), companyId (optional drill-down)
  *
  * Annual/Quarter Targets AND Quarter Actuals are both recognized per Company.
  * The Business-Unit-level numbers shown here (KPIs, chart, target matrix,
  * operational grid) are never stored directly — they're a rollup, computed
  * on the fly by summing every Company's target/actual within that BU.
+ *
+ * When quarter="all", every "quarter"-labeled figure (KPIs, operational
+ * grid) represents the sum of Q1-Q4 instead of a single quarter — this is
+ * the "All Quarters" option in the dashboard filter.
  */
 router.get("/", async (req, res) => {
   const user = req.user!;
   const { yearId, businessUnitId, companyId } = req.query as Record<string, string | undefined>;
-  const quarter = req.query.quarter ? Number(req.query.quarter) : 4;
+  const quarterParam = req.query.quarter as string | undefined;
+  const isAllQuarters = quarterParam === "all";
+  const quarter = isAllQuarters ? 4 : quarterParam ? Number(quarterParam) : 4;
+  const quartersInScope = isAllQuarters ? [1, 2, 3, 4] : [quarter];
 
   if (!yearId) return res.status(400).json({ error: "yearId is required" });
-  if (quarter < 1 || quarter > 4) return res.status(400).json({ error: "quarter must be 1-4" });
+  if (!isAllQuarters && (quarter < 1 || quarter > 4)) {
+    return res.status(400).json({ error: 'quarter must be 1-4 or "all"' });
+  }
 
   // Resolve the Business Unit scope (which BUs show up) and the Company
   // scope (whose targets/actuals get summed) for this request.
@@ -57,7 +66,7 @@ router.get("/", async (req, res) => {
 
   if (businessUnitIds.length === 0) {
     return res.json({
-      scope: { yearId, quarter, businessUnitId: businessUnitId || null, companyId: companyId || null },
+      scope: { yearId, quarter, allQuarters: isAllQuarters, businessUnitId: businessUnitId || null, companyId: companyId || null },
       kpis: { annualTarget: 0, quarterTarget: 0, quarterActual: 0, ytdTarget: 0, ytdActual: 0, attainmentPct: 0, ytdAttainmentPct: 0 },
       chart: [],
       targetMatrix: [],
@@ -143,10 +152,12 @@ router.get("/", async (req, res) => {
     const annual = annualByCompany.get(cid) || emptyFigures();
     annualTargetTotal += revenueTotal(annual);
 
-    const qt = qTargetByCompanyQuarter.get(`${cid}:${quarter}`) || emptyFigures();
-    quarterTargetTotal += revenueTotal(qt);
-    const qa = qActualByCompanyQuarter.get(`${cid}:${quarter}`) || emptyFigures();
-    quarterActualTotal += revenueTotal(qa);
+    for (const q of quartersInScope) {
+      const qt = qTargetByCompanyQuarter.get(`${cid}:${q}`) || emptyFigures();
+      quarterTargetTotal += revenueTotal(qt);
+      const qa = qActualByCompanyQuarter.get(`${cid}:${q}`) || emptyFigures();
+      quarterActualTotal += revenueTotal(qa);
+    }
 
     for (let q = 1; q <= quarter; q++) {
       const t = qTargetByCompanyQuarter.get(`${cid}:${q}`) || emptyFigures();
@@ -201,9 +212,14 @@ router.get("/", async (req, res) => {
 
     const companyRows = buCompanies.map((c) => {
       annualAgg = addFigures(annualAgg, annualByCompany.get(c.id) || emptyFigures());
-      quarterTargetAgg = addFigures(quarterTargetAgg, qTargetByCompanyQuarter.get(`${c.id}:${quarter}`) || emptyFigures());
 
-      const qa = qActualByCompanyQuarter.get(`${c.id}:${quarter}`) || emptyFigures();
+      let qt = emptyFigures();
+      let qa = emptyFigures();
+      for (const q of quartersInScope) {
+        qt = addFigures(qt, qTargetByCompanyQuarter.get(`${c.id}:${q}`) || emptyFigures());
+        qa = addFigures(qa, qActualByCompanyQuarter.get(`${c.id}:${q}`) || emptyFigures());
+      }
+      quarterTargetAgg = addFigures(quarterTargetAgg, qt);
       quarterActualAgg = addFigures(quarterActualAgg, qa);
 
       let ytdActualCompany = emptyFigures();
@@ -226,11 +242,11 @@ router.get("/", async (req, res) => {
           expensesExternal: qa.expensesExternal,
         },
         ytdActual: revenueTotal(ytdActualCompany),
-        ...(remarksByCompanyQuarter.get(`${c.id}:${quarter}`) || {
-          revenueRemarks: "",
-          collectionsRemarks: "",
-          expensesRemarks: "",
-        }),
+        // Remarks are logged per single quarter, so they're only meaningful
+        // (and only shown) when a specific quarter is selected, not "all".
+        ...(!isAllQuarters && remarksByCompanyQuarter.get(`${c.id}:${quarter}`)
+          ? remarksByCompanyQuarter.get(`${c.id}:${quarter}`)!
+          : { revenueRemarks: "", collectionsRemarks: "", expensesRemarks: "" }),
       };
     });
 
@@ -253,7 +269,7 @@ router.get("/", async (req, res) => {
   });
 
   res.json({
-    scope: { yearId, quarter, businessUnitId: businessUnitId || null, companyId: companyId || null },
+    scope: { yearId, quarter, allQuarters: isAllQuarters, businessUnitId: businessUnitId || null, companyId: companyId || null },
     kpis,
     chart,
     targetMatrix,
