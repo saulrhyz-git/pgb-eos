@@ -92,10 +92,10 @@ export interface ChartPoint {
 export interface TargetMatrixRow {
   businessUnitId: string;
   businessUnitName: string;
-  quarterTargets: { quarter: number; revenueInternal: number; revenueExternal: number; total: number }[];
-  // Always exactly the sum of quarterTargets' totals — Annual Target is no
-  // longer a separately-entered figure.
-  annualTarget: number;
+  quarterTargets: { quarter: number; revenue: number; collections: number; expenses: number }[];
+  // Always exactly the sum of quarterTargets' totals per category — Annual
+  // Target is no longer a separately-entered figure.
+  annualTarget: { revenue: number; collections: number; expenses: number };
 }
 
 // A single Company's recognized actuals within its Business Unit.

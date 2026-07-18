@@ -223,7 +223,7 @@ router.get("/", async (req, res) => {
     ytdAttainmentPct: pct(ytdActualTotal, ytdTargetTotal),
   };
 
-  // ---------- Target Distribution Matrix: Q1-Q4 Target per Business Unit, plus their Annual (Q1-Q4) sum ----------
+  // ---------- Target Distribution Matrix: Q1-Q4 Target per Business Unit, by category, plus their Annual (Q1-Q4) sum ----------
   // (a Business Unit's numbers here are the sum of its Companies' own targets;
   // Annual Target is always exactly the sum of the four quarters shown, since
   // it's no longer a separately-entered figure.)
@@ -233,9 +233,18 @@ router.get("/", async (req, res) => {
     const quarterTargetsRow = [1, 2, 3, 4].map((q) => {
       let t = emptyFigures();
       for (const c of buCompanies) t = addFigures(t, qTargetByCompanyQuarter.get(`${c.id}:${q}`) || emptyFigures());
-      return { quarter: q, revenueInternal: t.revenueInternal, revenueExternal: t.revenueExternal, total: revenueTotal(t) };
+      return {
+        quarter: q,
+        revenue: revenueTotal(t),
+        collections: collectionsTotal(t),
+        expenses: expensesTotal(t),
+      };
     });
-    const annualTarget = quarterTargetsRow.reduce((sum, q) => sum + q.total, 0);
+    const annualTarget = {
+      revenue: quarterTargetsRow.reduce((sum, q) => sum + q.revenue, 0),
+      collections: quarterTargetsRow.reduce((sum, q) => sum + q.collections, 0),
+      expenses: quarterTargetsRow.reduce((sum, q) => sum + q.expenses, 0),
+    };
     return {
       businessUnitId: bu.id,
       businessUnitName: bu.name,

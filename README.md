@@ -169,10 +169,12 @@ real data — the app starts completely empty.
   chart (Actual as blue bars, Target as an orange line; the Internal/External
   toggle uses a solid orange line for Internal and a dashed magenta line for
   External so the two target lines stay visually distinct from each other)
-  with an Internal/External breakdown toggle, a Target Distribution
-  Matrix with one row per Business Unit (Q1-Q4 target columns plus an Annual
-  Target column that's always their sum, computed by summing that BU's
-  Companies' own Quarter Targets), and an Operational Grid where each row is
+  with an Internal/External breakdown toggle, a Target Distribution Matrix
+  with three color-coded rows per Business Unit — Revenue/Collections/
+  Expenses, same blue/emerald/amber convention as the KPI cards — each with
+  Q1-Q4 target columns plus an Annual Target column that's always their sum,
+  computed by summing that BU's Companies' own Quarter Targets, and an
+  Operational Grid where each row is
   a Business Unit (target vs its Companies' combined actual, attainment %,
   YTD) expandable to show every contributing Company's own actuals plus
   three independently inline-editable Remarks fields
