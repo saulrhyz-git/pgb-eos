@@ -47,11 +47,25 @@ psql postgres -c "CREATE DATABASE eos_dashboard OWNER eos_user;"
 cd server
 cp .env.example .env      # edit DATABASE_URL / JWT_SECRET if needed
 npm install
-npm run prisma:generate
-npm run prisma:migrate     # creates all tables from prisma/schema.prisma
+npm run prisma:migrate     # first-time only: creates all tables from prisma/schema.prisma
 npm run seed                # creates only the superadmin account, no sample data
 npm run dev                 # starts the API on http://localhost:4000
 ```
+
+`npm run dev` (and `npm start`) now runs `prisma migrate deploy && prisma
+generate` automatically first, via `predev`/`prestart` npm hooks in
+`package.json` (deliberately not hooked into `npm run build`, since that's
+often run as a pure compile step — e.g. inside a Docker build stage — without
+a live database connection available yet) — so every time you pull new code
+and
+restart the server, any migrations added since your last pull (and the
+matching Prisma Client) are applied/regenerated for you, without a separate
+manual step. If you ever see an error like `The column "X" does not exist in
+the current database`, it means the server started *without* those hooks
+running (e.g. an older checkout, or `tsx src/index.ts` invoked directly
+instead of via `npm run dev`) — run `npm run prisma:deploy && npm run
+prisma:generate` by hand in `server/`, then start the app through `npm run
+dev`/`npm start` again so the hooks keep it in sync going forward.
 
 The seed script creates a single account and nothing else — no sample Business
 Units, Companies, Years, targets, or actuals:
