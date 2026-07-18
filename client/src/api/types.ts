@@ -60,7 +60,11 @@ export interface Figures {
 }
 
 export interface Kpis {
-  annualTarget: number;
+  // Sum of every in-scope Company's AnnualTarget, split by category — these
+  // never change with the quarter filter.
+  annualRevenueTarget: number;
+  annualCollectionsTarget: number;
+  annualExpensesTarget: number;
   quarterTarget: number;
   quarterActual: number;
   ytdTarget: number;

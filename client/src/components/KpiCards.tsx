@@ -1,4 +1,4 @@
-import { PhilippinePeso, Target, TrendingUp, CalendarRange } from "lucide-react";
+import { PhilippinePeso, Wallet, Receipt, Target, TrendingUp, CalendarRange } from "lucide-react";
 import type { Kpis } from "../api/types";
 import { attainmentColor, formatCurrency, formatPct } from "../utils/format";
 
@@ -36,27 +36,43 @@ export default function KpiCards({ kpis, quarter }: Props) {
   // quarter === 0 means "All Quarters" (full year) was selected in the filter bar.
   const periodLabel = quarter === 0 ? "Full Year" : `Q${quarter}`;
   return (
-    <div className="grid grid-cols-1 gap-4 sm:grid-cols-2 lg:grid-cols-4">
-      <Card
-        icon={<PhilippinePeso className="h-4 w-4" />}
-        label="Annual Target"
-        value={formatCurrency(kpis.annualTarget)}
-      />
-      <Card icon={<Target className="h-4 w-4" />} label={`${periodLabel} Target`} value={formatCurrency(kpis.quarterTarget)} />
-      <Card
-        icon={<TrendingUp className="h-4 w-4" />}
-        label={`${periodLabel} Actual`}
-        value={formatCurrency(kpis.quarterActual)}
-        sub={`${formatPct(kpis.attainmentPct)} attainment`}
-        subColor={attainmentColor(kpis.attainmentPct)}
-      />
-      <Card
-        icon={<CalendarRange className="h-4 w-4" />}
-        label="Year-to-Date Actual"
-        value={formatCurrency(kpis.ytdActual)}
-        sub={`${formatPct(kpis.ytdAttainmentPct)} of YTD target`}
-        subColor={attainmentColor(kpis.ytdAttainmentPct)}
-      />
+    <div className="flex flex-col gap-4">
+      {/* Annual targets by category — a straight sum of every in-scope Company's
+          AnnualTarget, unaffected by the Quarter filter above. */}
+      <div className="grid grid-cols-1 gap-4 sm:grid-cols-3">
+        <Card
+          icon={<PhilippinePeso className="h-4 w-4" />}
+          label="Annual Revenue Target"
+          value={formatCurrency(kpis.annualRevenueTarget)}
+        />
+        <Card
+          icon={<Wallet className="h-4 w-4" />}
+          label="Annual Collections Target"
+          value={formatCurrency(kpis.annualCollectionsTarget)}
+        />
+        <Card
+          icon={<Receipt className="h-4 w-4" />}
+          label="Annual Expenses Target"
+          value={formatCurrency(kpis.annualExpensesTarget)}
+        />
+      </div>
+      <div className="grid grid-cols-1 gap-4 sm:grid-cols-3">
+        <Card icon={<Target className="h-4 w-4" />} label={`${periodLabel} Target`} value={formatCurrency(kpis.quarterTarget)} />
+        <Card
+          icon={<TrendingUp className="h-4 w-4" />}
+          label={`${periodLabel} Actual`}
+          value={formatCurrency(kpis.quarterActual)}
+          sub={`${formatPct(kpis.attainmentPct)} attainment`}
+          subColor={attainmentColor(kpis.attainmentPct)}
+        />
+        <Card
+          icon={<CalendarRange className="h-4 w-4" />}
+          label="Year-to-Date Actual"
+          value={formatCurrency(kpis.ytdActual)}
+          sub={`${formatPct(kpis.ytdAttainmentPct)} of YTD target`}
+          subColor={attainmentColor(kpis.ytdAttainmentPct)}
+        />
+      </div>
     </div>
   );
 }

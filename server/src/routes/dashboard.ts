@@ -7,7 +7,7 @@ import {
   resolveCompanyBusinessUnit,
   scopedBusinessUnitFilter,
 } from "../middleware/auth";
-import { addFigures, emptyFigures, Figures, pct, revenueTotal, toFigures } from "../utils/aggregate";
+import { addFigures, collectionsTotal, emptyFigures, expensesTotal, Figures, pct, revenueTotal, toFigures } from "../utils/aggregate";
 
 const router = Router();
 router.use(requireAuth);
@@ -67,7 +67,17 @@ router.get("/", async (req, res) => {
   if (businessUnitIds.length === 0) {
     return res.json({
       scope: { yearId, quarter, allQuarters: isAllQuarters, businessUnitId: businessUnitId || null, companyId: companyId || null },
-      kpis: { annualTarget: 0, quarterTarget: 0, quarterActual: 0, ytdTarget: 0, ytdActual: 0, attainmentPct: 0, ytdAttainmentPct: 0 },
+      kpis: {
+        annualRevenueTarget: 0,
+        annualCollectionsTarget: 0,
+        annualExpensesTarget: 0,
+        quarterTarget: 0,
+        quarterActual: 0,
+        ytdTarget: 0,
+        ytdActual: 0,
+        attainmentPct: 0,
+        ytdAttainmentPct: 0,
+      },
       chart: [],
       targetMatrix: [],
       operationalGrid: [],
@@ -142,7 +152,11 @@ router.get("/", async (req, res) => {
   });
 
   // ---------- KPIs (sum of every Company's target/actual in scope) ----------
-  let annualTargetTotal = 0;
+  // The three Annual _ Target figures are a straight sum of every in-scope
+  // Company's AnnualTarget and never change with the quarter filter.
+  let annualRevenueTargetTotal = 0;
+  let annualCollectionsTargetTotal = 0;
+  let annualExpensesTargetTotal = 0;
   let quarterTargetTotal = 0;
   let quarterActualTotal = 0;
   let ytdTargetTotal = 0;
@@ -150,7 +164,9 @@ router.get("/", async (req, res) => {
 
   for (const cid of companyIds) {
     const annual = annualByCompany.get(cid) || emptyFigures();
-    annualTargetTotal += revenueTotal(annual);
+    annualRevenueTargetTotal += revenueTotal(annual);
+    annualCollectionsTargetTotal += collectionsTotal(annual);
+    annualExpensesTargetTotal += expensesTotal(annual);
 
     for (const q of quartersInScope) {
       const qt = qTargetByCompanyQuarter.get(`${cid}:${q}`) || emptyFigures();
@@ -168,7 +184,9 @@ router.get("/", async (req, res) => {
   }
 
   const kpis = {
-    annualTarget: annualTargetTotal,
+    annualRevenueTarget: annualRevenueTargetTotal,
+    annualCollectionsTarget: annualCollectionsTargetTotal,
+    annualExpensesTarget: annualExpensesTargetTotal,
     quarterTarget: quarterTargetTotal,
     quarterActual: quarterActualTotal,
     ytdTarget: ytdTargetTotal,

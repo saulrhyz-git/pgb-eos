@@ -51,6 +51,14 @@ export function revenueTotal(f: Figures): number {
   return f.revenueInternal + f.revenueExternal;
 }
 
+export function collectionsTotal(f: Figures): number {
+  return f.collectionsInternal + f.collectionsExternal;
+}
+
+export function expensesTotal(f: Figures): number {
+  return f.expensesInternal + f.expensesExternal;
+}
+
 export function pct(actual: number, target: number): number {
   if (!target) return actual > 0 ? 100 : 0;
   return Math.round((actual / target) * 1000) / 10; // one decimal place
