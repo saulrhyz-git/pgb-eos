@@ -155,14 +155,21 @@ real data — the app starts completely empty.
   to the API — which turns the "Q_ Target/Actual" KPIs and the Operational
   Grid's "Q_ Target/Actual" columns into full-year sums instead of a single
   quarter's figures; per-quarter Remarks are hidden in that mode since a
-  remark belongs to one specific quarter), KPI cards in two rows — the top
-  row is Annual Revenue/Collections/Expenses Target (each a straight sum of
-  every in-scope Company's Q1-Q4 Quarter Target, split by category, and
-  unaffected by the Quarter filter — there's nothing to separately enter
-  here), the bottom row is the selected-period Target/Actual and
+  remark belongs to one specific quarter), color-coded KPI cards in three
+  rows so a category can be matched at a glance (Revenue = blue, Collections
+  = emerald, Expenses = amber) — row 1 is Annual Revenue/Collections/Expenses
+  Target (each a straight sum of every in-scope Company's Q1-Q4 Quarter
+  Target, split by category, and unaffected by the Quarter filter — there's
+  nothing to separately enter here), row 2 is the same three categories for
+  just the selected period ("Q_ Revenue/Collections/Expenses Target", or the
+  full year in "All Quarters" mode — these DO change with the Quarter
+  filter), row 3 is the selected-period Actual (with attainment %) and
   Year-to-Date Actual — all in ₱ via `Intl.NumberFormat("en-PH", { currency:
   "PHP" })` — with green/red attainment coloring, a Recharts bar+line combo
-  chart with an Internal/External breakdown toggle, a Target Distribution
+  chart (Actual as blue bars, Target as an orange line; the Internal/External
+  toggle uses a solid orange line for Internal and a dashed magenta line for
+  External so the two target lines stay visually distinct from each other)
+  with an Internal/External breakdown toggle, a Target Distribution
   Matrix with one row per Business Unit (Q1-Q4 target columns plus an Annual
   Target column that's always their sum, computed by summing that BU's
   Companies' own Quarter Targets), and an Operational Grid where each row is

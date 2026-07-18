@@ -64,15 +64,25 @@ export default function ProgressChart({ chart }: Props) {
           <Legend />
           {breakdown === "combined" ? (
             <>
-              <Bar dataKey="Actual" fill="#3b5fe0" radius={[4, 4, 0, 0]} barSize={36} />
-              <Line type="monotone" dataKey="Target" stroke="#f97316" strokeWidth={2} dot={{ r: 4 }} />
+              <Bar dataKey="Actual" fill="#2563eb" radius={[4, 4, 0, 0]} barSize={36} />
+              <Line type="monotone" dataKey="Target" stroke="#ea580c" strokeWidth={2.5} dot={{ r: 4 }} />
             </>
           ) : (
             <>
-              <Bar dataKey="Actual (Internal)" stackId="actual" fill="#3b5fe0" radius={[4, 4, 0, 0]} barSize={36} />
+              <Bar dataKey="Actual (Internal)" stackId="actual" fill="#2563eb" radius={[4, 4, 0, 0]} barSize={36} />
               <Bar dataKey="Actual (External)" stackId="actual" fill="#93c5fd" radius={[4, 4, 0, 0]} barSize={36} />
-              <Line type="monotone" dataKey="Target (Internal)" stroke="#f97316" strokeWidth={2} dot={{ r: 3 }} />
-              <Line type="monotone" dataKey="Target (External)" stroke="#fb923c" strokeWidth={2} strokeDasharray="4 4" dot={{ r: 3 }} />
+              {/* Internal/External target lines use clearly distinct hues (not
+                  just lighter/darker shades of the same orange) so they stay
+                  readable against each other and against the blue bars. */}
+              <Line type="monotone" dataKey="Target (Internal)" stroke="#ea580c" strokeWidth={2.5} dot={{ r: 3 }} />
+              <Line
+                type="monotone"
+                dataKey="Target (External)"
+                stroke="#a21caf"
+                strokeWidth={2.5}
+                strokeDasharray="5 3"
+                dot={{ r: 3 }}
+              />
             </>
           )}
         </ComposedChart>

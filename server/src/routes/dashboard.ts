@@ -76,6 +76,8 @@ router.get("/", async (req, res) => {
         annualCollectionsTarget: 0,
         annualExpensesTarget: 0,
         quarterTarget: 0,
+        quarterCollectionsTarget: 0,
+        quarterExpensesTarget: 0,
         quarterActual: 0,
         ytdTarget: 0,
         ytdActual: 0,
@@ -173,7 +175,13 @@ router.get("/", async (req, res) => {
   let annualRevenueTargetTotal = 0;
   let annualCollectionsTargetTotal = 0;
   let annualExpensesTargetTotal = 0;
-  let quarterTargetTotal = 0;
+  // Unlike the Annual _ Target figures above, these three DO respect the
+  // quarter filter (quartersInScope) — they're the "Quarterly _ Target"
+  // cards, one quarter's (or, in "All Quarters" mode, the full year's)
+  // target by category.
+  let quarterRevenueTargetTotal = 0;
+  let quarterCollectionsTargetTotal = 0;
+  let quarterExpensesTargetTotal = 0;
   let quarterActualTotal = 0;
   let ytdTargetTotal = 0;
   let ytdActualTotal = 0;
@@ -186,7 +194,9 @@ router.get("/", async (req, res) => {
 
     for (const q of quartersInScope) {
       const qt = qTargetByCompanyQuarter.get(`${cid}:${q}`) || emptyFigures();
-      quarterTargetTotal += revenueTotal(qt);
+      quarterRevenueTargetTotal += revenueTotal(qt);
+      quarterCollectionsTargetTotal += collectionsTotal(qt);
+      quarterExpensesTargetTotal += expensesTotal(qt);
       const qa = qActualByCompanyQuarter.get(`${cid}:${q}`) || emptyFigures();
       quarterActualTotal += revenueTotal(qa);
     }
@@ -203,11 +213,13 @@ router.get("/", async (req, res) => {
     annualRevenueTarget: annualRevenueTargetTotal,
     annualCollectionsTarget: annualCollectionsTargetTotal,
     annualExpensesTarget: annualExpensesTargetTotal,
-    quarterTarget: quarterTargetTotal,
+    quarterTarget: quarterRevenueTargetTotal,
+    quarterCollectionsTarget: quarterCollectionsTargetTotal,
+    quarterExpensesTarget: quarterExpensesTargetTotal,
     quarterActual: quarterActualTotal,
     ytdTarget: ytdTargetTotal,
     ytdActual: ytdActualTotal,
-    attainmentPct: pct(quarterActualTotal, quarterTargetTotal),
+    attainmentPct: pct(quarterActualTotal, quarterRevenueTargetTotal),
     ytdAttainmentPct: pct(ytdActualTotal, ytdTargetTotal),
   };
 

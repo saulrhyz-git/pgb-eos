@@ -66,7 +66,11 @@ export interface Kpis {
   annualRevenueTarget: number;
   annualCollectionsTarget: number;
   annualExpensesTarget: number;
+  // Selected-period (or "All Quarters") target by category — these DO
+  // change with the quarter filter, unlike the annual figures above.
   quarterTarget: number;
+  quarterCollectionsTarget: number;
+  quarterExpensesTarget: number;
   quarterActual: number;
   ytdTarget: number;
   ytdActual: number;
