@@ -118,6 +118,25 @@ real data — the app starts completely empty.
     Target), and add/update Rocks for companies within their assigned
     Business Unit(s), but cannot create new Years/BUs/Companies or manage
     the Goals taxonomy.
+  - **Blank / no base role** — `role` on `User` is optional (`Role?` in
+    `schema.prisma`); Admin → Users' Role dropdown has a "No base role
+    (Custom Role only)" option alongside the three above. A blank-role user
+    has zero base-role-derived access on their own — no Business Unit
+    assignment mechanism, no structural admin actions — and relies entirely
+    on an assigned Custom Role (see below) for whatever View/Edit/Delete
+    access they get. This exists specifically to let a Superadmin build
+    narrow, View-Only-style accounts purely through the Custom Role matrix
+    without a base role's coarser scoping getting in the way. A blank-role
+    user with no Custom Role assigned at all has no access to anything (a
+    safe default, not an accidental "sees everything"): in
+    `server/src/middleware/auth.ts`, `hasGlobalBusinessUnitAccess` treats
+    `role === null` as globally-scoped *only if* a Custom Role is assigned
+    (letting that Custom Role's own per-Business-Unit/Company grants be the
+    sole source of truth, unconstrained by any coarse BU filter); with no
+    Custom Role, it falls through to the same "restricted to
+    `businessUnitIds`" path as a BU Integrator, and a blank-role user's
+    `businessUnitIds` is always empty, so every coarse check denies them by
+    default.
 - **Custom Roles** (`CustomRole`/`RolePermission` in `schema.prisma`,
   `server/src/routes/customRoles.ts`, `server/src/utils/permissions.ts`,
   `client/src/pages/admin/AdminRoles.tsx`): an optional, additional layer of
@@ -147,7 +166,10 @@ real data — the app starts completely empty.
   can't be deleted while any user still has it. Enforcement: a user with no
   Custom Role assigned sees zero change in behavior (today's Business-Unit
   scoping applies exactly as before). A user WITH one has their access
-  narrowed further everywhere that resource shows up —
+  narrowed further everywhere that resource shows up — and for a blank-role
+  user (see above), the Custom Role isn't just a narrowing layer but the
+  entire basis for their access, since they have no base-role scoping to
+  narrow in the first place —
   `server/src/routes/targets.ts` (TARGETS view/edit),
   `server/src/routes/actuals.ts` (the combined figures PUT requires edit on
   at least one of Revenue/Collections/Expenses, since that form submits all
@@ -199,12 +221,26 @@ real data — the app starts completely empty.
   Year+Quarter to actual calendar dates: Q1 = Jan-Mar, Q2 = Apr-Jun, Q3 =
   Jul-Sep, Q4 = Oct-Dec; this is the one authoritative place any future
   date/quarter-gated logic should hook into, rather than each feature
-  re-deriving it), `server/src/routes/targets.ts` (Quarter
-  target upserts keyed by `companyId` + `yearId` + `quarter` — Group
-  Integrator, Superadmin, or a BU Integrator scoped to their own Business
-  Unit(s), mirroring how actuals are scoped; there is no Annual Target
-  endpoint — Annual Target is read-only and derived, never written to
-  directly), `server/src/routes/actuals.ts`
+  re-deriving it), `server/src/routes/targets.ts` (`PUT /api/targets/quarter`
+  upserts one Quarter's target keyed by `companyId` + `yearId` + `quarter` —
+  Group Integrator, Superadmin, or a BU Integrator scoped to their own
+  Business Unit(s), mirroring how actuals are scoped. There is still no
+  separately-*stored* Annual Target row — Annual Target on the Revenue
+  dashboard remains purely a derived sum of Q1-Q4 — but `PUT
+  /api/targets/annual` offers a convenience way to *enter* one: it splits
+  the submitted total evenly across the Year's still-editable quarters
+  (already-passed quarters keep their existing values, subtracted from the
+  total first; if the request has zero editable quarters left, it 400s).
+  Both endpoints enforce a Quarter-locking rule — once the real calendar
+  date (per `quarterDates.ts`) has moved past a Quarter, it's rejected with
+  a 403 on any further direct edit — and both keep every Company's Q1-Q4
+  sum for a Year invariant across edits: saving one Quarter's target
+  redistributes the delta across that Company's *subsequent* Quarters only
+  (never prior ones), split evenly and clamped at zero, so the annual total
+  doesn't drift. This logic lives in `targets.ts` itself
+  (`isQuarterEditable`, `splitEvenly`, `distributeAdjustment` — no schema
+  changes were needed since it's pure business logic over the existing
+  `QuarterTarget` rows), `server/src/routes/actuals.ts`
   (quarterly actuals + per-category remarks upserts keyed by `companyId` +
   `yearId` + `quarter`, BU Integrator scoped to their assigned BUs), a
   superadmin-only `server/src/routes/admin.ts` with full CRUD over
@@ -274,10 +310,19 @@ real data — the app starts completely empty.
   YTD) expandable to show every contributing Company's own actuals plus
   three independently inline-editable Remarks fields
   (Revenue/Collections/Expenses); `pages/TargetConfig.tsx` ("Target Setup"
-  in the nav) sets Quarter targets by Year + Quarter + Business Unit +
-  **Company** — exactly the same Company-level granularity as
-  Data Entry/actuals — and that Company's quarter target rolls up into its
-  Business Unit's total shown on the Revenue dashboard. Target Setup and
+  in the nav) sets targets by Year + Business Unit + **Company** — exactly
+  the same Company-level granularity as Data Entry/actuals — via two modes,
+  a "Set by Quarter" / "Set Annual Target" toggle: Quarter mode sets one
+  Quarter at a time (with a Quarter picker that marks already-passed
+  quarters "(locked)" and disables their inputs/Save button); Annual mode
+  enters one full-year total per category, pre-filled with the Company's
+  current annual sum, and splits it evenly across the Year's still-editable
+  quarters on save (already-locked quarters are called out and left
+  untouched). Either mode's edit rolls up into its Business Unit's total
+  shown on the Revenue dashboard, and editing one Quarter automatically
+  redistributes the change across that Company's *subsequent* Quarters so
+  the Q1-Q4 sum for the Year doesn't drift (see the dedicated note further
+  down). Target Setup and
   Data Entry (`pages/IntegratorPortal.tsx`) both default their Year+Quarter
   to the real current calendar quarter the same way the Revenue dashboard
   does (via `GET /api/current-quarter`); the Rocks page does too for its Year,
@@ -505,3 +550,76 @@ but zeroed-out Revenue figures, and vice versa for a role with only
 financial view; the "Needs Attention" list only ever shows At Risk/Pending
 Rocks, sorted lowest-progress-first, and reflects the current Year/Quarter/
 Business Unit filter.
+
+**Annual Target entry, Quarter cascade, and Quarter locking** (all in
+`server/src/routes/targets.ts` — no schema change, since it's pure business
+logic layered over the existing `QuarterTarget` rows and the existing
+`quarterDates.ts` calendar utility). Three related behaviors, all scoped
+only to Targets (Actuals are untouched):
+1. `PUT /api/targets/annual` is a new endpoint that takes one Company/Year
+   and a full-year Figures total, and splits it evenly across that Year's
+   still-editable Quarters (`splitEvenly`, remainder-to-last-quarter so the
+   split always sums exactly). Quarters already locked by the calendar (see
+   #3) keep their existing values, which are subtracted from the annual
+   total before splitting the remainder across what's left; if every
+   Quarter is locked, it 400s instead of silently doing nothing.
+2. Saving a single Quarter's target (`PUT /api/targets/quarter`, and
+   internally after an annual split) now redistributes the delta — the
+   difference between the new and previous value, per category/Internal-
+   External field independently — across that Company's *subsequent*
+   Quarters of the same Year only, never prior ones (`distributeAdjustment`,
+   equal shares that self-correct quarter-to-quarter, clamped at zero rather
+   than going negative; if clamping prevents fully absorbing a decrease, the
+   shortfall is dropped rather than blocking the save, so the implied annual
+   total can shrink in that edge case but the save never fails). This keeps
+   "sum of Q1-Q4" stable across everyday edits without resurrecting a
+   separately-stored Annual Target row — the invariant is maintained
+   procedurally, not by storing a target-and-lock-it figure the old
+   `AnnualTarget` table used to.
+3. Both endpoints reject edits to a Quarter once the real calendar date (per
+   `quarterDates.ts`) has moved past it (`isQuarterEditable`) — a 403 on
+   direct edits, and locked Quarters are simply excluded from the annual
+   split's target set. `pages/TargetConfig.tsx` mirrors this client-side
+   using the existing `GET /api/current-quarter`: the Quarter dropdown
+   marks locked quarters "(locked)" and disables their form + Save button,
+   and Annual mode calls out which quarters will be left untouched before
+   saving.
+
+This is unverified end-to-end (no npm registry access in this sandbox — see
+the note at the top of this section). Worth checking by hand: setting an
+Annual Target of ₱400,000 Revenue on a Company with no prior targets splits
+into ₱100,000 per quarter; raising Q2 to ₱150,000 afterward drops Q3 and Q4
+to ₱75,000 each (Q1 stays at ₱100,000) so the total stays ₱400,000; lowering
+Q2 back down raises Q3/Q4 again the same way; once the server's real
+calendar date is inside Q2 (or later), Q1's Quarter-mode inputs and Save
+button are disabled with a lock message, and a direct `PUT
+/api/targets/quarter` for Q1 returns 403; setting a new Annual Target in
+that state leaves Q1 untouched and splits only across Q2-Q4; on a Company
+with all four quarters already at zero, saving Q1 for the first time
+doesn't push Q2-Q4 negative (clamped, so they simply stay at zero).
+
+**Blank ("no base role") Users** (`role Role?` on `User` in
+`schema.prisma`, `server/src/middleware/auth.ts`,
+`server/src/routes/admin.ts`, `client/src/pages/admin/AdminUsers.tsx`) needs
+a fresh `npm run prisma:migrate` to drop the `NOT NULL` constraint on
+`User.role` (purely additive/relaxing, no data migration needed — every
+existing user keeps their current role). Admin → Users' Role dropdown now
+has a "No base role (Custom Role only)" option; picking it hides the
+Business Unit checklist (a blank-role user has no BU-assignment mechanism
+of its own) but keeps the Custom Role dropdown visible with a nudge that a
+Custom Role should be assigned so the user can see anything. Enforcement is
+a single added branch in `hasGlobalBusinessUnitAccess`: a blank-role user
+with a Custom Role assigned bypasses the coarse Business-Unit gate entirely
+so that Custom Role's own per-Business-Unit/Company grants are the sole
+source of truth (unconstrained by any BU assignment, since blank-role users
+don't have one); a blank-role user with no Custom Role at all has no access
+to anything. This is unverified end-to-end. Worth checking by hand:
+creating a user with no base role and no Custom Role can log in but every
+page shows nothing/403; assigning that user a Custom Role with, say,
+REVENUE view on one Company immediately (no re-login) shows just that
+Company's Revenue figures and hides everything else, exactly as if the
+Custom Role were the user's entire identity; the Admin → Users table shows
+a "No base role" pill instead of crashing; the top-right role label in the
+header shows "No base role" for such a user instead of misreporting them as
+a BU Integrator; demoting the last remaining Superadmin to blank is
+rejected the same way demoting them to any other role is.

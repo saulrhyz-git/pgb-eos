@@ -94,9 +94,11 @@ export const api = {
     return request<DashboardResponse>(`/dashboard?${qs.toString()}`);
   },
 
-  // Annual Target is not separately entered anymore — it's always derived
-  // (sum of Q1-Q4 Quarter Target) and shown read-only on the Revenue
-  // dashboard; there is no annual API to write to.
+  // Annual Target is still always derived on the Revenue dashboard (sum of
+  // Q1-Q4 Quarter Target) — there's no separately *stored* annual figure.
+  // putAnnualTarget below is a convenience that splits an entered annual
+  // total evenly across the Year's still-editable quarters (see
+  // server/src/routes/targets.ts).
   quarterTargets: (params: { yearId: string; quarter?: number; businessUnitId?: string; companyId?: string }) => {
     const qs = new URLSearchParams({ yearId: params.yearId });
     if (params.quarter) qs.set("quarter", String(params.quarter));
@@ -104,8 +106,20 @@ export const api = {
     if (params.companyId) qs.set("companyId", params.companyId);
     return request<any[]>(`/targets/quarter?${qs.toString()}`);
   },
+  // Editing a quarter cascades: the delta is redistributed across that
+  // Company's *subsequent* quarters of the same Year (never prior ones) so
+  // the Q1-Q4 sum stays what it was before the edit. Quarters that have
+  // already passed (real calendar) are rejected with a 403.
   putQuarterTarget: (payload: { companyId: string; yearId: string; quarter: number } & Figures) =>
     request<any>("/targets/quarter", { method: "PUT", body: JSON.stringify(payload) }),
+  // Splits an annual total evenly across the Year's still-editable quarters
+  // (quarters already locked by the real calendar keep their existing
+  // values and are subtracted from the annual total first).
+  putAnnualTarget: (payload: { companyId: string; yearId: string } & Figures) =>
+    request<{ updated: any[]; lockedQuarters: number[] }>("/targets/annual", {
+      method: "PUT",
+      body: JSON.stringify(payload),
+    }),
 
   actuals: (params: { yearId: string; quarter?: number; businessUnitId?: string; companyId?: string }) => {
     const qs = new URLSearchParams({ yearId: params.yearId });
@@ -142,7 +156,8 @@ export const api = {
     email: string;
     username?: string;
     name: string;
-    role: Role;
+    // Omit or pass null for a "blank" role user (Custom Role only).
+    role: Role | null;
     password: string;
     businessUnitIds?: string[];
     customRoleId?: string | null;
@@ -153,7 +168,7 @@ export const api = {
       email: string;
       username: string | null;
       name: string;
-      role: Role;
+      role: Role | null;
       businessUnitIds: string[];
       password: string;
       customRoleId: string | null;
