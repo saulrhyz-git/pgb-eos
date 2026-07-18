@@ -132,25 +132,6 @@ real data — the app starts completely empty.
     Target), and add/update Rocks for companies within their assigned
     Business Unit(s), but cannot create new Years/BUs/Companies or manage
     the Goals taxonomy.
-  - **Blank / no base role** — `role` on `User` is optional (`Role?` in
-    `schema.prisma`); Admin → Users' Role dropdown has a "No base role
-    (Custom Role only)" option alongside the three above. A blank-role user
-    has zero base-role-derived access on their own — no Business Unit
-    assignment mechanism, no structural admin actions — and relies entirely
-    on an assigned Custom Role (see below) for whatever View/Edit/Delete
-    access they get. This exists specifically to let a Superadmin build
-    narrow, View-Only-style accounts purely through the Custom Role matrix
-    without a base role's coarser scoping getting in the way. A blank-role
-    user with no Custom Role assigned at all has no access to anything (a
-    safe default, not an accidental "sees everything"): in
-    `server/src/middleware/auth.ts`, `hasGlobalBusinessUnitAccess` treats
-    `role === null` as globally-scoped *only if* a Custom Role is assigned
-    (letting that Custom Role's own per-Business-Unit/Company grants be the
-    sole source of truth, unconstrained by any coarse BU filter); with no
-    Custom Role, it falls through to the same "restricted to
-    `businessUnitIds`" path as a BU Integrator, and a blank-role user's
-    `businessUnitIds` is always empty, so every coarse check denies them by
-    default.
 - **Custom Roles** (`CustomRole`/`RolePermission` in `schema.prisma`,
   `server/src/routes/customRoles.ts`, `server/src/utils/permissions.ts`,
   `client/src/pages/admin/AdminRoles.tsx`): an optional, additional layer of
@@ -180,10 +161,7 @@ real data — the app starts completely empty.
   can't be deleted while any user still has it. Enforcement: a user with no
   Custom Role assigned sees zero change in behavior (today's Business-Unit
   scoping applies exactly as before). A user WITH one has their access
-  narrowed further everywhere that resource shows up — and for a blank-role
-  user (see above), the Custom Role isn't just a narrowing layer but the
-  entire basis for their access, since they have no base-role scoping to
-  narrow in the first place —
+  narrowed further everywhere that resource shows up —
   `server/src/routes/targets.ts` (TARGETS view/edit),
   `server/src/routes/actuals.ts` (the combined figures PUT requires edit on
   at least one of Revenue/Collections/Expenses, since that form submits all
@@ -612,28 +590,6 @@ that state leaves Q1 untouched and splits only across Q2-Q4; on a Company
 with all four quarters already at zero, saving Q1 for the first time
 doesn't push Q2-Q4 negative (clamped, so they simply stay at zero).
 
-**Blank ("no base role") Users** (`role Role?` on `User` in
-`schema.prisma`, `server/src/middleware/auth.ts`,
-`server/src/routes/admin.ts`, `client/src/pages/admin/AdminUsers.tsx`) needs
-a fresh `npm run prisma:migrate` to drop the `NOT NULL` constraint on
-`User.role` (purely additive/relaxing, no data migration needed — every
-existing user keeps their current role). Admin → Users' Role dropdown now
-has a "No base role (Custom Role only)" option; picking it hides the
-Business Unit checklist (a blank-role user has no BU-assignment mechanism
-of its own) but keeps the Custom Role dropdown visible with a nudge that a
-Custom Role should be assigned so the user can see anything. Enforcement is
-a single added branch in `hasGlobalBusinessUnitAccess`: a blank-role user
-with a Custom Role assigned bypasses the coarse Business-Unit gate entirely
-so that Custom Role's own per-Business-Unit/Company grants are the sole
-source of truth (unconstrained by any BU assignment, since blank-role users
-don't have one); a blank-role user with no Custom Role at all has no access
-to anything. This is unverified end-to-end. Worth checking by hand:
-creating a user with no base role and no Custom Role can log in but every
-page shows nothing/403; assigning that user a Custom Role with, say,
-REVENUE view on one Company immediately (no re-login) shows just that
-Company's Revenue figures and hides everything else, exactly as if the
-Custom Role were the user's entire identity; the Admin → Users table shows
-a "No base role" pill instead of crashing; the top-right role label in the
-header shows "No base role" for such a user instead of misreporting them as
-a BU Integrator; demoting the last remaining Superadmin to blank is
-rejected the same way demoting them to any other role is.
+(A "blank / no base role" User option was briefly added and then removed in
+this same round of changes — every `User` still always has one of the three
+base Roles, required on both create and update, exactly as before.)

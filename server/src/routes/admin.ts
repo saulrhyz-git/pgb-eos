@@ -19,10 +19,6 @@ const passwordSchema = z
   .refine((v) => /[A-Za-z]/.test(v) && /[0-9]/.test(v), "Password must contain letters and numbers");
 
 const roleSchema = z.enum(["SUPERADMIN", "GROUP_INTEGRATOR", "BU_INTEGRATOR"]);
-// A user can be created/left with no base Role at all ("blank") — relying
-// entirely on an assigned Custom Role for access. Blank is represented as
-// `null` (as opposed to `undefined`, which on update means "leave unchanged").
-const nullableRoleSchema = roleSchema.nullable();
 
 const userSelect = {
   id: true,
@@ -62,9 +58,7 @@ const createUserSchema = z
     email: z.string().email(),
     username: z.string().min(3).max(50).optional(),
     name: z.string().min(1),
-    // Optional — omit (or pass null) to create a "blank" role user whose
-    // access is defined entirely by the Custom Role assigned below.
-    role: nullableRoleSchema.optional(),
+    role: roleSchema,
     password: passwordSchema,
     businessUnitIds: z.array(z.string().uuid()).optional().default([]),
     // Optional additional layer on top of `role` — a Custom Role's
@@ -89,8 +83,7 @@ router.post("/users", async (req, res) => {
   const parsed = createUserSchema.safeParse(req.body);
   if (!parsed.success) return res.status(400).json({ error: parsed.error.issues[0]?.message || "Invalid user payload", details: parsed.error.issues });
 
-  const { email, username, name, password, businessUnitIds, customRoleId } = parsed.data;
-  const role = parsed.data.role ?? null;
+  const { email, username, name, role, password, businessUnitIds, customRoleId } = parsed.data;
   const passwordHash = await bcrypt.hash(password, 10);
 
   try {
@@ -120,9 +113,7 @@ const updateUserSchema = z.object({
   email: z.string().email().optional(),
   username: z.string().min(3).max(50).nullable().optional(),
   name: z.string().min(1).optional(),
-  // Omit entirely to leave the role unchanged; pass `null` explicitly to
-  // clear it to "blank" (Custom Role only).
-  role: nullableRoleSchema.optional(),
+  role: roleSchema.optional(),
   businessUnitIds: z.array(z.string().uuid()).optional(),
   password: passwordSchema.optional(),
   customRoleId: z.string().uuid().nullable().optional(),
@@ -136,21 +127,15 @@ router.put("/users/:id", async (req, res) => {
   const existing = await prisma.user.findUnique({ where: { id: req.params.id } });
   if (!existing) return res.status(404).json({ error: "User not found" });
 
-  // role === undefined means "not provided, leave unchanged"; role === null
-  // means "explicitly clear to blank" and must go through the same
-  // last-superadmin-demotion guard as switching to any other non-SUPERADMIN
-  // role.
-  if (role !== undefined && role !== "SUPERADMIN" && existing.role === "SUPERADMIN") {
+  if (role && role !== "SUPERADMIN" && existing.role === "SUPERADMIN") {
     const superadminCount = await prisma.user.count({ where: { role: "SUPERADMIN" } });
     if (superadminCount <= 1) return res.status(400).json({ error: "Cannot demote the last remaining superadmin" });
   }
 
   // A BU Integrator must always be tied to at least one Business Unit —
   // check the effective post-update state (new role/assignment if provided,
-  // otherwise whatever's already on the record). Only fall back to the
-  // existing role when `role` was omitted entirely (undefined) — an explicit
-  // `null` means "blank", which is never BU_INTEGRATOR.
-  const effectiveRole = role === undefined ? existing.role : role;
+  // otherwise whatever's already on the record).
+  const effectiveRole = role ?? existing.role;
   if (effectiveRole === "BU_INTEGRATOR") {
     const effectiveBuCount = businessUnitIds
       ? businessUnitIds.length
@@ -164,7 +149,7 @@ router.put("/users/:id", async (req, res) => {
   if (email) data.email = email.toLowerCase();
   if (username !== undefined) data.username = username ? username.toLowerCase() : null;
   if (name) data.name = name;
-  if (role !== undefined) data.role = role;
+  if (role) data.role = role;
   if (customRoleId !== undefined) data.customRoleId = customRoleId || null;
   if (password) {
     data.passwordHash = await bcrypt.hash(password, 10);

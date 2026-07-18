@@ -19,11 +19,7 @@ async function main() {
   await prisma.quarterActual.deleteMany({});
   await prisma.quarterTarget.deleteMany({});
   await prisma.userBusinessUnit.deleteMany({});
-  // role is nullable now (a user can have no base role at all — see
-  // schema.prisma) — `{ not: "SUPERADMIN" }` alone would leave those blank-role
-  // rows behind under normal SQL NULL comparison semantics, so NULL is
-  // matched explicitly too.
-  await prisma.user.deleteMany({ where: { OR: [{ role: { not: "SUPERADMIN" } }, { role: null }] } });
+  await prisma.user.deleteMany({ where: { role: { not: "SUPERADMIN" } } });
   await prisma.customRole.deleteMany({});
   await prisma.company.deleteMany({});
   await prisma.businessUnit.deleteMany({});

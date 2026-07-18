@@ -43,11 +43,7 @@ model User {
   username           String?  @unique
   passwordHash       String
   name               String
-  // Optional — a user can be created with no base Role at all ("blank"),
-  // relying entirely on an assigned CustomRole for access (see customRoleId
-  // below). A blank-role user with no CustomRole assigned has no access to
-  // anything (see hasGlobalBusinessUnitAccess in middleware/auth.ts).
-  role               Role?
+  role               Role
   mustChangePassword Boolean  @default(false)
   createdAt          DateTime @default(now())
 

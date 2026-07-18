@@ -48,9 +48,7 @@ export default function Layout() {
                   ? "Superadmin"
                   : user?.role === "GROUP_INTEGRATOR"
                   ? "Group Integrator"
-                  : user?.role === "BU_INTEGRATOR"
-                  ? "BU Integrator"
-                  : "No base role"}
+                  : "BU Integrator"}
               </div>
             </div>
             <button

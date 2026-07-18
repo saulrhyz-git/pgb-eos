@@ -11,9 +11,7 @@ export interface AuthUser {
   email: string;
   username?: string | null;
   name: string;
-  // null = "blank" role — no base-role-derived access; relies entirely on
-  // an assigned Custom Role.
-  role: Role | null;
+  role: Role;
   businessUnitIds: string[];
   mustChangePassword: boolean;
   customRoleId?: string | null;
@@ -24,7 +22,7 @@ export interface AdminUser {
   email: string;
   username: string | null;
   name: string;
-  role: Role | null;
+  role: Role;
   mustChangePassword: boolean;
   createdAt: string;
   businessUnits: { id: string; name: string }[];
