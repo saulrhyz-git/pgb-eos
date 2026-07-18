@@ -226,4 +226,18 @@ export const api = {
     }>
   ) => request<Rock>(`/rocks/${id}`, { method: "PUT", body: JSON.stringify(payload) }),
   deleteRock: (id: string) => request<void>(`/rocks/${id}`, { method: "DELETE" }),
+  // Carries every not-yet-complete Rock in scope forward one quarter (Group
+  // Integrator/Superadmin only). Q4 rolls into Q1 of the following Year,
+  // which must already exist.
+  rolloverRocks: (payload: {
+    yearId: string;
+    quarter: number;
+    businessUnitId?: string;
+    companyId?: string;
+    businessGoalId?: string;
+  }) =>
+    request<{ rolledOver: number; targetYearId: string; targetQuarter: number; rocks: Rock[] }>("/rocks/rollover", {
+      method: "POST",
+      body: JSON.stringify(payload),
+    }),
 };

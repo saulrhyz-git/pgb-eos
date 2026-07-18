@@ -134,7 +134,13 @@ real data — the app starts completely empty.
   them), `server/src/routes/rocks.ts` (Rock CRUD, BU-scoped the same way as
   actuals/targets, plus `assertBusinessGoalUsable` which rejects tagging a
   Rock with a Business Goal that's scoped to a different Business Unit than
-  the Rock's company), and a single `/api/dashboard` endpoint that fetches
+  the Rock's company; also `POST /rocks/rollover`, Group Integrator/
+  Superadmin only, which finds every non-`TARGET_MET` Rock in the given
+  Year/Quarter/BU/Company/Business Goal scope and creates a copy of each one
+  in the next quarter — Q4 rolls into Q1 of the following Year, which must
+  already exist, otherwise it 400s asking the admin to create that Year
+  first; the original Rocks are left untouched, so this carries a copy
+  forward rather than moving them), and a single `/api/dashboard` endpoint that fetches
   targets and actuals per Company, then aggregates both up to whatever scope
   (BU, Group, or a single-Company drill-down) the request asks for (KPIs,
   chart series, per-BU target distribution matrix computed by summing each
@@ -190,9 +196,13 @@ real data — the app starts completely empty.
   figure that counts, so "One Total" is purely a data-entry shortcut that
   puts the whole number in Internal and zeroes External; no schema or API
   change was needed for it; a **Rocks** page (`pages/Rocks.tsx`) with
-  its own Year/Quarter/BU/Company/Business Goal filter bar, five summary
-  cards (Total Rocks, Target Met, On Track, At Risk / Pending, Avg
-  Progress %) computed client-side from the filtered list, a "Manage
+  its own Year/Quarter/BU/Company/Business Goal filter bar, a Rollover
+  button (Group Integrator/Superadmin only, enabled only when a specific
+  Quarter — not "All Quarters" — is selected) that carries every
+  not-yet-`TARGET_MET` Rock in the current filter scope forward into the
+  next quarter, with a confirmation prompt naming the from/to quarter before
+  it runs, five summary cards (Total Rocks, Target Met, On Track, At Risk /
+  Pending, Avg Progress %) computed client-side from the filtered list, a "Manage
   Business Goals" panel (Group Integrator/Superadmin only) with a
   Business-Unit-checklist per goal for assigning it to one or more BUs (or
   leaving it unassigned/global), an Add/Edit Rock form with its own Remarks

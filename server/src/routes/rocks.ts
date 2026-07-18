@@ -5,6 +5,7 @@ import {
   assertBusinessUnitAccess,
   blockPendingPasswordChange,
   requireAuth,
+  requireRole,
   resolveCompanyBusinessUnit,
   scopedBusinessUnitFilter,
 } from "../middleware/auth";
@@ -117,6 +118,95 @@ router.post("/", async (req, res) => {
     include: rockInclude,
   });
   res.status(201).json(rock);
+});
+
+// ---------- Rollover ----------
+// Carries every not-yet-complete Rock (status != TARGET_MET) in the given
+// scope forward one quarter: Q1-Q3 roll into Q2-Q4 of the same Year; Q4 rolls
+// into Q1 of the following Year (which must already exist — this endpoint
+// never creates a Year). Each carried-over Rock is a new row in the target
+// quarter with the same details/status/progress; the original Rock in its
+// original quarter is left untouched, so this is a "carry forward a copy",
+// not a "move". Restricted to Group Integrator/Superadmin since it acts
+// across whatever scope is currently filtered on the Rocks page, not just a
+// single Company.
+const rolloverSchema = z.object({
+  yearId: z.string().uuid(),
+  quarter: z.number().int().min(1).max(4),
+  businessUnitId: z.string().uuid().optional(),
+  companyId: z.string().uuid().optional(),
+  businessGoalId: z.string().uuid().optional(),
+});
+
+router.post("/rollover", requireRole("GROUP_INTEGRATOR", "SUPERADMIN"), async (req, res) => {
+  const parsed = rolloverSchema.safeParse(req.body);
+  if (!parsed.success) return res.status(400).json({ error: "Invalid rollover payload", details: parsed.error.issues });
+  const { yearId, quarter, businessUnitId, companyId, businessGoalId } = parsed.data;
+
+  const user = req.user!;
+  try {
+    if (companyId) assertBusinessUnitAccess(user, await resolveCompanyBusinessUnit(companyId));
+  } catch (err: any) {
+    return res.status(err.status || 500).json({ error: err.message });
+  }
+
+  const sourceYear = await prisma.year.findUnique({ where: { id: yearId } });
+  if (!sourceYear) return res.status(404).json({ error: "Year not found" });
+
+  let targetYearId = yearId;
+  let targetQuarter = quarter + 1;
+  if (quarter === 4) {
+    const nextYear = await prisma.year.findUnique({ where: { year: sourceYear.year + 1 } });
+    if (!nextYear) {
+      return res.status(400).json({
+        error: `Year ${sourceYear.year + 1} doesn't exist yet — create it in Target Setup before rolling over Q4 rocks.`,
+      });
+    }
+    targetYearId = nextYear.id;
+    targetQuarter = 1;
+  }
+
+  const where: any = { yearId, quarter, status: { not: "TARGET_MET" } };
+  if (businessGoalId) where.businessGoalId = businessGoalId;
+  if (companyId) {
+    where.companyId = companyId;
+  } else {
+    try {
+      const buFilter = scopedBusinessUnitFilter(user, businessUnitId);
+      if (buFilter) where.company = { businessUnitId: buFilter };
+    } catch (err: any) {
+      return res.status(err.status || 500).json({ error: err.message });
+    }
+  }
+
+  const sourceRocks = await prisma.rock.findMany({ where });
+  if (sourceRocks.length === 0) {
+    return res.json({ rolledOver: 0, targetYearId, targetQuarter, rocks: [] });
+  }
+
+  const created = await prisma.$transaction(
+    sourceRocks.map((r) =>
+      prisma.rock.create({
+        data: {
+          companyId: r.companyId,
+          yearId: targetYearId,
+          quarter: targetQuarter,
+          businessGoalId: r.businessGoalId,
+          title: r.title,
+          description: r.description,
+          remarks: r.remarks,
+          ownerName: r.ownerName,
+          status: r.status,
+          progressPct: r.progressPct,
+          createdById: user.id,
+          updatedById: user.id,
+        },
+        include: rockInclude,
+      })
+    )
+  );
+
+  res.json({ rolledOver: created.length, targetYearId, targetQuarter, rocks: created });
 });
 
 const updateSchema = z.object({

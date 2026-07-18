@@ -7,6 +7,7 @@ import {
   Pencil,
   Percent,
   Plus,
+  SkipForward,
   Trash2,
   TrendingUp,
   X,
@@ -106,6 +107,7 @@ export default function Rocks() {
 
   const [loading, setLoading] = useState(false);
   const [error, setError] = useState("");
+  const [rollingOver, setRollingOver] = useState(false);
 
   const [showRockForm, setShowRockForm] = useState(false);
   const [rockForm, setRockForm] = useState(emptyRockForm);
@@ -238,6 +240,43 @@ export default function Rocks() {
       loadRocks();
     } catch (err: any) {
       alert(err.message || "Failed to delete rock");
+    }
+  }
+
+  // Carries every not-yet-complete Rock in the current filter scope forward
+  // one quarter. Requires a specific Quarter to be selected (not "All
+  // Quarters") since "next quarter" is otherwise ambiguous.
+  async function handleRollover() {
+    if (!yearId || !quarter) return;
+    const currentYear = years.find((y) => y.id === yearId);
+    const fromLabel = `Q${quarter}${currentYear ? ` ${currentYear.year}` : ""}`;
+    const toLabel =
+      quarter === 4
+        ? `Q1 ${currentYear ? currentYear.year + 1 : ""}`
+        : `Q${quarter + 1}${currentYear ? ` ${currentYear.year}` : ""}`;
+    if (
+      !confirm(
+        `Roll over all incomplete Rocks from ${fromLabel} to ${toLabel}? This creates a copy of each incomplete Rock in ${toLabel} — the originals in ${fromLabel} are left as-is.`
+      )
+    ) {
+      return;
+    }
+    setRollingOver(true);
+    setError("");
+    try {
+      const result = await api.rolloverRocks({
+        yearId,
+        quarter,
+        businessUnitId: businessUnitId || undefined,
+        companyId: companyId || undefined,
+        businessGoalId: businessGoalId || undefined,
+      });
+      alert(`Rolled over ${result.rolledOver} rock${result.rolledOver === 1 ? "" : "s"} to ${toLabel}.`);
+      loadRocks();
+    } catch (err: any) {
+      setError(err.message || "Failed to roll over rocks");
+    } finally {
+      setRollingOver(false);
     }
   }
 
@@ -413,12 +452,29 @@ export default function Rocks() {
             ))}
           </select>
         </div>
-        <button
-          onClick={startAddRock}
-          className="ml-auto flex items-center gap-2 rounded-md bg-brand-500 px-3 py-2 text-sm font-medium text-white hover:bg-brand-600"
-        >
-          <Plus className="h-4 w-4" /> Add Rock
-        </button>
+        <div className="ml-auto flex items-center gap-2">
+          {canManageStructure && (
+            <button
+              onClick={handleRollover}
+              disabled={rollingOver || !yearId || !quarter}
+              title={
+                !quarter
+                  ? "Select a specific Quarter (not All Quarters) to roll over"
+                  : "Carry every incomplete Rock in this scope forward to the next quarter"
+              }
+              className="flex items-center gap-2 rounded-md border border-slate-300 bg-white px-3 py-2 text-sm font-medium text-slate-700 hover:bg-slate-50 disabled:cursor-not-allowed disabled:opacity-50"
+            >
+              {rollingOver ? <Loader2 className="h-4 w-4 animate-spin" /> : <SkipForward className="h-4 w-4" />}
+              {rollingOver ? "Rolling over..." : "Rollover"}
+            </button>
+          )}
+          <button
+            onClick={startAddRock}
+            className="flex items-center gap-2 rounded-md bg-brand-500 px-3 py-2 text-sm font-medium text-white hover:bg-brand-600"
+          >
+            <Plus className="h-4 w-4" /> Add Rock
+          </button>
+        </div>
       </div>
 
       {error && <div className="rounded-md bg-red-50 px-4 py-3 text-sm text-red-600">{error}</div>}
