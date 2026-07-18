@@ -4,11 +4,13 @@ import type {
   BusinessGoal,
   BusinessUnit,
   Company,
+  CustomRole,
   DashboardResponse,
   Figures,
   Rock,
   RockStatus,
   Role,
+  RolePermission,
   SmtpSettings,
   Year,
 } from "./types";
@@ -142,6 +144,7 @@ export const api = {
     role: Role;
     password: string;
     businessUnitIds?: string[];
+    customRoleId?: string | null;
   }) => request<AdminUser>("/admin/users", { method: "POST", body: JSON.stringify(payload) }),
   adminUpdateUser: (
     id: string,
@@ -152,6 +155,7 @@ export const api = {
       role: Role;
       businessUnitIds: string[];
       password: string;
+      customRoleId: string | null;
     }>
   ) => request<AdminUser>(`/admin/users/${id}`, { method: "PUT", body: JSON.stringify(payload) }),
   adminDeleteUser: (id: string) => request<void>(`/admin/users/${id}`, { method: "DELETE" }),
@@ -179,6 +183,17 @@ export const api = {
   }) => request<SmtpSettings>("/settings/smtp", { method: "PUT", body: JSON.stringify(payload) }),
   testSmtpSettings: (to: string) =>
     request<{ ok: true }>("/settings/smtp/test", { method: "POST", body: JSON.stringify({ to }) }),
+
+  // ---------- Custom Roles (Superadmin only) ----------
+  // Named permission profiles assignable to Users as an additional,
+  // more granular layer on top of their base Role — see server's
+  // routes/customRoles.ts and utils/permissions.ts.
+  customRoles: () => request<CustomRole[]>("/custom-roles"),
+  createCustomRole: (payload: { name: string; description?: string; permissions: RolePermission[] }) =>
+    request<CustomRole>("/custom-roles", { method: "POST", body: JSON.stringify(payload) }),
+  updateCustomRole: (id: string, payload: { name: string; description?: string; permissions: RolePermission[] }) =>
+    request<CustomRole>(`/custom-roles/${id}`, { method: "PUT", body: JSON.stringify(payload) }),
+  deleteCustomRole: (id: string) => request<void>(`/custom-roles/${id}`, { method: "DELETE" }),
 
   // ---------- Business Goals (Group Integrator / Superadmin manage; everyone reads) ----------
   businessGoals: () => request<BusinessGoal[]>("/business-goals"),

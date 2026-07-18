@@ -29,6 +29,7 @@ const userSelect = {
   mustChangePassword: true,
   createdAt: true,
   businessUnits: { select: { businessUnit: { select: { id: true, name: true } } } },
+  customRole: { select: { id: true, name: true } },
 } as const;
 
 function serializeUser(user: any) {
@@ -41,6 +42,7 @@ function serializeUser(user: any) {
     mustChangePassword: user.mustChangePassword,
     createdAt: user.createdAt,
     businessUnits: user.businessUnits.map((b: any) => b.businessUnit),
+    customRole: user.customRole,
   };
 }
 
@@ -59,6 +61,10 @@ const createUserSchema = z
     role: roleSchema,
     password: passwordSchema,
     businessUnitIds: z.array(z.string().uuid()).optional().default([]),
+    // Optional additional layer on top of `role` — a Custom Role's
+    // permission matrix (see routes/customRoles.ts). Superadmins ignore this
+    // even if set.
+    customRoleId: z.string().uuid().nullable().optional(),
   })
   .superRefine((data, ctx) => {
     // A BU Integrator must always be tied to at least one Business Unit.
@@ -77,7 +83,7 @@ router.post("/users", async (req, res) => {
   const parsed = createUserSchema.safeParse(req.body);
   if (!parsed.success) return res.status(400).json({ error: parsed.error.issues[0]?.message || "Invalid user payload", details: parsed.error.issues });
 
-  const { email, username, name, role, password, businessUnitIds } = parsed.data;
+  const { email, username, name, role, password, businessUnitIds, customRoleId } = parsed.data;
   const passwordHash = await bcrypt.hash(password, 10);
 
   try {
@@ -89,6 +95,7 @@ router.post("/users", async (req, res) => {
         role,
         passwordHash,
         mustChangePassword: true,
+        customRoleId: customRoleId || null,
         businessUnits: {
           create: businessUnitIds.map((businessUnitId) => ({ businessUnitId })),
         },
@@ -109,13 +116,14 @@ const updateUserSchema = z.object({
   role: roleSchema.optional(),
   businessUnitIds: z.array(z.string().uuid()).optional(),
   password: passwordSchema.optional(),
+  customRoleId: z.string().uuid().nullable().optional(),
 });
 
 router.put("/users/:id", async (req, res) => {
   const parsed = updateUserSchema.safeParse(req.body);
   if (!parsed.success) return res.status(400).json({ error: parsed.error.issues[0]?.message || "Invalid user payload", details: parsed.error.issues });
 
-  const { email, username, name, role, businessUnitIds, password } = parsed.data;
+  const { email, username, name, role, businessUnitIds, password, customRoleId } = parsed.data;
   const existing = await prisma.user.findUnique({ where: { id: req.params.id } });
   if (!existing) return res.status(404).json({ error: "User not found" });
 
@@ -142,6 +150,7 @@ router.put("/users/:id", async (req, res) => {
   if (username !== undefined) data.username = username ? username.toLowerCase() : null;
   if (name) data.name = name;
   if (role) data.role = role;
+  if (customRoleId !== undefined) data.customRoleId = customRoleId || null;
   if (password) {
     data.passwordHash = await bcrypt.hash(password, 10);
     data.mustChangePassword = true;

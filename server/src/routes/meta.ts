@@ -1,7 +1,8 @@
 import { Router } from "express";
 import { z } from "zod";
 import { prisma } from "../lib/prisma";
-import { blockPendingPasswordChange, requireAuth, requireRole, scopedBusinessUnitFilter } from "../middleware/auth";
+import { blockPendingPasswordChange, loadUserPermissions, requireAuth, requireRole, scopedBusinessUnitFilter } from "../middleware/auth";
+import { canAny } from "../utils/permissions";
 import { currentCalendarQuarter } from "../utils/quarterDates";
 
 const router = Router();
@@ -48,11 +49,26 @@ router.get("/business-units", async (req, res) => {
   } catch (err: any) {
     return res.status(err.status || 500).json({ error: err.message });
   }
-  const bus = await prisma.businessUnit.findMany({
+  let bus = await prisma.businessUnit.findMany({
     where,
-    include: { companies: { select: { id: true, name: true } } },
+    include: { companies: { select: { id: true, name: true, businessUnitId: true } } },
     orderBy: { name: "asc" },
   });
+
+  const permRows = await loadUserPermissions(user);
+  if (permRows.length) {
+    // A Custom Role narrows which Business Units/Companies even show up in
+    // dropdowns app-wide, using "any view, on anything" so a role scoped to
+    // just ROCKS (say) can still find the right Company on the Rocks page
+    // even though it has no financial view at all.
+    bus = bus
+      .map((bu) => ({
+        ...bu,
+        companies: bu.companies.filter((c) => canAny(permRows, "view", { businessUnitId: bu.id, companyId: c.id })),
+      }))
+      .filter((bu) => canAny(permRows, "view", { businessUnitId: bu.id }) || bu.companies.length > 0);
+  }
+
   res.json(bus);
 });
 
@@ -88,7 +104,13 @@ router.get("/companies", async (req, res) => {
     return res.status(err.status || 500).json({ error: err.message });
   }
 
-  const companies = await prisma.company.findMany({ where, orderBy: { name: "asc" } });
+  let companies = await prisma.company.findMany({ where, orderBy: { name: "asc" } });
+
+  const permRows = await loadUserPermissions(user);
+  if (permRows.length) {
+    companies = companies.filter((c) => canAny(permRows, "view", { businessUnitId: c.businessUnitId, companyId: c.id }));
+  }
+
   res.json(companies);
 });
 

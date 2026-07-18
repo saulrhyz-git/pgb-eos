@@ -1,5 +1,9 @@
 export type Role = "SUPERADMIN" | "GROUP_INTEGRATOR" | "BU_INTEGRATOR";
 
+// The five gate-able areas of the app a Custom Role's permission matrix can
+// grant View/Edit/Delete over, independently, per Business Unit or Company.
+export type Resource = "TARGETS" | "REVENUE" | "COLLECTIONS" | "EXPENSES" | "ROCKS";
+
 export interface AuthUser {
   id: string;
   email: string;
@@ -8,6 +12,7 @@ export interface AuthUser {
   role: Role;
   businessUnitIds: string[];
   mustChangePassword: boolean;
+  customRoleId?: string | null;
 }
 
 export interface AdminUser {
@@ -19,6 +24,33 @@ export interface AdminUser {
   mustChangePassword: boolean;
   createdAt: string;
   businessUnits: { id: string; name: string }[];
+  customRole: { id: string; name: string } | null;
+}
+
+// One row of a Custom Role's permission matrix: for one Business Unit (or,
+// if companyId is set, one specific Company within it) and one resource,
+// what's allowed. A Company-level row takes precedence over a
+// Business-Unit-level row for the same resource when both exist.
+export interface RolePermission {
+  id?: string;
+  businessUnitId: string;
+  businessUnitName?: string | null;
+  companyId?: string | null;
+  companyName?: string | null;
+  resource: Resource;
+  canView: boolean;
+  canEdit: boolean;
+  canDelete: boolean;
+}
+
+export interface CustomRole {
+  id: string;
+  name: string;
+  description: string;
+  createdAt: string;
+  updatedAt: string;
+  userCount: number;
+  permissions: RolePermission[];
 }
 
 export interface SmtpSettings {

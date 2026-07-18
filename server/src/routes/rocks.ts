@@ -4,11 +4,13 @@ import { prisma } from "../lib/prisma";
 import {
   assertBusinessUnitAccess,
   blockPendingPasswordChange,
+  loadUserPermissions,
   requireAuth,
   requireRole,
   resolveCompanyBusinessUnit,
   scopedBusinessUnitFilter,
 } from "../middleware/auth";
+import { assertPermission, can } from "../utils/permissions";
 
 // Rocks (EOS-style 90-day priorities) tracked per Company/Year/Quarter.
 // Read access follows the same Business-Unit scoping as the rest of the app;
@@ -16,7 +18,9 @@ import {
 // may only add/edit/delete Rocks for companies within their assigned
 // Business Unit(s), while Group Integrators/Superadmins can act on any Rock
 // within their own scope (which may itself be narrowed if a Group Integrator
-// has been assigned specific BUs).
+// has been assigned specific BUs). If the requesting user has a Custom Role
+// (see utils/permissions.ts), their ROCKS view/edit/delete grants per
+// Business Unit/Company narrow this further still.
 const router = Router();
 router.use(requireAuth);
 router.use(blockPendingPasswordChange);
@@ -55,8 +59,14 @@ router.get("/", async (req, res) => {
   if (!yearId) return res.status(400).json({ error: "yearId is required" });
 
   const user = req.user!;
+  const permRows = await loadUserPermissions(user);
+
   try {
-    if (companyId) assertBusinessUnitAccess(user, await resolveCompanyBusinessUnit(companyId));
+    if (companyId) {
+      const buId = await resolveCompanyBusinessUnit(companyId);
+      assertBusinessUnitAccess(user, buId);
+      if (permRows.length) assertPermission(permRows, "view", "ROCKS", { businessUnitId: buId, companyId });
+    }
   } catch (err: any) {
     return res.status(err.status || 500).json({ error: err.message });
   }
@@ -69,14 +79,27 @@ router.get("/", async (req, res) => {
     if (!parsedStatus.success) return res.status(400).json({ error: "Invalid status filter" });
     where.status = parsedStatus.data;
   }
+
   if (companyId) {
     where.companyId = companyId;
   } else {
+    let buFilter: string | { in: string[] } | undefined;
     try {
-      const buFilter = scopedBusinessUnitFilter(user, businessUnitId);
-      if (buFilter) where.company = { businessUnitId: buFilter };
+      buFilter = scopedBusinessUnitFilter(user, businessUnitId);
     } catch (err: any) {
       return res.status(err.status || 500).json({ error: err.message });
+    }
+
+    if (permRows.length) {
+      const companyWhere: any = {};
+      if (buFilter) companyWhere.businessUnitId = buFilter;
+      const candidates = await prisma.company.findMany({ where: companyWhere, select: { id: true, businessUnitId: true } });
+      const permittedIds = candidates
+        .filter((c) => can(permRows, "view", "ROCKS", { businessUnitId: c.businessUnitId, companyId: c.id }))
+        .map((c) => c.id);
+      where.companyId = { in: permittedIds };
+    } else if (buFilter) {
+      where.company = { businessUnitId: buFilter };
     }
   }
 
@@ -108,6 +131,8 @@ router.post("/", async (req, res) => {
   try {
     const businessUnitId = await resolveCompanyBusinessUnit(parsed.data.companyId);
     assertBusinessUnitAccess(req.user!, businessUnitId);
+    const permRows = await loadUserPermissions(req.user!);
+    if (permRows.length) assertPermission(permRows, "edit", "ROCKS", { businessUnitId, companyId: parsed.data.companyId });
     if (parsed.data.businessGoalId) await assertBusinessGoalUsable(parsed.data.businessGoalId, businessUnitId);
   } catch (err: any) {
     return res.status(err.status || 500).json({ error: err.message });
@@ -144,8 +169,13 @@ router.post("/rollover", requireRole("GROUP_INTEGRATOR", "SUPERADMIN"), async (r
   const { yearId, quarter, businessUnitId, companyId, businessGoalId } = parsed.data;
 
   const user = req.user!;
+  const permRows = await loadUserPermissions(user);
   try {
-    if (companyId) assertBusinessUnitAccess(user, await resolveCompanyBusinessUnit(companyId));
+    if (companyId) {
+      const buId = await resolveCompanyBusinessUnit(companyId);
+      assertBusinessUnitAccess(user, buId);
+      if (permRows.length) assertPermission(permRows, "edit", "ROCKS", { businessUnitId: buId, companyId });
+    }
   } catch (err: any) {
     return res.status(err.status || 500).json({ error: err.message });
   }
@@ -168,14 +198,30 @@ router.post("/rollover", requireRole("GROUP_INTEGRATOR", "SUPERADMIN"), async (r
 
   const where: any = { yearId, quarter, status: { not: "TARGET_MET" } };
   if (businessGoalId) where.businessGoalId = businessGoalId;
+
   if (companyId) {
     where.companyId = companyId;
   } else {
+    let buFilter: string | { in: string[] } | undefined;
     try {
-      const buFilter = scopedBusinessUnitFilter(user, businessUnitId);
-      if (buFilter) where.company = { businessUnitId: buFilter };
+      buFilter = scopedBusinessUnitFilter(user, businessUnitId);
     } catch (err: any) {
       return res.status(err.status || 500).json({ error: err.message });
+    }
+
+    if (permRows.length) {
+      // Only roll over Rocks belonging to Companies this Custom Role grants
+      // ROCKS edit on — a broad rollover silently skips the rest rather than
+      // failing outright.
+      const companyWhere: any = {};
+      if (buFilter) companyWhere.businessUnitId = buFilter;
+      const candidates = await prisma.company.findMany({ where: companyWhere, select: { id: true, businessUnitId: true } });
+      const permittedIds = candidates
+        .filter((c) => can(permRows, "edit", "ROCKS", { businessUnitId: c.businessUnitId, companyId: c.id }))
+        .map((c) => c.id);
+      where.companyId = { in: permittedIds };
+    } else if (buFilter) {
+      where.company = { businessUnitId: buFilter };
     }
   }
 
@@ -230,6 +276,8 @@ router.put("/:id", async (req, res) => {
   try {
     const businessUnitId = await resolveCompanyBusinessUnit(existing.companyId);
     assertBusinessUnitAccess(req.user!, businessUnitId);
+    const permRows = await loadUserPermissions(req.user!);
+    if (permRows.length) assertPermission(permRows, "edit", "ROCKS", { businessUnitId, companyId: existing.companyId });
     if (parsed.data.businessGoalId) await assertBusinessGoalUsable(parsed.data.businessGoalId, businessUnitId);
   } catch (err: any) {
     return res.status(err.status || 500).json({ error: err.message });
@@ -250,6 +298,8 @@ router.delete("/:id", async (req, res) => {
   try {
     const businessUnitId = await resolveCompanyBusinessUnit(existing.companyId);
     assertBusinessUnitAccess(req.user!, businessUnitId);
+    const permRows = await loadUserPermissions(req.user!);
+    if (permRows.length) assertPermission(permRows, "delete", "ROCKS", { businessUnitId, companyId: existing.companyId });
   } catch (err: any) {
     return res.status(err.status || 500).json({ error: err.message });
   }

@@ -14,7 +14,11 @@ provided for a Superadmin
 (full system access), a Group Integrator (global by default, but can
 optionally be scoped to one or more assigned Business Units), and BU
 Integrators (always tied to at least one assigned Business Unit, with data
-entry, target-setup, and Rock-tracking rights scoped to it).
+entry, target-setup, and Rock-tracking rights scoped to it). On top of that,
+a Superadmin can build named **Custom Roles** — a tickbox matrix granting
+View/Edit/Delete over Targets/Revenue/Collections/Expenses/Rocks per
+Business Unit or individual Company — and assign one to any user for
+accountability finer than a blanket Business Unit assignment.
 
 **Stack:** React (Vite) + Tailwind + Recharts + Lucide on the front end;
 Express + TypeScript + Prisma + PostgreSQL on the back end.
@@ -111,6 +115,51 @@ real data — the app starts completely empty.
     Target), and add/update Rocks for companies within their assigned
     Business Unit(s), but cannot create new Years/BUs/Companies or manage
     the Goals taxonomy.
+- **Custom Roles** (`CustomRole`/`RolePermission` in `schema.prisma`,
+  `server/src/routes/customRoles.ts`, `server/src/utils/permissions.ts`,
+  `client/src/pages/admin/AdminRoles.tsx`): an optional, additional layer of
+  access control a Superadmin can build and assign on top of the three base
+  Roles above, for finer-grained accountability than "everything in my
+  assigned Business Unit(s)." A Custom Role is a named matrix: for any number
+  of Business Units and/or specific Companies (multiple of each can be
+  selected — a Company-level grant takes precedence over a Business-Unit-level
+  one for the same resource when both exist, so a role can grant BU-wide
+  access with a narrower or wider carve-out for one Company), independently
+  choose View/Edit/Delete for each of five resources — **Targets** (the
+  Target Setup page), **Revenue**, **Collections**, **Expenses** (each
+  financial category wherever it appears — Revenue dashboard KPIs/chart/
+  matrix/Operational Grid, Data Entry, per-category Remarks), and **Rocks**
+  (the Rocks page). Admin → Roles presents this as the requested tickbox
+  matrix: pick a Business Unit or Company on the left (a tree with Business
+  Units expandable to their Companies, both independently selectable), and
+  each pick gets its own 5-resource x View/Edit/Delete grid on the right;
+  saving flattens the selections into `RolePermission` rows (only rows with
+  at least one box checked are kept). A role is assigned to a user via a
+  "Custom Role" dropdown on Admin → Users (hidden for Superadmins, who always
+  have full access regardless); it has no effect until assigned, and a role
+  can't be deleted while any user still has it. Enforcement: a user with no
+  Custom Role assigned sees zero change in behavior (today's Business-Unit
+  scoping applies exactly as before). A user WITH one has their access
+  narrowed further everywhere that resource shows up —
+  `server/src/routes/targets.ts` (TARGETS view/edit),
+  `server/src/routes/actuals.ts` (the combined figures PUT requires edit on
+  at least one of Revenue/Collections/Expenses, since that form submits all
+  three together; the per-category Remarks PATCH enforces the exact matching
+  category instead, since remarks save one category at a time),
+  `server/src/routes/rocks.ts` (ROCKS view/edit/delete, including which
+  Rocks a broad Rollover actually picks up), `server/src/routes/meta.ts`
+  (which Business Units/Companies even appear in dropdowns app-wide — "any
+  view, on anything" so a Rocks-only role can still find its Companies), and
+  `server/src/routes/dashboard.ts` (any Business Unit/Company with no
+  Revenue/Collections/Expenses view at all is dropped entirely rather than
+  shown with zeroes; within what remains, Revenue/Collections/Expenses are
+  independently zeroed out per Company per category — since the dashboard's
+  "headline" KPIs/chart/Operational Grid totals have always been
+  revenue-based, a role with only Collections view sees real Collections
+  figures alongside zeroed headline numbers). Permissions are looked up fresh
+  from the database on every request (not baked into the login token), so
+  editing a role's matrix takes effect immediately for anyone assigned to it,
+  without needing to log out and back in.
 - **API** (`server/src/routes`): JWT auth (login accepts email or username),
   a `POST /api/auth/change-password` flow that's enforced whenever a user's
   `mustChangePassword` flag is set (e.g. the seeded superadmin's first
@@ -132,6 +181,8 @@ real data — the app starts completely empty.
   `yearId` + `quarter`, BU Integrator scoped to their assigned BUs), a
   superadmin-only `server/src/routes/admin.ts` with full CRUD over
   Users/Companies/Business Units, a superadmin-only
+  `server/src/routes/customRoles.ts` with full CRUD over Custom Roles and
+  their permission matrix (see the Custom Roles bullet above), a superadmin-only
   `server/src/routes/settings.ts` for SMTP configuration + test-send (via
   `nodemailer`), `server/src/routes/businessGoals.ts` (Business Goal CRUD —
   read is open to everyone, write is Group Integrator + Superadmin,
@@ -227,14 +278,15 @@ real data — the app starts completely empty.
   quick-add forms on Target Setup are only shown to Group
   Integrators/Superadmin), a forced Change Password screen, and a
   Superadmin-only `/admin` section (`client/src/pages/admin`) with tabs for
-  Users (including the Business Unit assignment checklist), Companies,
+  Users (including the Business Unit assignment checklist and the Custom
+  Role dropdown), Roles (the Custom Role tickbox-matrix builder), Companies,
   Business Units, and SMTP Settings.
 
 - **Seed script** (`server/prisma/seed.ts`): a hard reset, not a passive
   seed. Every time you run `npm run seed` it wipes all Business Units,
-  Companies, Years, targets, actuals, Rocks, Business Goals, and any
-  non-superadmin users, then ensures the superadmin account exists. This is
-  what to run if
+  Companies, Years, targets, actuals, Rocks, Business Goals, Custom Roles,
+  and any non-superadmin users, then ensures the superadmin account exists.
+  This is what to run if
   sample/demo data from an earlier version of this project is still showing
   up in your database — re-run `npm run seed` and it will be removed. SMTP
   settings are left untouched.
@@ -374,3 +426,28 @@ Expenses Target KPI cards update immediately after saving a Quarter Target
 even with Q3/Q4 still empty); the Target Distribution Matrix's Annual
 Target column always exactly equals its Q1+Q2+Q3+Q4 row for that Business
 Unit; the Operational Grid's Annual Target column behaves the same way.
+
+**Custom Roles** (the `CustomRole`/`RolePermission` schema additions,
+`server/src/routes/customRoles.ts`, `server/src/utils/permissions.ts`,
+enforcement changes across `targets.ts`/`actuals.ts`/`rocks.ts`/
+`dashboard.ts`/`meta.ts`, and `client/src/pages/admin/AdminRoles.tsx`) is a
+purely additive feature — every existing User keeps `customRoleId = NULL`
+after migrating, which every enforcement point treats as "fall back to
+today's Business-Unit scoping, unchanged." This needs a fresh
+`npm run prisma:migrate` to pick up the new tables/column, and is
+unverified end-to-end. Worth checking by hand: Admin → Roles lets you build
+a role by ticking a Business Unit and/or one of its Companies in the tree on
+the left (both independently selectable) and, for each pick, checking
+View/Edit/Delete boxes per resource (Targets/Revenue/Collections/Expenses/
+Rocks) in the matrix on the right; saving with nothing ticked anywhere is
+rejected; assigning that role to a BU Integrator or Group Integrator via the
+new "Custom Role" dropdown on Admin → Users immediately (no re-login needed)
+narrows what that user sees — a role with only REVENUE view on one Company
+should show that Company's real Revenue figures on the dashboard but 0 for
+Collections/Expenses, and should hide every other Business Unit/Company
+entirely rather than showing them with zeroes; a role with TARGETS edit but
+no ROCKS access lets that user save Quarter Targets but the Rocks page
+and its API reject create/edit/delete for them; a role can't be deleted
+while still assigned to a user (the delete button is disabled with a
+tooltip explaining why); clearing a user's Custom Role (setting it back to
+"None") restores today's default Business-Unit-wide behavior for them.

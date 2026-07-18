@@ -4,10 +4,12 @@ import { prisma } from "../lib/prisma";
 import {
   assertBusinessUnitAccess,
   blockPendingPasswordChange,
+  loadUserPermissions,
   requireAuth,
   resolveCompanyBusinessUnit,
   scopedBusinessUnitFilter,
 } from "../middleware/auth";
+import { assertPermission, can } from "../utils/permissions";
 
 const router = Router();
 router.use(requireAuth);
@@ -34,22 +36,44 @@ router.get("/quarter", async (req, res) => {
   if (!yearId) return res.status(400).json({ error: "yearId is required" });
 
   const user = req.user!;
+  const permRows = await loadUserPermissions(user);
+
   try {
-    if (companyId) assertBusinessUnitAccess(user, await resolveCompanyBusinessUnit(companyId));
+    if (companyId) {
+      const buId = await resolveCompanyBusinessUnit(companyId);
+      assertBusinessUnitAccess(user, buId);
+      if (permRows.length) assertPermission(permRows, "view", "TARGETS", { businessUnitId: buId, companyId });
+    }
   } catch (err: any) {
     return res.status(err.status || 500).json({ error: err.message });
   }
 
   const where: any = { yearId };
   if (quarter) where.quarter = Number(quarter);
+
   if (companyId) {
     where.companyId = companyId;
   } else {
+    let buFilter: string | { in: string[] } | undefined;
     try {
-      const buFilter = scopedBusinessUnitFilter(user, businessUnitId);
-      if (buFilter) where.company = { businessUnitId: buFilter };
+      buFilter = scopedBusinessUnitFilter(user, businessUnitId);
     } catch (err: any) {
       return res.status(err.status || 500).json({ error: err.message });
+    }
+
+    if (permRows.length) {
+      // A Custom Role narrows visibility further, down to only the
+      // Companies it grants TARGETS view on (Company-level rows take
+      // precedence over a Business-Unit-level grant for the same resource).
+      const companyWhere: any = {};
+      if (buFilter) companyWhere.businessUnitId = buFilter;
+      const candidates = await prisma.company.findMany({ where: companyWhere, select: { id: true, businessUnitId: true } });
+      const permittedIds = candidates
+        .filter((c) => can(permRows, "view", "TARGETS", { businessUnitId: c.businessUnitId, companyId: c.id }))
+        .map((c) => c.id);
+      where.companyId = { in: permittedIds };
+    } else if (buFilter) {
+      where.company = { businessUnitId: buFilter };
     }
   }
 
@@ -71,6 +95,8 @@ router.put("/quarter", async (req, res) => {
   try {
     const businessUnitId = await resolveCompanyBusinessUnit(parsed.data.companyId);
     assertBusinessUnitAccess(req.user!, businessUnitId);
+    const permRows = await loadUserPermissions(req.user!);
+    if (permRows.length) assertPermission(permRows, "edit", "TARGETS", { businessUnitId, companyId: parsed.data.companyId });
   } catch (err: any) {
     return res.status(err.status || 500).json({ error: err.message });
   }

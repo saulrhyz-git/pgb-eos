@@ -1,6 +1,7 @@
 import { NextFunction, Request, Response } from "express";
 import jwt from "jsonwebtoken";
 import { prisma } from "../lib/prisma";
+import { loadRolePermissions } from "../utils/permissions";
 
 export interface AuthUser {
   id: string;
@@ -10,6 +11,14 @@ export interface AuthUser {
   role: "SUPERADMIN" | "GROUP_INTEGRATOR" | "BU_INTEGRATOR";
   businessUnitIds: string[];
   mustChangePassword: boolean;
+  // Optional, additional layer on top of `role` (see CustomRole/RolePermission
+  // in schema.prisma). Only the id travels in the token — permissions
+  // themselves are looked up fresh from the DB per request (see
+  // utils/permissions.ts) so edits to a role take effect immediately rather
+  // than waiting for the affected user to log in again. Superadmins ignore
+  // this entirely; users with no customRoleId keep today's coarser
+  // "everything in my assigned Business Unit(s)" behavior unchanged.
+  customRoleId?: string | null;
 }
 
 declare global {
@@ -121,4 +130,16 @@ export async function resolveCompanyBusinessUnit(companyId: string): Promise<str
     throw err;
   }
   return company.businessUnitId;
+}
+
+/**
+ * Loads the requesting user's Custom Role permission rows, if any (empty
+ * array if they have no customRoleId — routes should treat an empty array as
+ * "not using the Custom Role system, fall back to existing BU scoping").
+ * Superadmins never have their access narrowed by a Custom Role even if one
+ * is somehow assigned, so this returns [] for them unconditionally.
+ */
+export async function loadUserPermissions(user: AuthUser) {
+  if (user.role === "SUPERADMIN" || !user.customRoleId) return [];
+  return loadRolePermissions(user.customRoleId);
 }

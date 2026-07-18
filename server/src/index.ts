@@ -19,6 +19,7 @@ import adminRoutes from "./routes/admin";
 import settingsRoutes from "./routes/settings";
 import businessGoalRoutes from "./routes/businessGoals";
 import rockRoutes from "./routes/rocks";
+import customRoleRoutes from "./routes/customRoles";
 
 const app = express();
 app.use(cors({ origin: process.env.CLIENT_ORIGIN || "*" }));
@@ -35,6 +36,7 @@ app.use("/api/admin", adminRoutes);
 app.use("/api/settings", settingsRoutes);
 app.use("/api/business-goals", businessGoalRoutes);
 app.use("/api/rocks", rockRoutes);
+app.use("/api/custom-roles", customRoleRoutes);
 
 // Generic error handler as a safety net for anything thrown above.
 app.use((err: any, _req: express.Request, res: express.Response, _next: express.NextFunction) => {

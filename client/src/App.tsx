@@ -8,6 +8,7 @@ import Rocks from "./pages/Rocks";
 import IntegratorPortal from "./pages/IntegratorPortal";
 import TargetConfig from "./pages/TargetConfig";
 import AdminUsers from "./pages/admin/AdminUsers";
+import AdminRoles from "./pages/admin/AdminRoles";
 import AdminCompanies from "./pages/admin/AdminCompanies";
 import AdminBusinessUnits from "./pages/admin/AdminBusinessUnits";
 import AdminSmtp from "./pages/admin/AdminSmtp";
@@ -68,6 +69,7 @@ export default function App() {
         >
           <Route index element={<Navigate to="users" replace />} />
           <Route path="users" element={<AdminUsers />} />
+          <Route path="roles" element={<AdminRoles />} />
           <Route path="companies" element={<AdminCompanies />} />
           <Route path="business-units" element={<AdminBusinessUnits />} />
           <Route path="smtp" element={<AdminSmtp />} />

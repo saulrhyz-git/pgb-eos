@@ -21,6 +21,7 @@ function toAuthUser(user: {
   name: string;
   role: AuthUser["role"];
   mustChangePassword: boolean;
+  customRoleId: string | null;
   businessUnits: { businessUnitId: string }[];
 }): AuthUser {
   return {
@@ -31,6 +32,7 @@ function toAuthUser(user: {
     role: user.role,
     businessUnitIds: user.businessUnits.map((b) => b.businessUnitId),
     mustChangePassword: user.mustChangePassword,
+    customRoleId: user.customRoleId,
   };
 }
 

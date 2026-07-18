@@ -3,11 +3,13 @@ import { prisma } from "../lib/prisma";
 import {
   assertBusinessUnitAccess,
   blockPendingPasswordChange,
+  loadUserPermissions,
   requireAuth,
   resolveCompanyBusinessUnit,
   scopedBusinessUnitFilter,
 } from "../middleware/auth";
 import { addFigures, collectionsTotal, emptyFigures, expensesTotal, Figures, pct, revenueTotal, toFigures } from "../utils/aggregate";
+import { can, canAnyOf, FINANCIAL_RESOURCES, Resource } from "../utils/permissions";
 
 const router = Router();
 router.use(requireAuth);
@@ -30,6 +32,17 @@ router.use(blockPendingPasswordChange);
  * grid) represents the sum of Q1-Q4 instead of a single quarter — this is
  * the "All Quarters" option in the dashboard filter. This is unrelated to
  * Annual Target, which is always the Q1-Q4 sum regardless.
+ *
+ * If the requesting user has a Custom Role (see utils/permissions.ts), two
+ * things happen on top of the usual Business-Unit scoping: (1) any Business
+ * Unit/Company with no REVENUE/COLLECTIONS/EXPENSES view grant at all is
+ * dropped from every list below rather than shown with zeroes, and (2)
+ * within what remains, each of Revenue/Collections/Expenses is independently
+ * zeroed out per Company wherever that specific category isn't granted —
+ * so, e.g., a role with COLLECTIONS view but not REVENUE view sees real
+ * Collections figures but 0 for every Revenue-derived number (which, per the
+ * existing data model, includes the dashboard's "headline" KPIs/chart/
+ * Operational Grid totals, since those have always been revenue-based).
  */
 router.get("/", async (req, res) => {
   const user = req.user!;
@@ -65,7 +78,26 @@ router.get("/", async (req, res) => {
     return res.status(err.status || 500).json({ error: err.message });
   }
 
-  const businessUnits = await prisma.businessUnit.findMany({ where: buWhere, orderBy: { name: "asc" } });
+  const permRows = await loadUserPermissions(user);
+
+  let businessUnits = await prisma.businessUnit.findMany({ where: buWhere, orderBy: { name: "asc" } });
+  let companies = await prisma.company.findMany({ where: companyWhere, orderBy: { name: "asc" } });
+
+  if (permRows.length) {
+    // A Custom Role can grant view either at the whole-Business-Unit level or
+    // at just one specific Company within it — a Business Unit stays visible
+    // if EITHER is true for at least one of its Companies (or for itself
+    // directly), so a narrow "just this one Company" grant isn't hidden for
+    // lack of a BU-wide grant.
+    companies = companies.filter((c) =>
+      canAnyOf(permRows, "view", FINANCIAL_RESOURCES, { businessUnitId: c.businessUnitId, companyId: c.id })
+    );
+    const permittedBuIds = new Set(companies.map((c) => c.businessUnitId));
+    for (const bu of businessUnits) {
+      if (canAnyOf(permRows, "view", FINANCIAL_RESOURCES, { businessUnitId: bu.id })) permittedBuIds.add(bu.id);
+    }
+    businessUnits = businessUnits.filter((bu) => permittedBuIds.has(bu.id));
+  }
   const businessUnitIds = businessUnits.map((b) => b.id);
 
   if (businessUnitIds.length === 0) {
@@ -90,10 +122,6 @@ router.get("/", async (req, res) => {
     });
   }
 
-  const companies = await prisma.company.findMany({
-    where: companyWhere,
-    orderBy: { name: "asc" },
-  });
   const companyIds = companies.map((c) => c.id);
 
   const [quarterTargets, quarterActuals] = await Promise.all([
@@ -132,10 +160,22 @@ router.get("/", async (req, res) => {
   }
 
   const companiesByBu = new Map<string, typeof companies>();
+  const businessUnitIdByCompany = new Map<string, string>();
   for (const c of companies) {
     const list = companiesByBu.get(c.businessUnitId) || [];
     list.push(c);
     companiesByBu.set(c.businessUnitId, list);
+    businessUnitIdByCompany.set(c.id, c.businessUnitId);
+  }
+
+  // Per-Company, per-category view check used to mask figures below. Users
+  // with no Custom Role (permRows.length === 0) always pass — identical to
+  // today's behavior. `companies`/`businessUnits` were already narrowed above
+  // to ones with at least SOME financial view, so this only ever hides one
+  // specific category's numbers, never an entire row.
+  function isCatAllowed(companyId: string, resource: Resource): boolean {
+    if (!permRows.length) return true;
+    return can(permRows, "view", resource, { businessUnitId: businessUnitIdByCompany.get(companyId), companyId });
   }
 
   // ---------- Chart: quarterly revenue vs target across Q1-Q4 for the whole scope ----------
@@ -145,6 +185,7 @@ router.get("/", async (req, res) => {
       actualInternal = 0,
       actualExternal = 0;
     for (const cid of companyIds) {
+      if (!isCatAllowed(cid, "REVENUE")) continue;
       const t = qTargetByCompanyQuarter.get(`${cid}:${q}`);
       if (t) {
         targetInternal += t.revenueInternal;
@@ -188,24 +229,28 @@ router.get("/", async (req, res) => {
 
   for (const cid of companyIds) {
     const annual = annualByCompany.get(cid) || emptyFigures();
-    annualRevenueTargetTotal += revenueTotal(annual);
-    annualCollectionsTargetTotal += collectionsTotal(annual);
-    annualExpensesTargetTotal += expensesTotal(annual);
+    if (isCatAllowed(cid, "REVENUE")) annualRevenueTargetTotal += revenueTotal(annual);
+    if (isCatAllowed(cid, "COLLECTIONS")) annualCollectionsTargetTotal += collectionsTotal(annual);
+    if (isCatAllowed(cid, "EXPENSES")) annualExpensesTargetTotal += expensesTotal(annual);
 
     for (const q of quartersInScope) {
       const qt = qTargetByCompanyQuarter.get(`${cid}:${q}`) || emptyFigures();
-      quarterRevenueTargetTotal += revenueTotal(qt);
-      quarterCollectionsTargetTotal += collectionsTotal(qt);
-      quarterExpensesTargetTotal += expensesTotal(qt);
-      const qa = qActualByCompanyQuarter.get(`${cid}:${q}`) || emptyFigures();
-      quarterActualTotal += revenueTotal(qa);
+      if (isCatAllowed(cid, "REVENUE")) quarterRevenueTargetTotal += revenueTotal(qt);
+      if (isCatAllowed(cid, "COLLECTIONS")) quarterCollectionsTargetTotal += collectionsTotal(qt);
+      if (isCatAllowed(cid, "EXPENSES")) quarterExpensesTargetTotal += expensesTotal(qt);
+      if (isCatAllowed(cid, "REVENUE")) {
+        const qa = qActualByCompanyQuarter.get(`${cid}:${q}`) || emptyFigures();
+        quarterActualTotal += revenueTotal(qa);
+      }
     }
 
-    for (let q = 1; q <= quarter; q++) {
-      const t = qTargetByCompanyQuarter.get(`${cid}:${q}`) || emptyFigures();
-      ytdTargetTotal += revenueTotal(t);
-      const a = qActualByCompanyQuarter.get(`${cid}:${q}`) || emptyFigures();
-      ytdActualTotal += revenueTotal(a);
+    if (isCatAllowed(cid, "REVENUE")) {
+      for (let q = 1; q <= quarter; q++) {
+        const t = qTargetByCompanyQuarter.get(`${cid}:${q}`) || emptyFigures();
+        ytdTargetTotal += revenueTotal(t);
+        const a = qActualByCompanyQuarter.get(`${cid}:${q}`) || emptyFigures();
+        ytdActualTotal += revenueTotal(a);
+      }
     }
   }
 
@@ -231,14 +276,16 @@ router.get("/", async (req, res) => {
     const buCompanies = companiesByBu.get(bu.id) || [];
 
     const quarterTargetsRow = [1, 2, 3, 4].map((q) => {
-      let t = emptyFigures();
-      for (const c of buCompanies) t = addFigures(t, qTargetByCompanyQuarter.get(`${c.id}:${q}`) || emptyFigures());
-      return {
-        quarter: q,
-        revenue: revenueTotal(t),
-        collections: collectionsTotal(t),
-        expenses: expensesTotal(t),
-      };
+      let revenue = 0,
+        collections = 0,
+        expenses = 0;
+      for (const c of buCompanies) {
+        const t = qTargetByCompanyQuarter.get(`${c.id}:${q}`) || emptyFigures();
+        if (isCatAllowed(c.id, "REVENUE")) revenue += revenueTotal(t);
+        if (isCatAllowed(c.id, "COLLECTIONS")) collections += collectionsTotal(t);
+        if (isCatAllowed(c.id, "EXPENSES")) expenses += expensesTotal(t);
+      }
+      return { quarter: q, revenue, collections, expenses };
     });
     const annualTarget = {
       revenue: quarterTargetsRow.reduce((sum, q) => sum + q.revenue, 0),
@@ -263,7 +310,16 @@ router.get("/", async (req, res) => {
     let ytdActualAgg = emptyFigures();
 
     const companyRows = buCompanies.map((c) => {
-      annualAgg = addFigures(annualAgg, annualByCompany.get(c.id) || emptyFigures());
+      const revenueOk = isCatAllowed(c.id, "REVENUE");
+      const collectionsOk = isCatAllowed(c.id, "COLLECTIONS");
+      const expensesOk = isCatAllowed(c.id, "EXPENSES");
+
+      // The Business-Unit-level headline figures below (annualTarget/
+      // quarterTarget/quarterActual/ytdActual) have always been revenue-only
+      // (see revenueTotal() calls further down), so gating a Company's
+      // contribution to these aggregates on REVENUE view alone is correct
+      // and sufficient — Collections/Expenses are never read from them.
+      if (revenueOk) annualAgg = addFigures(annualAgg, annualByCompany.get(c.id) || emptyFigures());
 
       let qt = emptyFigures();
       let qa = emptyFigures();
@@ -271,34 +327,40 @@ router.get("/", async (req, res) => {
         qt = addFigures(qt, qTargetByCompanyQuarter.get(`${c.id}:${q}`) || emptyFigures());
         qa = addFigures(qa, qActualByCompanyQuarter.get(`${c.id}:${q}`) || emptyFigures());
       }
-      quarterTargetAgg = addFigures(quarterTargetAgg, qt);
-      quarterActualAgg = addFigures(quarterActualAgg, qa);
+      if (revenueOk) {
+        quarterTargetAgg = addFigures(quarterTargetAgg, qt);
+        quarterActualAgg = addFigures(quarterActualAgg, qa);
+      }
 
       let ytdActualCompany = emptyFigures();
       for (let q = 1; q <= quarter; q++) {
         const a = qActualByCompanyQuarter.get(`${c.id}:${q}`) || emptyFigures();
         ytdActualCompany = addFigures(ytdActualCompany, a);
       }
-      ytdActualAgg = addFigures(ytdActualAgg, ytdActualCompany);
+      if (revenueOk) ytdActualAgg = addFigures(ytdActualAgg, ytdActualCompany);
+
+      const remarks = !isAllQuarters ? remarksByCompanyQuarter.get(`${c.id}:${quarter}`) : undefined;
 
       return {
         companyId: c.id,
         companyName: c.name,
         quarterActual: {
-          internal: qa.revenueInternal,
-          external: qa.revenueExternal,
-          total: revenueTotal(qa),
-          collectionsInternal: qa.collectionsInternal,
-          collectionsExternal: qa.collectionsExternal,
-          expensesInternal: qa.expensesInternal,
-          expensesExternal: qa.expensesExternal,
+          internal: revenueOk ? qa.revenueInternal : 0,
+          external: revenueOk ? qa.revenueExternal : 0,
+          total: revenueOk ? revenueTotal(qa) : 0,
+          collectionsInternal: collectionsOk ? qa.collectionsInternal : 0,
+          collectionsExternal: collectionsOk ? qa.collectionsExternal : 0,
+          expensesInternal: expensesOk ? qa.expensesInternal : 0,
+          expensesExternal: expensesOk ? qa.expensesExternal : 0,
         },
-        ytdActual: revenueTotal(ytdActualCompany),
+        ytdActual: revenueOk ? revenueTotal(ytdActualCompany) : 0,
         // Remarks are logged per single quarter, so they're only meaningful
-        // (and only shown) when a specific quarter is selected, not "all".
-        ...(!isAllQuarters && remarksByCompanyQuarter.get(`${c.id}:${quarter}`)
-          ? remarksByCompanyQuarter.get(`${c.id}:${quarter}`)!
-          : { revenueRemarks: "", collectionsRemarks: "", expensesRemarks: "" }),
+        // (and only shown) when a specific quarter is selected, not "all" —
+        // and, same as the figures above, each category's remarks are only
+        // included if that category is view-permitted for this Company.
+        revenueRemarks: revenueOk && remarks ? remarks.revenueRemarks : "",
+        collectionsRemarks: collectionsOk && remarks ? remarks.collectionsRemarks : "",
+        expensesRemarks: expensesOk && remarks ? remarks.expensesRemarks : "",
       };
     });
 

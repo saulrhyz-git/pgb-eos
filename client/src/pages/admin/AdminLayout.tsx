@@ -1,5 +1,5 @@
 import { NavLink, Outlet } from "react-router-dom";
-import { Users, Building2, Briefcase, Mail } from "lucide-react";
+import { Users, Building2, Briefcase, Mail, ShieldCheck } from "lucide-react";
 
 export default function AdminLayout() {
   const tabClass = ({ isActive }: { isActive: boolean }) =>
@@ -16,6 +16,9 @@ export default function AdminLayout() {
       <nav className="flex flex-wrap gap-2 border-b border-slate-200 pb-4">
         <NavLink to="/admin/users" className={tabClass}>
           <Users className="h-4 w-4" /> Users
+        </NavLink>
+        <NavLink to="/admin/roles" className={tabClass}>
+          <ShieldCheck className="h-4 w-4" /> Roles
         </NavLink>
         <NavLink to="/admin/companies" className={tabClass}>
           <Building2 className="h-4 w-4" /> Companies

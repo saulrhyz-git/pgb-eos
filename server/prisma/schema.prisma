@@ -17,6 +17,20 @@ enum Role {
   BU_INTEGRATOR
 }
 
+// The five gate-able areas of the app a Custom Role's permission matrix can
+// grant View/Edit/Delete over, independently, per Business Unit or Company.
+// TARGETS covers the Target Setup page (QuarterTarget records); REVENUE/
+// COLLECTIONS/EXPENSES cover their matching figures wherever they appear
+// (Revenue dashboard KPIs/chart/matrix, Operational Grid, Data Entry/actuals,
+// per-category Remarks); ROCKS covers the Rocks page.
+enum PermissionResource {
+  TARGETS
+  REVENUE
+  COLLECTIONS
+  EXPENSES
+  ROCKS
+}
+
 model User {
   id                 String   @id @default(uuid())
   email              String   @unique
@@ -27,12 +41,62 @@ model User {
   mustChangePassword Boolean  @default(false)
   createdAt          DateTime @default(now())
 
+  // Optional, additional layer on top of `role`. When set (typically for a
+  // GROUP_INTEGRATOR or BU_INTEGRATOR), the user's effective View/Edit/Delete
+  // access to Targets/Revenue/Collections/Expenses/Rocks per Business Unit or
+  // Company is governed by this Custom Role's permission matrix instead of
+  // the coarser "everything in my assigned Business Unit(s)" default.
+  // Superadmins ignore this entirely (always full access).
+  customRoleId String?
+  customRole   CustomRole? @relation(fields: [customRoleId], references: [id], onDelete: SetNull)
+
   businessUnits UserBusinessUnit[]
   actualEdits   QuarterActual[]    @relation("ActualEditedBy")
   rockCreations Rock[]             @relation("RockCreatedBy")
   rockEdits     Rock[]             @relation("RockUpdatedBy")
 
   @@index([role])
+  @@index([customRoleId])
+}
+
+// A named, superadmin-authored permission profile: a matrix of which
+// Business Units and/or Companies are accessible, broken down by resource
+// (Targets/Revenue/Collections/Expenses/Rocks) and action (View/Edit/
+// Delete). Assignable to any number of Users to give them exactly the
+// accountability slice they need instead of a blanket BU assignment.
+model CustomRole {
+  id          String   @id @default(uuid())
+  name        String   @unique
+  description String   @default("")
+  createdAt   DateTime @default(now())
+  updatedAt   DateTime @updatedAt
+
+  permissions RolePermission[]
+  users       User[]
+}
+
+// One row = "for this Business Unit (or, if companyId is set, this specific
+// Company) and this resource, here's what's allowed." A Company-level row
+// takes precedence over a Business-Unit-level row for the same resource
+// when both exist, letting a role grant BU-wide access with a narrower (or
+// wider) carve-out for one specific Company.
+model RolePermission {
+  id             String             @id @default(uuid())
+  customRoleId   String
+  businessUnitId String?
+  companyId      String?
+  resource       PermissionResource
+  canView        Boolean            @default(false)
+  canEdit        Boolean            @default(false)
+  canDelete      Boolean            @default(false)
+
+  customRole   CustomRole    @relation(fields: [customRoleId], references: [id], onDelete: Cascade)
+  businessUnit BusinessUnit? @relation(fields: [businessUnitId], references: [id], onDelete: Cascade)
+  company      Company?      @relation(fields: [companyId], references: [id], onDelete: Cascade)
+
+  @@index([customRoleId])
+  @@index([businessUnitId])
+  @@index([companyId])
 }
 
 // Singleton row (fixed id "default") holding the outbound SMTP configuration
@@ -68,6 +132,7 @@ model BusinessUnit {
   companies      Company[]
   users          UserBusinessUnit[]
   businessGoals  BusinessGoalBusinessUnit[]
+  rolePermissions RolePermission[]
 }
 
 model Company {
@@ -81,6 +146,7 @@ model Company {
   quarterTargets QuarterTarget[]
   quarterActuals QuarterActual[]
   rocks          Rock[]
+  rolePermissions RolePermission[]
 
   @@unique([businessUnitId, name])
   @@index([businessUnitId])

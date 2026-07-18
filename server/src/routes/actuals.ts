@@ -4,10 +4,12 @@ import { prisma } from "../lib/prisma";
 import {
   assertBusinessUnitAccess,
   blockPendingPasswordChange,
+  loadUserPermissions,
   requireAuth,
   resolveCompanyBusinessUnit,
   scopedBusinessUnitFilter,
 } from "../middleware/auth";
+import { can, canAnyOf, FINANCIAL_RESOURCES, PermissionError } from "../utils/permissions";
 
 const router = Router();
 router.use(requireAuth);
@@ -31,22 +33,43 @@ router.get("/", async (req, res) => {
   if (!yearId) return res.status(400).json({ error: "yearId is required" });
 
   const user = req.user!;
+  const permRows = await loadUserPermissions(user);
+
   try {
-    if (companyId) assertBusinessUnitAccess(user, await resolveCompanyBusinessUnit(companyId));
+    if (companyId) {
+      const buId = await resolveCompanyBusinessUnit(companyId);
+      assertBusinessUnitAccess(user, buId);
+      if (permRows.length && !canAnyOf(permRows, "view", FINANCIAL_RESOURCES, { businessUnitId: buId, companyId })) {
+        throw new PermissionError("Your assigned role does not grant view access to any financial category here");
+      }
+    }
   } catch (err: any) {
     return res.status(err.status || 500).json({ error: err.message });
   }
 
   const where: any = { yearId };
   if (quarter) where.quarter = Number(quarter);
+
   if (companyId) {
     where.companyId = companyId;
   } else {
+    let buFilter: string | { in: string[] } | undefined;
     try {
-      const buFilter = scopedBusinessUnitFilter(user, businessUnitId);
-      if (buFilter) where.company = { businessUnitId: buFilter };
+      buFilter = scopedBusinessUnitFilter(user, businessUnitId);
     } catch (err: any) {
       return res.status(err.status || 500).json({ error: err.message });
+    }
+
+    if (permRows.length) {
+      const companyWhere: any = {};
+      if (buFilter) companyWhere.businessUnitId = buFilter;
+      const candidates = await prisma.company.findMany({ where: companyWhere, select: { id: true, businessUnitId: true } });
+      const permittedIds = candidates
+        .filter((c) => canAnyOf(permRows, "view", FINANCIAL_RESOURCES, { businessUnitId: c.businessUnitId, companyId: c.id }))
+        .map((c) => c.id);
+      where.companyId = { in: permittedIds };
+    } else if (buFilter) {
+      where.company = { businessUnitId: buFilter };
     }
   }
 
@@ -70,6 +93,16 @@ router.put("/", async (req, res) => {
   try {
     const businessUnitId = await resolveCompanyBusinessUnit(parsed.data.companyId);
     assertBusinessUnitAccess(req.user!, businessUnitId);
+    const permRows = await loadUserPermissions(req.user!);
+    // The form submits Revenue/Collections/Expenses together in one payload,
+    // so — since permissions are granted per-category — this only requires
+    // edit access to at least one of the three; it can't yet block editing
+    // just the one category a role isn't supposed to touch within the same
+    // submission (see the per-category PATCH remarks endpoint below for a
+    // fully granular example).
+    if (permRows.length && !canAnyOf(permRows, "edit", FINANCIAL_RESOURCES, { businessUnitId, companyId: parsed.data.companyId })) {
+      throw new PermissionError("Your assigned role does not grant edit access to any financial category here");
+    }
   } catch (err: any) {
     return res.status(err.status || 500).json({ error: err.message });
   }
@@ -107,6 +140,23 @@ router.patch("/:companyId/:yearId/:quarter/remarks", async (req, res) => {
   try {
     const businessUnitId = await resolveCompanyBusinessUnit(companyId);
     assertBusinessUnitAccess(req.user!, businessUnitId);
+    const permRows = await loadUserPermissions(req.user!);
+    if (permRows.length) {
+      // Unlike the combined figures PUT above, remarks are submitted one
+      // category at a time, so this can enforce edit access per exact field
+      // instead of "any one of the three".
+      const fieldResource: Record<string, "REVENUE" | "COLLECTIONS" | "EXPENSES"> = {
+        revenueRemarks: "REVENUE",
+        collectionsRemarks: "COLLECTIONS",
+        expensesRemarks: "EXPENSES",
+      };
+      for (const field of Object.keys(remarksParsed.data)) {
+        const resource = fieldResource[field];
+        if (resource && !can(permRows, "edit", resource, { businessUnitId, companyId })) {
+          throw new PermissionError(`Your assigned role does not grant edit access to ${resource.toLowerCase()} remarks here`);
+        }
+      }
+    }
   } catch (err: any) {
     return res.status(err.status || 500).json({ error: err.message });
   }
