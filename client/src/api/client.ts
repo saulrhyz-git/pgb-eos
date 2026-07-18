@@ -68,6 +68,11 @@ export const api = {
 
   years: () => request<Year[]>("/years"),
   createYear: (year: number) => request<Year>("/years", { method: "POST", body: JSON.stringify({ year }) }),
+  // The real calendar quarter "right now" per the server clock — yearId is
+  // null if that Year hasn't been created yet. Used to default filter bars
+  // to the actual current quarter instead of guessing from the year list.
+  currentQuarter: () =>
+    request<{ year: number; quarter: number; yearId: string | null; start: string; end: string }>("/current-quarter"),
 
   businessUnits: () => request<BusinessUnit[]>("/business-units"),
   createBusinessUnit: (name: string) =>

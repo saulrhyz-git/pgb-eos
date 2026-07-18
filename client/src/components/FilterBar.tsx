@@ -2,6 +2,7 @@ import { useEffect, useState } from "react";
 import { api } from "../api/client";
 import type { BusinessUnit, Company, Year } from "../api/types";
 import { useAuth } from "../contexts/AuthContext";
+import { formatQuarterRange } from "../utils/quarterDates";
 
 export interface DashboardFilters {
   yearId: string;
@@ -22,10 +23,18 @@ export default function FilterBar({ filters, onChange }: Props) {
   const [companies, setCompanies] = useState<Company[]>([]);
 
   useEffect(() => {
-    api.years().then((ys) => {
+    // Default the Year/Quarter to the real current calendar quarter (per the
+    // server clock) when possible, so the dashboard opens already lined up
+    // with "today" instead of an arbitrary first-in-list year. Falls back to
+    // the first available Year if today's Year hasn't been created yet.
+    Promise.all([api.years(), api.currentQuarter().catch(() => null)]).then(([ys, current]) => {
       setYears(ys);
       if (!filters.yearId && ys.length > 0) {
-        onChange({ ...filters, yearId: ys[0].id });
+        if (current?.yearId && ys.some((y) => y.id === current.yearId)) {
+          onChange({ ...filters, yearId: current.yearId, quarter: current.quarter });
+        } else {
+          onChange({ ...filters, yearId: ys[0].id });
+        }
       }
     });
     api.businessUnits().then((bus) => {
@@ -41,6 +50,14 @@ export default function FilterBar({ filters, onChange }: Props) {
   useEffect(() => {
     api.companies(filters.businessUnitId || undefined).then(setCompanies);
   }, [filters.businessUnitId]);
+
+  const selectedYear = years.find((y) => y.id === filters.yearId)?.year;
+  const quarterRangeLabel =
+    selectedYear != null
+      ? filters.quarter === 0
+        ? `Jan 1 - Dec 31, ${selectedYear}`
+        : formatQuarterRange(selectedYear, filters.quarter)
+      : null;
 
   return (
     <div className="flex flex-wrap items-end gap-4 rounded-lg border border-slate-200 bg-white p-4 shadow-sm">
@@ -73,6 +90,7 @@ export default function FilterBar({ filters, onChange }: Props) {
             </option>
           ))}
         </select>
+        {quarterRangeLabel && <span className="text-[11px] text-slate-500">{quarterRangeLabel}</span>}
       </div>
 
       <div className="flex flex-col gap-1">

@@ -115,7 +115,14 @@ real data — the app starts completely empty.
   a `POST /api/auth/change-password` flow that's enforced whenever a user's
   `mustChangePassword` flag is set (e.g. the seeded superadmin's first
   login, or any account an admin resets), CRUD for Years/BUs/Companies
-  (Group Integrator or Superadmin), `server/src/routes/targets.ts` (Quarter
+  (Group Integrator or Superadmin), `GET /api/current-quarter` (returns the
+  real calendar quarter "right now" per the server clock — `{ year, quarter,
+  yearId, start, end }`, with `yearId` `null` if that Year hasn't been
+  created yet — backed by `server/src/utils/quarterDates.ts`, which maps
+  Year+Quarter to actual calendar dates: Q1 = Jan-Mar, Q2 = Apr-Jun, Q3 =
+  Jul-Sep, Q4 = Oct-Dec; this is the one authoritative place any future
+  date/quarter-gated logic should hook into, rather than each feature
+  re-deriving it), `server/src/routes/targets.ts` (Quarter
   target upserts keyed by `companyId` + `yearId` + `quarter` — Group
   Integrator, Superadmin, or a BU Integrator scoped to their own Business
   Unit(s), mirroring how actuals are scoped; there is no Annual Target
@@ -161,7 +168,12 @@ real data — the app starts completely empty.
   to the API — which turns the "Q_ Target/Actual" KPIs and the Operational
   Grid's "Q_ Target/Actual" columns into full-year sums instead of a single
   quarter's figures; per-quarter Remarks are hidden in that mode since a
-  remark belongs to one specific quarter), color-coded KPI cards in three
+  remark belongs to one specific quarter; on load it calls
+  `GET /api/current-quarter` and defaults Year+Quarter to the real current
+  calendar quarter if that Year already exists, falling back to the first
+  available Year otherwise; a small caption under the Quarter selector shows
+  its actual date range, e.g. "Jan 1 - Mar 31, 2026", via
+  `client/src/utils/quarterDates.ts`), color-coded KPI cards in three
   rows so a category can be matched at a glance (Revenue = blue, Collections
   = emerald, Expenses = amber) — row 1 is Annual Revenue/Collections/Expenses
   Target (each a straight sum of every in-scope Company's Q1-Q4 Quarter
@@ -188,7 +200,13 @@ real data — the app starts completely empty.
   in the nav) sets Quarter targets by Year + Quarter + Business Unit +
   **Company** — exactly the same Company-level granularity as
   Data Entry/actuals — and that Company's quarter target rolls up into its
-  Business Unit's total shown on the Revenue dashboard. There's no Annual
+  Business Unit's total shown on the Revenue dashboard. Target Setup and
+  Data Entry (`pages/IntegratorPortal.tsx`) both default their Year+Quarter
+  to the real current calendar quarter the same way the Revenue dashboard
+  does (via `GET /api/current-quarter`), and show the same date-range
+  caption under the Quarter selector; the Rocks page does too for its Year,
+  but deliberately keeps defaulting its Quarter filter to "All Quarters"
+  since it's meant as a broad overview. There's no Annual
   Target entry here (or anywhere) — it's always derived by summing a
   Company's own Q1-Q4 Quarter Targets, shown read-only on the Revenue
   dashboard. Each of Revenue/Collections/Expenses has its own "One Total" vs

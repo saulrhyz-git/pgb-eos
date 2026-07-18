@@ -3,6 +3,7 @@ import { CheckCircle2, Plus, Save } from "lucide-react";
 import { api } from "../api/client";
 import { useAuth } from "../contexts/AuthContext";
 import type { BusinessUnit, Company, Year } from "../api/types";
+import { formatQuarterRange } from "../utils/quarterDates";
 
 type FigureKey =
   | "revenueInternal"
@@ -75,7 +76,22 @@ export default function TargetConfig() {
   }
 
   useEffect(() => {
-    refreshYears();
+    // Default to the real current calendar quarter (server clock) when
+    // possible, so Target Setup opens already on "today"'s quarter instead
+    // of an arbitrary first-in-list year.
+    api.years().then((ys) => {
+      setYears(ys);
+      if (!yearId && ys.length) {
+        api.currentQuarter().catch(() => null).then((current) => {
+          if (current?.yearId && ys.some((y) => y.id === current.yearId)) {
+            setYearId(current.yearId);
+            setQuarter(current.quarter);
+          } else {
+            setYearId(ys[0].id);
+          }
+        });
+      }
+    });
     refreshBUs();
     // eslint-disable-next-line react-hooks/exhaustive-deps
   }, []);
@@ -175,6 +191,9 @@ export default function TargetConfig() {
     api.companies(businessUnitId).then(setCompanies);
   }
 
+  const selectedYear = years.find((y) => y.id === yearId)?.year;
+  const quarterRangeLabel = selectedYear != null ? formatQuarterRange(selectedYear, quarter) : null;
+
   return (
     <div className="mx-auto flex max-w-5xl flex-col gap-8">
       <div>
@@ -262,6 +281,7 @@ export default function TargetConfig() {
                 </option>
               ))}
             </select>
+            {quarterRangeLabel && <span className="text-[11px] text-slate-500">{quarterRangeLabel}</span>}
           </div>
           <div className="flex flex-col gap-1">
             <label className="text-xs font-medium text-slate-500">Business Unit</label>

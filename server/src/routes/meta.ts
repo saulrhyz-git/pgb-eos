@@ -2,6 +2,7 @@ import { Router } from "express";
 import { z } from "zod";
 import { prisma } from "../lib/prisma";
 import { blockPendingPasswordChange, requireAuth, requireRole, scopedBusinessUnitFilter } from "../middleware/auth";
+import { currentCalendarQuarter } from "../utils/quarterDates";
 
 const router = Router();
 router.use(requireAuth);
@@ -12,6 +13,17 @@ router.use(blockPendingPasswordChange);
 router.get("/years", async (_req, res) => {
   const years = await prisma.year.findMany({ orderBy: { year: "desc" } });
   res.json(years);
+});
+
+// The real calendar quarter "right now" (server clock, UTC — see
+// utils/quarterDates.ts), plus the matching Year row's id if one has been
+// created yet. Lets the frontend default filters to the actual current
+// quarter instead of guessing from the client's local clock, and gives any
+// future date/quarter-gated feature one authoritative source of truth.
+router.get("/current-quarter", async (_req, res) => {
+  const { year, quarter, start, end } = currentCalendarQuarter();
+  const yearRow = await prisma.year.findUnique({ where: { year } });
+  res.json({ year, quarter, yearId: yearRow?.id ?? null, start, end });
 });
 
 router.post("/years", requireRole("GROUP_INTEGRATOR", "SUPERADMIN"), async (req, res) => {
