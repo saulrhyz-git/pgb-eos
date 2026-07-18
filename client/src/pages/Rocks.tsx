@@ -15,7 +15,6 @@ import {
 import { api } from "../api/client";
 import { useAuth } from "../contexts/AuthContext";
 import { attainmentColor } from "../utils/format";
-import { formatQuarterRange } from "../utils/quarterDates";
 import type { BusinessGoal, BusinessUnit, Company, Rock, RockStatus, Year } from "../api/types";
 
 const STATUS_LABELS: Record<RockStatus, string> = {
@@ -378,14 +377,6 @@ export default function Rocks() {
 
   const formGoals = goalsForBu(formBusinessUnitId);
 
-  const selectedYear = years.find((y) => y.id === yearId)?.year;
-  const quarterRangeLabel =
-    selectedYear != null
-      ? quarter === 0
-        ? `Jan 1 - Dec 31, ${selectedYear}`
-        : formatQuarterRange(selectedYear, quarter)
-      : null;
-
   return (
     <div className="flex flex-col gap-6">
       <div>
@@ -425,7 +416,6 @@ export default function Rocks() {
               </option>
             ))}
           </select>
-          {quarterRangeLabel && <span className="text-[11px] text-slate-500">{quarterRangeLabel}</span>}
         </div>
         <div className="flex flex-col gap-1">
           <label className="text-xs font-medium text-slate-500">Business Unit</label>

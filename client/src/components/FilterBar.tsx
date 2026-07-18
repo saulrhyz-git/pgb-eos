@@ -2,7 +2,6 @@ import { useEffect, useState } from "react";
 import { api } from "../api/client";
 import type { BusinessUnit, Company, Year } from "../api/types";
 import { useAuth } from "../contexts/AuthContext";
-import { formatQuarterRange } from "../utils/quarterDates";
 
 export interface DashboardFilters {
   yearId: string;
@@ -51,14 +50,6 @@ export default function FilterBar({ filters, onChange }: Props) {
     api.companies(filters.businessUnitId || undefined).then(setCompanies);
   }, [filters.businessUnitId]);
 
-  const selectedYear = years.find((y) => y.id === filters.yearId)?.year;
-  const quarterRangeLabel =
-    selectedYear != null
-      ? filters.quarter === 0
-        ? `Jan 1 - Dec 31, ${selectedYear}`
-        : formatQuarterRange(selectedYear, filters.quarter)
-      : null;
-
   return (
     <div className="flex flex-wrap items-end gap-4 rounded-lg border border-slate-200 bg-white p-4 shadow-sm">
       <div className="flex flex-col gap-1">
@@ -90,7 +81,6 @@ export default function FilterBar({ filters, onChange }: Props) {
             </option>
           ))}
         </select>
-        {quarterRangeLabel && <span className="text-[11px] text-slate-500">{quarterRangeLabel}</span>}
       </div>
 
       <div className="flex flex-col gap-1">

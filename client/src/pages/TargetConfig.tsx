@@ -3,7 +3,6 @@ import { CheckCircle2, Plus, Save } from "lucide-react";
 import { api } from "../api/client";
 import { useAuth } from "../contexts/AuthContext";
 import type { BusinessUnit, Company, Year } from "../api/types";
-import { formatQuarterRange } from "../utils/quarterDates";
 
 type FigureKey =
   | "revenueInternal"
@@ -191,9 +190,6 @@ export default function TargetConfig() {
     api.companies(businessUnitId).then(setCompanies);
   }
 
-  const selectedYear = years.find((y) => y.id === yearId)?.year;
-  const quarterRangeLabel = selectedYear != null ? formatQuarterRange(selectedYear, quarter) : null;
-
   return (
     <div className="mx-auto flex max-w-5xl flex-col gap-8">
       <div>
@@ -281,7 +277,6 @@ export default function TargetConfig() {
                 </option>
               ))}
             </select>
-            {quarterRangeLabel && <span className="text-[11px] text-slate-500">{quarterRangeLabel}</span>}
           </div>
           <div className="flex flex-col gap-1">
             <label className="text-xs font-medium text-slate-500">Business Unit</label>

@@ -3,7 +3,6 @@ import { CheckCircle2, Save } from "lucide-react";
 import { api } from "../api/client";
 import type { BusinessUnit, Company, Year } from "../api/types";
 import { useAuth } from "../contexts/AuthContext";
-import { formatQuarterRange } from "../utils/quarterDates";
 
 type FigureKey =
   | "revenueInternal"
@@ -143,9 +142,6 @@ export default function IntegratorPortal() {
     }
   }
 
-  const selectedYear = years.find((y) => y.id === yearId)?.year;
-  const quarterRangeLabel = selectedYear != null ? formatQuarterRange(selectedYear, quarter) : null;
-
   return (
     <div className="mx-auto max-w-3xl">
       <h2 className="mb-1 text-lg font-semibold text-slate-800">Quarterly Data Entry</h2>
@@ -176,7 +172,6 @@ export default function IntegratorPortal() {
                 </option>
               ))}
             </select>
-            {quarterRangeLabel && <span className="text-[11px] text-slate-500">{quarterRangeLabel}</span>}
           </div>
           <div className="flex flex-col gap-1">
             <label className="text-xs font-medium text-slate-500">Business Unit</label>

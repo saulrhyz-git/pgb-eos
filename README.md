@@ -171,9 +171,7 @@ real data — the app starts completely empty.
   remark belongs to one specific quarter; on load it calls
   `GET /api/current-quarter` and defaults Year+Quarter to the real current
   calendar quarter if that Year already exists, falling back to the first
-  available Year otherwise; a small caption under the Quarter selector shows
-  its actual date range, e.g. "Jan 1 - Mar 31, 2026", via
-  `client/src/utils/quarterDates.ts`), color-coded KPI cards in three
+  available Year otherwise), color-coded KPI cards in three
   rows so a category can be matched at a glance (Revenue = blue, Collections
   = emerald, Expenses = amber) — row 1 is Annual Revenue/Collections/Expenses
   Target (each a straight sum of every in-scope Company's Q1-Q4 Quarter
@@ -203,8 +201,7 @@ real data — the app starts completely empty.
   Business Unit's total shown on the Revenue dashboard. Target Setup and
   Data Entry (`pages/IntegratorPortal.tsx`) both default their Year+Quarter
   to the real current calendar quarter the same way the Revenue dashboard
-  does (via `GET /api/current-quarter`), and show the same date-range
-  caption under the Quarter selector; the Rocks page does too for its Year,
+  does (via `GET /api/current-quarter`); the Rocks page does too for its Year,
   but deliberately keeps defaulting its Quarter filter to "All Quarters"
   since it's meant as a broad overview. There's no Annual
   Target entry here (or anywhere) — it's always derived by summing a
