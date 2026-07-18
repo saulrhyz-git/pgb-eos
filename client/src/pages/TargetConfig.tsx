@@ -1,5 +1,5 @@
 import { FormEvent, useEffect, useState } from "react";
-import { CheckCircle2, Lock, Plus, Save, Unlock, X } from "lucide-react";
+import { CheckCircle2, Plus, Save } from "lucide-react";
 import { api } from "../api/client";
 import { useAuth } from "../contexts/AuthContext";
 import type { BusinessUnit, Company, Year } from "../api/types";
@@ -34,8 +34,10 @@ const FIELD_GROUPS: { title: string; internal: FigureKey; external: FigureKey }[
 type FieldMode = "split" | "combined";
 const emptyFieldModes: Record<string, FieldMode> = { Revenue: "combined", Collections: "combined", Expenses: "combined" };
 
-type Mode = "annual" | "quarter";
-
+// There is no separate Annual Target entry — Annual Target is always the
+// sum of a Company's Q1-Q4 Quarter Target, shown read-only on the Revenue
+// dashboard (KPI cards, Target Distribution Matrix, Operational Grid). This
+// page only sets Quarter Targets.
 export default function TargetConfig() {
   const { user } = useAuth();
   const canManageStructure = user?.role === "GROUP_INTEGRATOR" || user?.role === "SUPERADMIN";
@@ -43,19 +45,12 @@ export default function TargetConfig() {
   const [businessUnits, setBusinessUnits] = useState<BusinessUnit[]>([]);
   const [companies, setCompanies] = useState<Company[]>([]);
 
-  const [mode, setMode] = useState<Mode>("annual");
   const [yearId, setYearId] = useState("");
   const [quarter, setQuarter] = useState(1);
   const [businessUnitId, setBusinessUnitId] = useState("");
   const [companyId, setCompanyId] = useState("");
   const [form, setForm] = useState(emptyForm);
   const [fieldModes, setFieldModes] = useState<Record<string, FieldMode>>(emptyFieldModes);
-
-  // Annual targets lock themselves on save; only Group Integrator/Superadmin
-  // can unlock one so a BU Integrator can edit it again.
-  const [annualLocked, setAnnualLocked] = useState(false);
-  const [showLockedModal, setShowLockedModal] = useState(false);
-  const [unlocking, setUnlocking] = useState(false);
 
   const [newYear, setNewYear] = useState(new Date().getFullYear() + 1);
   const [newBuName, setNewBuName] = useState("");
@@ -93,14 +88,12 @@ export default function TargetConfig() {
     });
   }, [businessUnitId]);
 
-  // Annual/Quarter targets belong to the Company itself, so there's at most
-  // one existing row for the selected Year(+Quarter)/Company.
+  // Quarter targets belong to the Company itself, so there's at most one
+  // existing row for the selected Year+Quarter/Company.
   useEffect(() => {
     if (!yearId || !companyId) return;
     setSaved(false);
-    const loader =
-      mode === "annual" ? api.annualTargets({ yearId, companyId }) : api.quarterTargets({ yearId, quarter, companyId });
-    loader.then((rows: any[]) => {
+    api.quarterTargets({ yearId, quarter, companyId }).then((rows: any[]) => {
       const existing = rows[0];
       if (existing) {
         setForm({
@@ -119,27 +112,12 @@ export default function TargetConfig() {
           modes[group.title] = Number(existing[group.external] ?? 0) !== 0 ? "split" : "combined";
         }
         setFieldModes(modes);
-        setAnnualLocked(mode === "annual" ? !!existing.locked : false);
       } else {
         setForm(emptyForm);
         setFieldModes(emptyFieldModes);
-        setAnnualLocked(false);
       }
     });
-  }, [mode, yearId, quarter, companyId]);
-
-  async function handleUnlock() {
-    setUnlocking(true);
-    setError("");
-    try {
-      await api.unlockAnnualTarget(companyId, yearId);
-      setAnnualLocked(false);
-    } catch (err: any) {
-      setError(err.message || "Failed to unlock annual target");
-    } finally {
-      setUnlocking(false);
-    }
-  }
+  }, [yearId, quarter, companyId]);
 
   function setCombinedMode(title: string, internal: FigureKey, external: FigureKey) {
     setFieldModes((m) => ({ ...m, [title]: "combined" }));
@@ -167,15 +145,7 @@ export default function TargetConfig() {
         expensesInternal: Number(form.expensesInternal) || 0,
         expensesExternal: Number(form.expensesExternal) || 0,
       };
-      if (mode === "annual") {
-        await api.putAnnualTarget({ companyId, yearId, ...figures });
-        // Every successful save locks the annual target — reflect that
-        // immediately rather than waiting on a re-fetch.
-        setAnnualLocked(true);
-        setShowLockedModal(true);
-      } else {
-        await api.putQuarterTarget({ companyId, yearId, quarter, ...figures });
-      }
+      await api.putQuarterTarget({ companyId, yearId, quarter, ...figures });
       setSaved(true);
     } catch (err: any) {
       setError(err.message || "Failed to save target");
@@ -205,16 +175,14 @@ export default function TargetConfig() {
     api.companies(businessUnitId).then(setCompanies);
   }
 
-  const isLockedForMe = mode === "annual" && annualLocked && !canManageStructure;
-
   return (
     <div className="mx-auto flex max-w-5xl flex-col gap-8">
       <div>
         <h2 className="mb-1 text-lg font-semibold text-slate-800">Target Configuration</h2>
         <p className="text-sm text-slate-500">
           {canManageStructure
-            ? "Set up Annual and Quarterly targets per Company at the start of a cycle — they roll up into their Business Unit's total — and manage Years / Business Units / Companies."
-            : "Set up Annual and Quarterly targets for the companies in your assigned Business Unit(s). Each Company's target rolls up into its Business Unit's total."}
+            ? "Set up Quarter targets per Company at the start of a cycle — Annual Target is always the sum of Q1-Q4 and shown read-only on the Revenue dashboard — and manage Years / Business Units / Companies."
+            : "Set up Quarter targets for the companies in your assigned Business Unit(s). Annual Target is always the sum of Q1-Q4 and shown read-only on the Revenue dashboard."}
         </p>
       </div>
 
@@ -274,23 +242,6 @@ export default function TargetConfig() {
       )}
 
       <form onSubmit={handleSubmit} className="flex flex-col gap-6 rounded-lg border border-slate-200 bg-white p-6 shadow-sm">
-        <div className="flex rounded-md border border-slate-200 p-0.5 text-xs w-fit">
-          <button
-            type="button"
-            onClick={() => setMode("annual")}
-            className={`rounded px-3 py-1.5 font-medium ${mode === "annual" ? "bg-brand-500 text-white" : "text-slate-500"}`}
-          >
-            Annual Target
-          </button>
-          <button
-            type="button"
-            onClick={() => setMode("quarter")}
-            className={`rounded px-3 py-1.5 font-medium ${mode === "quarter" ? "bg-brand-500 text-white" : "text-slate-500"}`}
-          >
-            Quarter Target
-          </button>
-        </div>
-
         <div className="grid grid-cols-2 gap-4 sm:grid-cols-4">
           <div className="flex flex-col gap-1">
             <label className="text-xs font-medium text-slate-500">Year</label>
@@ -302,18 +253,16 @@ export default function TargetConfig() {
               ))}
             </select>
           </div>
-          {mode === "quarter" && (
-            <div className="flex flex-col gap-1">
-              <label className="text-xs font-medium text-slate-500">Quarter</label>
-              <select className="rounded-md border border-slate-300 px-3 py-2 text-sm" value={quarter} onChange={(e) => setQuarter(Number(e.target.value))}>
-                {[1, 2, 3, 4].map((q) => (
-                  <option key={q} value={q}>
-                    Q{q}
-                  </option>
-                ))}
-              </select>
-            </div>
-          )}
+          <div className="flex flex-col gap-1">
+            <label className="text-xs font-medium text-slate-500">Quarter</label>
+            <select className="rounded-md border border-slate-300 px-3 py-2 text-sm" value={quarter} onChange={(e) => setQuarter(Number(e.target.value))}>
+              {[1, 2, 3, 4].map((q) => (
+                <option key={q} value={q}>
+                  Q{q}
+                </option>
+              ))}
+            </select>
+          </div>
           <div className="flex flex-col gap-1">
             <label className="text-xs font-medium text-slate-500">Business Unit</label>
             <select
@@ -340,27 +289,6 @@ export default function TargetConfig() {
           </div>
         </div>
 
-        {mode === "annual" && annualLocked && (
-          <div className="flex flex-wrap items-center justify-between gap-2 rounded-md border border-amber-200 bg-amber-50 px-3 py-2 text-xs text-amber-800">
-            <div className="flex items-center gap-1.5">
-              <Lock className="h-3.5 w-3.5" />
-              This Company's annual target is locked.
-              {!canManageStructure && " Ask a Group Integrator or Superadmin to unlock it before making changes."}
-            </div>
-            {canManageStructure && (
-              <button
-                type="button"
-                onClick={handleUnlock}
-                disabled={unlocking}
-                className="flex items-center gap-1.5 rounded-md border border-amber-300 bg-white px-2.5 py-1 font-medium text-amber-800 hover:bg-amber-100 disabled:opacity-50"
-              >
-                <Unlock className="h-3.5 w-3.5" />
-                {unlocking ? "Unlocking..." : "Unlock"}
-              </button>
-            )}
-          </div>
-        )}
-
         <div className="grid grid-cols-1 gap-4">
           {FIELD_GROUPS.map((group) => {
             const isCombined = fieldModes[group.title] !== "split";
@@ -371,17 +299,15 @@ export default function TargetConfig() {
                   <div className="flex rounded-md border border-slate-200 p-0.5 text-[11px]">
                     <button
                       type="button"
-                      disabled={isLockedForMe}
                       onClick={() => setCombinedMode(group.title, group.internal, group.external)}
-                      className={`rounded px-2 py-1 font-medium disabled:opacity-50 ${isCombined ? "bg-brand-500 text-white" : "text-slate-500"}`}
+                      className={`rounded px-2 py-1 font-medium ${isCombined ? "bg-brand-500 text-white" : "text-slate-500"}`}
                     >
                       One Total
                     </button>
                     <button
                       type="button"
-                      disabled={isLockedForMe}
                       onClick={() => setSplitMode(group.title)}
-                      className={`rounded px-2 py-1 font-medium disabled:opacity-50 ${!isCombined ? "bg-brand-500 text-white" : "text-slate-500"}`}
+                      className={`rounded px-2 py-1 font-medium ${!isCombined ? "bg-brand-500 text-white" : "text-slate-500"}`}
                     >
                       Internal / External
                     </button>
@@ -394,8 +320,7 @@ export default function TargetConfig() {
                       type="number"
                       min={0}
                       step="0.01"
-                      disabled={isLockedForMe}
-                      className="rounded-md border border-slate-300 px-3 py-2 text-sm disabled:bg-slate-100 disabled:text-slate-500"
+                      className="rounded-md border border-slate-300 px-3 py-2 text-sm"
                       value={form[group.internal]}
                       onChange={(e) => setForm((f) => ({ ...f, [group.internal]: e.target.value, [group.external]: "0" }))}
                     />
@@ -408,8 +333,7 @@ export default function TargetConfig() {
                         type="number"
                         min={0}
                         step="0.01"
-                        disabled={isLockedForMe}
-                        className="rounded-md border border-slate-300 px-3 py-2 text-sm disabled:bg-slate-100 disabled:text-slate-500"
+                        className="rounded-md border border-slate-300 px-3 py-2 text-sm"
                         value={form[group.internal]}
                         onChange={(e) => setForm((f) => ({ ...f, [group.internal]: e.target.value }))}
                       />
@@ -420,8 +344,7 @@ export default function TargetConfig() {
                         type="number"
                         min={0}
                         step="0.01"
-                        disabled={isLockedForMe}
-                        className="rounded-md border border-slate-300 px-3 py-2 text-sm disabled:bg-slate-100 disabled:text-slate-500"
+                        className="rounded-md border border-slate-300 px-3 py-2 text-sm"
                         value={form[group.external]}
                         onChange={(e) => setForm((f) => ({ ...f, [group.external]: e.target.value }))}
                       />
@@ -437,44 +360,13 @@ export default function TargetConfig() {
 
         <button
           type="submit"
-          disabled={saving || !companyId || !yearId || isLockedForMe}
+          disabled={saving || !companyId || !yearId}
           className="flex items-center justify-center gap-2 rounded-md bg-brand-500 px-4 py-2 text-sm font-medium text-white hover:bg-brand-600 disabled:opacity-50"
         >
           {saved ? <CheckCircle2 className="h-4 w-4" /> : <Save className="h-4 w-4" />}
-          {saving ? "Saving..." : saved ? "Saved" : `Save ${mode === "annual" ? "Annual" : "Quarter"} Target`}
+          {saving ? "Saving..." : saved ? "Saved" : "Save Quarter Target"}
         </button>
       </form>
-
-      {showLockedModal && (
-        <div className="fixed inset-0 z-50 flex items-center justify-center bg-slate-900/40 px-4">
-          <div className="w-full max-w-sm rounded-lg bg-white p-6 shadow-xl">
-            <div className="mb-3 flex items-start justify-between">
-              <div className="flex items-center gap-2 text-emerald-600">
-                <Lock className="h-5 w-5" />
-                <span className="text-sm font-semibold">Annual Target Locked</span>
-              </div>
-              <button
-                type="button"
-                onClick={() => setShowLockedModal(false)}
-                className="text-slate-500 hover:text-slate-600"
-              >
-                <X className="h-4 w-4" />
-              </button>
-            </div>
-            <p className="mb-5 text-sm text-slate-600">
-              This Company's annual target has been saved and is now locked. A Business Integrator won't be able to
-              edit it again until a Group Integrator or Superadmin unlocks it.
-            </p>
-            <button
-              type="button"
-              onClick={() => setShowLockedModal(false)}
-              className="w-full rounded-md bg-brand-500 px-4 py-2 text-sm font-medium text-white hover:bg-brand-600"
-            >
-              Got it
-            </button>
-          </div>
-        </div>
-      )}
     </div>
   );
 }

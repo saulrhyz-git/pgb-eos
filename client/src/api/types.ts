@@ -60,7 +60,8 @@ export interface Figures {
 }
 
 export interface Kpis {
-  // Sum of every in-scope Company's AnnualTarget, split by category — these
+  // Annual Target is not separately entered — it's always the sum of every
+  // in-scope Company's Q1-Q4 Quarter Target, split by category, so these
   // never change with the quarter filter.
   annualRevenueTarget: number;
   annualCollectionsTarget: number;
@@ -87,10 +88,10 @@ export interface ChartPoint {
 export interface TargetMatrixRow {
   businessUnitId: string;
   businessUnitName: string;
-  annualTarget: { revenueInternal: number; revenueExternal: number; total: number };
   quarterTargets: { quarter: number; revenueInternal: number; revenueExternal: number; total: number }[];
-  distributedTotal: number;
-  varianceFromAnnual: number;
+  // Always exactly the sum of quarterTargets' totals — Annual Target is no
+  // longer a separately-entered figure.
+  annualTarget: number;
 }
 
 // A single Company's recognized actuals within its Business Unit.

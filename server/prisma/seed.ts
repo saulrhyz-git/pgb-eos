@@ -18,7 +18,6 @@ async function main() {
   await prisma.businessGoal.deleteMany({});
   await prisma.quarterActual.deleteMany({});
   await prisma.quarterTarget.deleteMany({});
-  await prisma.annualTarget.deleteMany({});
   await prisma.userBusinessUnit.deleteMany({});
   await prisma.company.deleteMany({});
   await prisma.businessUnit.deleteMany({});

@@ -18,14 +18,18 @@ router.use(blockPendingPasswordChange);
  * Query params: yearId (required), quarter (1-4, or "all" for the full year, default 4),
  *               businessUnitId (optional scope), companyId (optional drill-down)
  *
- * Annual/Quarter Targets AND Quarter Actuals are both recognized per Company.
- * The Business-Unit-level numbers shown here (KPIs, chart, target matrix,
- * operational grid) are never stored directly — they're a rollup, computed
- * on the fly by summing every Company's target/actual within that BU.
+ * Quarter Target and Quarter Actual are both recognized per Company. There is
+ * no separately-stored Annual Target — it's always derived by summing a
+ * Company's Q1-Q4 QuarterTarget rows, and that sum never changes with the
+ * quarter filter. The Business-Unit-level numbers shown here (KPIs, chart,
+ * target matrix, operational grid) are never stored directly either —
+ * they're a rollup, computed on the fly by summing every Company's
+ * target/actual within that BU.
  *
  * When quarter="all", every "quarter"-labeled figure (KPIs, operational
  * grid) represents the sum of Q1-Q4 instead of a single quarter — this is
- * the "All Quarters" option in the dashboard filter.
+ * the "All Quarters" option in the dashboard filter. This is unrelated to
+ * Annual Target, which is always the Q1-Q4 sum regardless.
  */
 router.get("/", async (req, res) => {
   const user = req.user!;
@@ -90,15 +94,26 @@ router.get("/", async (req, res) => {
   });
   const companyIds = companies.map((c) => c.id);
 
-  const [annualTargets, quarterTargets, quarterActuals] = await Promise.all([
-    companyIds.length ? prisma.annualTarget.findMany({ where: { yearId, companyId: { in: companyIds } } }) : [],
+  const [quarterTargets, quarterActuals] = await Promise.all([
     companyIds.length ? prisma.quarterTarget.findMany({ where: { yearId, companyId: { in: companyIds } } }) : [],
     companyIds.length ? prisma.quarterActual.findMany({ where: { yearId, companyId: { in: companyIds } } }) : [],
   ]);
 
-  const annualByCompany = new Map(annualTargets.map((t) => [t.companyId, toFigures(t)]));
   const qTargetByCompanyQuarter = new Map<string, Figures>();
   for (const t of quarterTargets) qTargetByCompanyQuarter.set(`${t.companyId}:${t.quarter}`, toFigures(t));
+
+  // "Annual Target" is not a separately-entered value — it's always the sum
+  // of a Company's Q1-Q4 QuarterTarget rows, independent of the quarter
+  // filter (unlike quarterTargetTotal/quarterActualTotal below, which do
+  // respect it).
+  const annualByCompany = new Map<string, Figures>();
+  for (const cid of companyIds) {
+    let annual = emptyFigures();
+    for (let q = 1; q <= 4; q++) {
+      annual = addFigures(annual, qTargetByCompanyQuarter.get(`${cid}:${q}`) || emptyFigures());
+    }
+    annualByCompany.set(cid, annual);
+  }
 
   const qActualByCompanyQuarter = new Map<string, Figures>();
   const remarksByCompanyQuarter = new Map<
@@ -153,7 +168,8 @@ router.get("/", async (req, res) => {
 
   // ---------- KPIs (sum of every Company's target/actual in scope) ----------
   // The three Annual _ Target figures are a straight sum of every in-scope
-  // Company's AnnualTarget and never change with the quarter filter.
+  // Company's Q1-Q4 Quarter Target (via annualByCompany above) and never
+  // change with the quarter filter.
   let annualRevenueTargetTotal = 0;
   let annualCollectionsTargetTotal = 0;
   let annualExpensesTargetTotal = 0;
@@ -195,27 +211,24 @@ router.get("/", async (req, res) => {
     ytdAttainmentPct: pct(ytdActualTotal, ytdTargetTotal),
   };
 
-  // ---------- Target Distribution Matrix: Annual vs each Quarter Target, per Business Unit ----------
-  // (a Business Unit's numbers here are the sum of its Companies' own targets)
+  // ---------- Target Distribution Matrix: Q1-Q4 Target per Business Unit, plus their Annual (Q1-Q4) sum ----------
+  // (a Business Unit's numbers here are the sum of its Companies' own targets;
+  // Annual Target is always exactly the sum of the four quarters shown, since
+  // it's no longer a separately-entered figure.)
   const targetMatrix = businessUnits.map((bu) => {
     const buCompanies = companiesByBu.get(bu.id) || [];
-
-    let annual = emptyFigures();
-    for (const c of buCompanies) annual = addFigures(annual, annualByCompany.get(c.id) || emptyFigures());
 
     const quarterTargetsRow = [1, 2, 3, 4].map((q) => {
       let t = emptyFigures();
       for (const c of buCompanies) t = addFigures(t, qTargetByCompanyQuarter.get(`${c.id}:${q}`) || emptyFigures());
       return { quarter: q, revenueInternal: t.revenueInternal, revenueExternal: t.revenueExternal, total: revenueTotal(t) };
     });
-    const distributedTotal = quarterTargetsRow.reduce((sum, q) => sum + q.total, 0);
+    const annualTarget = quarterTargetsRow.reduce((sum, q) => sum + q.total, 0);
     return {
       businessUnitId: bu.id,
       businessUnitName: bu.name,
-      annualTarget: { revenueInternal: annual.revenueInternal, revenueExternal: annual.revenueExternal, total: revenueTotal(annual) },
       quarterTargets: quarterTargetsRow,
-      distributedTotal,
-      varianceFromAnnual: revenueTotal(annual) - distributedTotal,
+      annualTarget,
     };
   });
 

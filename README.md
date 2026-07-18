@@ -74,19 +74,17 @@ real data — the app starts completely empty.
 - **Schema** (`server/prisma/schema.prisma`): `User` (now with `username`,
   `mustChangePassword`), `BusinessUnit`, `UserBusinessUnit` (many-to-many BU
   assignment), `Company` (with an optional free-text `description` field, set
-  on create and editable afterward), `Year`, `AnnualTarget`, `QuarterTarget`,
+  on create and editable afterward), `Year`, `QuarterTarget`,
   `QuarterActual`, `SmtpSettings` (singleton row), `BusinessGoal`,
   `BusinessGoalBusinessUnit` (many-to-many BU assignment for goals), and
-  `Rock`. **`AnnualTarget`, `QuarterTarget`, and `QuarterActual` all belong
-  to a `Company`** (`@@unique([companyId, yearId])` / `@@unique([companyId,
-  yearId, quarter])` on each) — targets and actuals are entered at exactly
-  the same granularity. A Business Unit's target/actual is never stored
-  directly; it's a rollup computed on the fly in `server/src/routes/dashboard.ts`
-  by summing every Company's numbers within that BU. `AnnualTarget`
-  additionally carries a `locked` Boolean (default `false`) — every
-  successful save sets it `true`; a BU Integrator can't save an
-  already-locked one for that Company, only a Group Integrator or Superadmin
-  can clear it back to `false`. Every financial model splits Revenue/Collections/Expenses into
+  `Rock`. **`QuarterTarget` and `QuarterActual` both belong to a `Company`**
+  (`@@unique([companyId, yearId, quarter])` on each) — targets and actuals are
+  entered at exactly the same granularity. There is no `AnnualTarget` table:
+  Annual Target is never separately entered or stored, it's always derived by
+  summing a Company's Q1-Q4 `QuarterTarget` rows on the fly in
+  `server/src/routes/dashboard.ts`. A Business Unit's target/actual is
+  likewise never stored directly; it's a rollup computed the same way, by
+  summing every Company's numbers within that BU. Every financial model splits Revenue/Collections/Expenses into
   Internal/External columns. `QuarterActual` carries three independent
   remarks fields —
   `revenueRemarks`, `collectionsRemarks`, `expensesRemarks` — instead of one
@@ -109,21 +107,20 @@ real data — the app starts completely empty.
   - `BU_INTEGRATOR` — always scoped, and always required to have at least one
     assigned Business Unit (enforced on both create and edit in
     `server/src/routes/admin.ts`). Can do data entry (quarterly actuals),
-    target setup (Annual/Quarter targets), and add/update Rocks for companies
-    within their assigned Business Unit(s), but cannot create new
-    Years/BUs/Companies or manage the Goals taxonomy.
+    target setup (Quarter targets, which roll up into a computed Annual
+    Target), and add/update Rocks for companies within their assigned
+    Business Unit(s), but cannot create new Years/BUs/Companies or manage
+    the Goals taxonomy.
 - **API** (`server/src/routes`): JWT auth (login accepts email or username),
   a `POST /api/auth/change-password` flow that's enforced whenever a user's
   `mustChangePassword` flag is set (e.g. the seeded superadmin's first
   login, or any account an admin resets), CRUD for Years/BUs/Companies
-  (Group Integrator or Superadmin), `server/src/routes/targets.ts` (Annual/
-  Quarter target upserts keyed by `companyId` + `yearId[+quarter]` — Group
+  (Group Integrator or Superadmin), `server/src/routes/targets.ts` (Quarter
+  target upserts keyed by `companyId` + `yearId` + `quarter` — Group
   Integrator, Superadmin, or a BU Integrator scoped to their own Business
-  Unit(s), mirroring how actuals are scoped; `PUT /targets/annual` 403s with
-  `code: "ANNUAL_TARGET_LOCKED"` if a BU Integrator tries to save an
-  already-locked Company's annual target, and every successful save sets
-  `locked: true`; a separate `PATCH /targets/annual/unlock`, restricted to
-  Group Integrator/Superadmin, clears it), `server/src/routes/actuals.ts`
+  Unit(s), mirroring how actuals are scoped; there is no Annual Target
+  endpoint — Annual Target is read-only and derived, never written to
+  directly), `server/src/routes/actuals.ts`
   (quarterly actuals + per-category remarks upserts keyed by `companyId` +
   `yearId` + `quarter`, BU Integrator scoped to their assigned BUs), a
   superadmin-only `server/src/routes/admin.ts` with full CRUD over
@@ -160,33 +157,30 @@ real data — the app starts completely empty.
   quarter's figures; per-quarter Remarks are hidden in that mode since a
   remark belongs to one specific quarter), KPI cards in two rows — the top
   row is Annual Revenue/Collections/Expenses Target (each a straight sum of
-  every in-scope Company's AnnualTarget, split by category, and unaffected
-  by the Quarter filter), the bottom row is the selected-period
-  Target/Actual and Year-to-Date Actual — all in ₱ via
-  `Intl.NumberFormat("en-PH", { currency: "PHP" })` — with green/red
-  attainment coloring, a Recharts bar+line combo chart with an
-  Internal/External breakdown toggle, a Target Distribution
-  Matrix with one row per Business Unit (Annual vs each Quarter's target,
-  computed by summing that BU's Companies' own targets),
-  and an Operational Grid where each row is a Business Unit (target vs its
-  Companies' combined actual, attainment %, YTD) expandable to show every
-  contributing Company's own actuals plus three independently
-  inline-editable Remarks fields (Revenue/Collections/Expenses);
-  `pages/TargetConfig.tsx` ("Target Setup" in the nav) sets Annual/Quarter
-  targets by Year + Business Unit + **Company** — exactly the same
-  Company-level granularity as Data Entry/actuals — and that Company's
-  target rolls up into its Business Unit's total shown on the Revenue
+  every in-scope Company's Q1-Q4 Quarter Target, split by category, and
+  unaffected by the Quarter filter — there's nothing to separately enter
+  here), the bottom row is the selected-period Target/Actual and
+  Year-to-Date Actual — all in ₱ via `Intl.NumberFormat("en-PH", { currency:
+  "PHP" })` — with green/red attainment coloring, a Recharts bar+line combo
+  chart with an Internal/External breakdown toggle, a Target Distribution
+  Matrix with one row per Business Unit (Q1-Q4 target columns plus an Annual
+  Target column that's always their sum, computed by summing that BU's
+  Companies' own Quarter Targets), and an Operational Grid where each row is
+  a Business Unit (target vs its Companies' combined actual, attainment %,
+  YTD) expandable to show every contributing Company's own actuals plus
+  three independently inline-editable Remarks fields
+  (Revenue/Collections/Expenses); `pages/TargetConfig.tsx` ("Target Setup"
+  in the nav) sets Quarter targets by Year + Quarter + Business Unit +
+  **Company** — exactly the same Company-level granularity as
+  Data Entry/actuals — and that Company's quarter target rolls up into its
+  Business Unit's total shown on the Revenue dashboard. There's no Annual
+  Target entry here (or anywhere) — it's always derived by summing a
+  Company's own Q1-Q4 Quarter Targets, shown read-only on the Revenue
   dashboard. Each of Revenue/Collections/Expenses has its own "One Total" vs
   "Internal / External" toggle there — Internal + External is always the
   figure that counts, so "One Total" is purely a data-entry shortcut that
   puts the whole number in Internal and zeroes External; no schema or API
-  change was needed for it. Saving an Annual Target locks it
-  (`AnnualTarget.locked`) — a confirmation pop-up says so, and from then on
-  a BU Integrator can't edit that Company's annual target again (the form
-  disables, showing an amber "locked" banner) until a Group Integrator or
-  Superadmin clicks Unlock. Group Integrators/Superadmins always bypass the
-  lock when saving, and every save re-locks it — locking is specific to
-  Annual Target, Quarter Target is unaffected; a **Rocks** page (`pages/Rocks.tsx`) with
+  change was needed for it; a **Rocks** page (`pages/Rocks.tsx`) with
   its own Year/Quarter/BU/Company/Business Goal filter bar, five summary
   cards (Total Rocks, Target Met, On Track, At Risk / Pending, Avg
   Progress %) computed client-side from the filtered list, a "Manage
@@ -310,37 +304,39 @@ editing a company's description in place persists after refresh.
 
 **Targets are per-Company again (rolling up to a Business Unit total)** —
 `AnnualTarget` and `QuarterTarget` briefly moved to `businessUnitId` in an
-earlier iteration of this project, then moved back: they now key off
-`companyId` again, exactly like `QuarterActual`, and a Business Unit's
+earlier iteration of this project, then moved back: `QuarterTarget` keys
+off `companyId` again, exactly like `QuarterActual`, and a Business Unit's
 number is a computed rollup (sum of its Companies' targets), never stored
-directly. If your database still has the BU-keyed version of these tables
-from that earlier iteration, `npm run prisma:migrate` will need to drop and
-recreate them — this is not an additive migration, and any target data
-entered under the BU-keyed schema does not carry over (fits this project's
-existing pattern of treating pre-launch data as disposable). This is
-unverified end-to-end. Worth checking by hand: Target Setup shows a Company
-picker again for both Annual and Quarter Target (alongside Year and
-Business Unit, the latter now just used to filter which Companies show up);
-saving a target for one Company doesn't affect another Company's target in
-the same BU; the Revenue dashboard's Target Distribution Matrix and
-Operational Grid still show one row per Business Unit, but those numbers
-now update correctly as the *sum* of whichever Companies have a target set
-in that BU (a BU with some but not all Companies targeted should show a
-partial, not-yet-complete total, not zero); a Business Unit with zero
-Companies targeted shows a zero target row; drilling the dashboard down to
-a single Company (via the Company filter) shows that Company's own
-target/actual, not its BU's combined number.
+directly. Worth checking by hand: Target Setup shows a Company picker for
+Quarter Target (alongside Year, Quarter, and Business Unit, the latter now
+just used to filter which Companies show up); saving a target for one
+Company doesn't affect another Company's target in the same BU; the
+Revenue dashboard's Target Distribution Matrix and Operational Grid still
+show one row per Business Unit, but those numbers update correctly as the
+*sum* of whichever Companies have a target set in that BU (a BU with some
+but not all Companies targeted should show a partial, not-yet-complete
+total, not zero); a Business Unit with zero Companies targeted shows a zero
+target row; drilling the dashboard down to a single Company (via the
+Company filter) shows that Company's own target/actual, not its BU's
+combined number.
 
-**Annual Target lock/unlock** is a schema change (`AnnualTarget.locked`)
-requiring `npm run prisma:migrate`, and is unverified end-to-end — now
-scoped per-Company rather than per-Business-Unit. Worth checking by hand: a
-BU Integrator saves a new annual target for a Company and sees the "Annual
-Target Locked" pop-up; the form for that Company/Year is now disabled with
-an amber locked banner and no Unlock button; attempting the PUT directly
-(bypassing the UI) still 403s with `code: "ANNUAL_TARGET_LOCKED"`; a Group
-Integrator/Superadmin viewing the same locked target can still edit and
-save it freely, sees an Unlock button in the banner, and clicking it clears
-the lock so the BU Integrator can edit that Company's target again; a
-different Company in the same Business Unit is unaffected by one Company's
-lock; switching to Quarter Target is entirely unaffected by an annual
-lock.
+**Annual Target is now a pure computed rollup — the `AnnualTarget` table,
+its lock/unlock feature, and its Target Setup entry mode have all been
+removed.** Annual Target used to be a separately-entered, lockable figure
+(see git history if curious); it's now always just the sum of a Company's
+(or Business Unit's) Q1-Q4 `QuarterTarget` rows, computed on the fly in
+`server/src/routes/dashboard.ts` — the same relationship the Target
+Distribution Matrix already showed between "Distributed Total" and
+"Annual Target" before, just made the only source of truth instead of a
+separate, possibly-differing entry. This drops the `AnnualTarget` table
+entirely (`npm run prisma:migrate` / `prisma migrate deploy` needs to run
+the new migration; any previously entered Annual Target data, including
+its lock state, is gone). This is unverified end-to-end. Worth checking by
+hand: Target Setup no longer has an Annual/Quarter mode toggle — it's
+Quarter-only now; there's no lock banner, Unlock button, or "Annual Target
+Locked" pop-up anywhere; the Revenue dashboard's Annual Revenue/Collections/
+Expenses Target KPI cards update immediately after saving a Quarter Target
+(entering Q1 and Q2 for a Company should make those cards reflect Q1+Q2,
+even with Q3/Q4 still empty); the Target Distribution Matrix's Annual
+Target column always exactly equals its Q1+Q2+Q3+Q4 row for that Business
+Unit; the Operational Grid's Annual Target column behaves the same way.

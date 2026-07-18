@@ -86,17 +86,9 @@ export const api = {
     return request<DashboardResponse>(`/dashboard?${qs.toString()}`);
   },
 
-  annualTargets: (params: { yearId: string; businessUnitId?: string; companyId?: string }) => {
-    const qs = new URLSearchParams({ yearId: params.yearId });
-    if (params.businessUnitId) qs.set("businessUnitId", params.businessUnitId);
-    if (params.companyId) qs.set("companyId", params.companyId);
-    return request<any[]>(`/targets/annual?${qs.toString()}`);
-  },
-  putAnnualTarget: (payload: { companyId: string; yearId: string } & Figures) =>
-    request<any>("/targets/annual", { method: "PUT", body: JSON.stringify(payload) }),
-  unlockAnnualTarget: (companyId: string, yearId: string) =>
-    request<any>("/targets/annual/unlock", { method: "PATCH", body: JSON.stringify({ companyId, yearId }) }),
-
+  // Annual Target is not separately entered anymore — it's always derived
+  // (sum of Q1-Q4 Quarter Target) and shown read-only on the Revenue
+  // dashboard; there is no annual API to write to.
   quarterTargets: (params: { yearId: string; quarter?: number; businessUnitId?: string; companyId?: string }) => {
     const qs = new URLSearchParams({ yearId: params.yearId });
     if (params.quarter) qs.set("quarter", String(params.quarter));

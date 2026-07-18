@@ -38,7 +38,7 @@ export default function KpiCards({ kpis, quarter }: Props) {
   return (
     <div className="flex flex-col gap-4">
       {/* Annual targets by category — a straight sum of every in-scope Company's
-          AnnualTarget, unaffected by the Quarter filter above. */}
+          Q1-Q4 Quarter Target, unaffected by the Quarter filter above. */}
       <div className="grid grid-cols-1 gap-4 sm:grid-cols-3">
         <Card
           icon={<PhilippinePeso className="h-4 w-4" />}

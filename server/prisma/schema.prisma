@@ -78,7 +78,6 @@ model Company {
   createdAt      DateTime @default(now())
 
   businessUnit   BusinessUnit    @relation(fields: [businessUnitId], references: [id], onDelete: Cascade)
-  annualTargets  AnnualTarget[]
   quarterTargets QuarterTarget[]
   quarterActuals QuarterActual[]
   rocks          Rock[]
@@ -92,48 +91,17 @@ model Year {
   year      Int      @unique
   createdAt DateTime @default(now())
 
-  annualTargets  AnnualTarget[]
   quarterTargets QuarterTarget[]
   quarterActuals QuarterActual[]
   rocks          Rock[]
 }
 
-// Annual target: set once per Company per year (Group Integrator, Superadmin,
-// or a BU Integrator scoped to their own BU). Business-Unit-level "target" is
-// not stored anywhere — it's a derived rollup, computed on the fly in
-// routes/dashboard.ts by summing every Company's AnnualTarget within that BU,
-// the same way BU-level actuals are a rollup of each Company's QuarterActual.
-//
-// `locked`: every successful save locks that Company's target — a BU
-// Integrator can no longer edit it once locked. Group Integrators/Superadmins
-// always bypass the lock when saving, and are the only roles who can
-// explicitly unlock it (PATCH /targets/annual/unlock) to let a BU Integrator
-// edit it again.
-model AnnualTarget {
-  id        String  @id @default(uuid())
-  companyId String
-  yearId    String
-  locked    Boolean @default(false)
-
-  revenueInternal     Decimal @default(0) @db.Decimal(14, 2)
-  revenueExternal     Decimal @default(0) @db.Decimal(14, 2)
-  collectionsInternal Decimal @default(0) @db.Decimal(14, 2)
-  collectionsExternal Decimal @default(0) @db.Decimal(14, 2)
-  expensesInternal    Decimal @default(0) @db.Decimal(14, 2)
-  expensesExternal    Decimal @default(0) @db.Decimal(14, 2)
-
-  updatedAt DateTime @updatedAt
-
-  company Company @relation(fields: [companyId], references: [id], onDelete: Cascade)
-  year    Year    @relation(fields: [yearId], references: [id], onDelete: Cascade)
-
-  @@unique([companyId, yearId])
-  @@index([yearId])
-}
-
-// Quarter target: how a Company's annual goal is distributed across Q1-Q4.
-// Set by Group Integrator (or a BU Integrator scoped to their own BU); rolls
-// up to a Business Unit total the same way AnnualTarget does.
+// Quarter target: set once per Company per Year+Quarter (Group Integrator,
+// Superadmin, or a BU Integrator scoped to their own BU). There is no
+// separately-stored Annual Target anymore — "Annual Target" is purely a
+// derived figure, computed on the fly in routes/dashboard.ts by summing a
+// Company's (or Business Unit's) QuarterTarget rows across Q1-Q4, the same
+// way BU-level actuals are a rollup of each Company's QuarterActual.
 model QuarterTarget {
   id        String @id @default(uuid())
   companyId String
