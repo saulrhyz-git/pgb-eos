@@ -1,24 +1,27 @@
 # EOS Executive Dashboard
 
-Full-stack dashboard with two views: **Revenue** (Revenue, Collections, and
+Full-stack dashboard with three views: **Revenue** (Revenue, Collections, and
 Expenses — each split Internal / External, in Philippine Peso, each with its
 own Remarks field — across a Year → Business Unit → Member Company → Quarter
 hierarchy; Annual and Quarter **targets, like actuals, are set once per
 Company** — a Business Unit's target is never entered directly, it's a
-rollup computed by summing every Company's target within that BU) and
+rollup computed by summing every Company's target within that BU),
 **Rocks** (EOS-style 90-day priorities tracked per
 Company/Year/Quarter, each with its own Remarks field, tagged against a
 shared Business Goals taxonomy that Superadmin/Group Integrator can assign
-to one or more Business Units, or leave global). Role-based access is
-provided for a Superadmin
+to one or more Business Units, or leave global), and an **Executive
+Scorecard** (a filterable, BU-level-only condensed summary of the same
+Revenue and Rocks data, designed for a C-Level/BOD audience). Role-based
+access is provided for a Superadmin
 (full system access), a Group Integrator (global by default, but can
 optionally be scoped to one or more assigned Business Units), and BU
 Integrators (always tied to at least one assigned Business Unit, with data
 entry, target-setup, and Rock-tracking rights scoped to it). On top of that,
 a Superadmin can build named **Custom Roles** — a tickbox matrix granting
-View/Edit/Delete over Targets/Revenue/Collections/Expenses/Rocks per
-Business Unit or individual Company — and assign one to any user for
-accountability finer than a blanket Business Unit assignment.
+View/Edit/Delete over Targets/Revenue/Collections/Expenses/Rocks (plus a
+View-only toggle for the Executive Scorecard) per Business Unit or
+individual Company — and assign one to any user for accountability finer
+than a blanket Business Unit assignment.
 
 **Stack:** React (Vite) + Tailwind + Recharts + Lucide on the front end;
 Express + TypeScript + Prisma + PostgreSQL on the back end.
@@ -125,14 +128,18 @@ real data — the app starts completely empty.
   selected — a Company-level grant takes precedence over a Business-Unit-level
   one for the same resource when both exist, so a role can grant BU-wide
   access with a narrower or wider carve-out for one Company), independently
-  choose View/Edit/Delete for each of five resources — **Targets** (the
+  choose View/Edit/Delete for each of six resources — **Targets** (the
   Target Setup page), **Revenue**, **Collections**, **Expenses** (each
   financial category wherever it appears — Revenue dashboard KPIs/chart/
-  matrix/Operational Grid, Data Entry, per-category Remarks), and **Rocks**
-  (the Rocks page). Admin → Roles presents this as the requested tickbox
-  matrix: pick a Business Unit or Company on the left (a tree with Business
-  Units expandable to their Companies, both independently selectable), and
-  each pick gets its own 5-resource x View/Edit/Delete grid on the right;
+  matrix/Operational Grid, Data Entry, per-category Remarks), **Rocks**
+  (the Rocks page), and **Executive Scorecard** (a coarse "can this user open
+  the page at all" toggle — only its View flag is meaningful, since the page
+  itself is read-only; the figures shown once inside are still masked by the
+  Revenue/Collections/Expenses/Rocks grants like everywhere else). Admin →
+  Roles presents this as the requested tickbox matrix: pick a Business Unit
+  or Company on the left (a tree with Business Units expandable to their
+  Companies, both independently selectable), and each pick gets its own
+  6-resource x View/Edit/Delete grid on the right;
   saving flattens the selections into `RolePermission` rows (only rows with
   at least one box checked are kept). A role is assigned to a user via a
   "Custom Role" dropdown on Admin → Users (hidden for Superadmins, who always
@@ -160,6 +167,27 @@ real data — the app starts completely empty.
   from the database on every request (not baked into the login token), so
   editing a role's matrix takes effect immediately for anyone assigned to it,
   without needing to log out and back in.
+- **Executive Scorecard** (`server/src/routes/scorecard.ts`,
+  `client/src/pages/Scorecard.tsx`): a third, filterable/interactive view
+  aimed at a C-Level/BOD audience — a condensed, Business-Unit-level-only
+  (no Company drill-down) re-shaping of the same Revenue dashboard and Rocks
+  data into a scorecard: two traffic-light headline cards (Revenue
+  Attainment, Rocks Completion) up top, a **Revenue Performance Summary**
+  section (Annual Revenue/Collections/Expenses Target cards, Actual-vs-Target
+  and Year-to-Date stats, a revenue trend chart, and a sortable per-Business-
+  Unit attainment table), and a **Rocks Performance Summary** section (status
+  count cards, a sortable per-Business-Unit breakdown, and a "Needs
+  Attention" list of At Risk/Pending Rocks sorted lowest-progress-first for
+  management-by-exception). Filters are Year, Quarter (or "All Quarters",
+  which is the default here since this is meant as a board-level annual
+  view), and Business Unit. Default access is Superadmin and Group
+  Integrator (matching the default access level of other exec-facing
+  features like Business Goals management and Rock Rollover) — a BU
+  Integrator needs a Custom Role that explicitly grants **Executive
+  Scorecard** view to open the page at all (a plain 403 with an in-page
+  "access required" message otherwise); once inside, the actual figures
+  shown are still masked by that role's Revenue/Collections/Expenses/Rocks
+  grants exactly like the Revenue dashboard and Rocks page.
 - **API** (`server/src/routes`): JWT auth (login accepts email or username),
   a `POST /api/auth/change-password` flow that's enforced whenever a user's
   `mustChangePassword` flag is set (e.g. the seeded superadmin's first
@@ -276,7 +304,14 @@ real data — the app starts completely empty.
   project-tracker style; a Data Entry page and a Target Setup page open to
   all three roles (each scoped server-side; the Add Year/BU/Company
   quick-add forms on Target Setup are only shown to Group
-  Integrators/Superadmin), a forced Change Password screen, and a
+  Integrators/Superadmin); an **Executive Scorecard** page
+  (`pages/Scorecard.tsx`, nav-linked for all three roles — a BU Integrator
+  without SCORECARD access gets a clean "access required" message in the
+  page body rather than a broken screen) with its own compact Year/Quarter/
+  Business Unit filter row, two sortable Business-Unit-level summary tables
+  (click a column header to sort), a Recharts revenue trend chart, and a
+  "Needs Attention" Rocks list — all described in the Executive Scorecard
+  bullet above; a forced Change Password screen, and a
   Superadmin-only `/admin` section (`client/src/pages/admin`) with tabs for
   Users (including the Business Unit assignment checklist and the Custom
   Role dropdown), Roles (the Custom Role tickbox-matrix builder), Companies,
@@ -451,3 +486,22 @@ and its API reject create/edit/delete for them; a role can't be deleted
 while still assigned to a user (the delete button is disabled with a
 tooltip explaining why); clearing a user's Custom Role (setting it back to
 "None") restores today's default Business-Unit-wide behavior for them.
+
+**Executive Scorecard** (the `SCORECARD` addition to the `PermissionResource`
+enum, `server/src/routes/scorecard.ts`, and `client/src/pages/Scorecard.tsx`)
+needs a fresh `npm run prisma:migrate` to pick up the new enum value (a
+single `ALTER TYPE ... ADD VALUE`, purely additive), and is unverified
+end-to-end. Worth checking by hand: logging in as the Superadmin or a Group
+Integrator opens `/scorecard` directly with no extra setup; logging in as a
+BU Integrator with no Custom Role shows the "access required" message
+instead of data, and the same BU Integrator gains access the moment a
+Superadmin assigns them a Custom Role with SCORECARD view checked (no
+re-login needed, same as every other Custom Role change); the Year/Quarter/
+Business Unit filters reload the page's data and the two Business-Unit
+breakdown tables are sortable by clicking their column headers (an arrow
+flips direction on a second click); a role with SCORECARD view but only
+ROCKS view (no financial resources) sees a real Rocks Performance Summary
+but zeroed-out Revenue figures, and vice versa for a role with only
+financial view; the "Needs Attention" list only ever shows At Risk/Pending
+Rocks, sorted lowest-progress-first, and reflects the current Year/Quarter/
+Business Unit filter.

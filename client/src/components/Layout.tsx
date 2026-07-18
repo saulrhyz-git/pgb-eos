@@ -1,5 +1,5 @@
 import { NavLink, Outlet } from "react-router-dom";
-import { LayoutDashboard, ClipboardEdit, Settings, LogOut, TrendingUp, ShieldCheck, Mountain } from "lucide-react";
+import { LayoutDashboard, ClipboardEdit, Settings, LogOut, TrendingUp, ShieldCheck, Mountain, Gauge } from "lucide-react";
 import { useAuth } from "../contexts/AuthContext";
 
 export default function Layout() {
@@ -21,6 +21,9 @@ export default function Layout() {
           <nav className="flex items-center gap-2">
             <NavLink to="/" end className={linkClass}>
               <LayoutDashboard className="h-4 w-4" /> Revenue
+            </NavLink>
+            <NavLink to="/scorecard" className={linkClass}>
+              <Gauge className="h-4 w-4" /> Scorecard
             </NavLink>
             <NavLink to="/rocks" className={linkClass}>
               <Mountain className="h-4 w-4" /> Rocks

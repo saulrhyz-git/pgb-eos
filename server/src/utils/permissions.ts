@@ -3,8 +3,8 @@ import { prisma } from "../lib/prisma";
 // Mirrors the Prisma PermissionResource enum. Kept as a plain string union
 // here (rather than importing the generated enum) so this file has no
 // Prisma-client-generation-order dependency.
-export type Resource = "TARGETS" | "REVENUE" | "COLLECTIONS" | "EXPENSES" | "ROCKS";
-export const ALL_RESOURCES: Resource[] = ["TARGETS", "REVENUE", "COLLECTIONS", "EXPENSES", "ROCKS"];
+export type Resource = "TARGETS" | "REVENUE" | "COLLECTIONS" | "EXPENSES" | "ROCKS" | "SCORECARD";
+export const ALL_RESOURCES: Resource[] = ["TARGETS", "REVENUE", "COLLECTIONS", "EXPENSES", "ROCKS", "SCORECARD"];
 // The three financial categories a single QuarterActual record covers at
 // once. Its PUT endpoint submits all three together, so — since permissions
 // are granted per-category — actuals.ts treats "can I submit this form at

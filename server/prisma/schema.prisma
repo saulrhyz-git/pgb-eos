@@ -17,18 +17,24 @@ enum Role {
   BU_INTEGRATOR
 }
 
-// The five gate-able areas of the app a Custom Role's permission matrix can
-// grant View/Edit/Delete over, independently, per Business Unit or Company.
+// The gate-able areas of the app a Custom Role's permission matrix can grant
+// View/Edit/Delete over, independently, per Business Unit or Company.
 // TARGETS covers the Target Setup page (QuarterTarget records); REVENUE/
 // COLLECTIONS/EXPENSES cover their matching figures wherever they appear
 // (Revenue dashboard KPIs/chart/matrix, Operational Grid, Data Entry/actuals,
-// per-category Remarks); ROCKS covers the Rocks page.
+// per-category Remarks); ROCKS covers the Rocks page. SCORECARD gates the
+// Executive Scorecard page itself (a coarse "can this user open the page at
+// all" check) — the figures shown once inside are still masked by the
+// REVENUE/COLLECTIONS/EXPENSES/ROCKS grants exactly as everywhere else; only
+// canView is meaningful for SCORECARD (there's nothing to edit or delete on
+// a read-only summary page), canEdit/canDelete are simply ignored for it.
 enum PermissionResource {
   TARGETS
   REVENUE
   COLLECTIONS
   EXPENSES
   ROCKS
+  SCORECARD
 }
 
 model User {

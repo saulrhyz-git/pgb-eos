@@ -20,6 +20,7 @@ import settingsRoutes from "./routes/settings";
 import businessGoalRoutes from "./routes/businessGoals";
 import rockRoutes from "./routes/rocks";
 import customRoleRoutes from "./routes/customRoles";
+import scorecardRoutes from "./routes/scorecard";
 
 const app = express();
 app.use(cors({ origin: process.env.CLIENT_ORIGIN || "*" }));
@@ -37,6 +38,7 @@ app.use("/api/settings", settingsRoutes);
 app.use("/api/business-goals", businessGoalRoutes);
 app.use("/api/rocks", rockRoutes);
 app.use("/api/custom-roles", customRoleRoutes);
+app.use("/api/scorecard", scorecardRoutes);
 
 // Generic error handler as a safety net for anything thrown above.
 app.use((err: any, _req: express.Request, res: express.Response, _next: express.NextFunction) => {

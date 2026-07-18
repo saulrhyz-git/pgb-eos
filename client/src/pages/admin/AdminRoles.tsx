@@ -3,13 +3,14 @@ import { ChevronDown, ChevronRight, Pencil, Plus, Trash2, X } from "lucide-react
 import { api } from "../../api/client";
 import type { BusinessUnit, CustomRole, Resource, RolePermission } from "../../api/types";
 
-const RESOURCES: Resource[] = ["TARGETS", "REVENUE", "COLLECTIONS", "EXPENSES", "ROCKS"];
+const RESOURCES: Resource[] = ["TARGETS", "REVENUE", "COLLECTIONS", "EXPENSES", "ROCKS", "SCORECARD"];
 const RESOURCE_LABELS: Record<Resource, string> = {
   TARGETS: "Targets",
   REVENUE: "Revenue",
   COLLECTIONS: "Collections",
   EXPENSES: "Expenses",
   ROCKS: "Rocks",
+  SCORECARD: "Executive Scorecard",
 };
 
 type Grants = Record<Resource, { canView: boolean; canEdit: boolean; canDelete: boolean }>;
@@ -190,7 +191,9 @@ export default function AdminRoles() {
           <h3 className="text-base font-semibold text-slate-800">Custom Roles</h3>
           <p className="text-sm text-slate-500">
             Named permission profiles you can assign to any user — pick which Business Units/Companies they can touch, and
-            whether they can View, Edit, or Delete each of Targets, Revenue, Collections, Expenses, and Rocks there.
+            whether they can View, Edit, or Delete each of Targets, Revenue, Collections, Expenses, Rocks, and the Executive
+            Scorecard there. Only the View column matters for the Executive Scorecard — it's a read-only summary page, so
+            Edit/Delete checkboxes for it are ignored.
           </p>
         </div>
         <button

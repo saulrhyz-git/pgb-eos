@@ -11,6 +11,7 @@ import type {
   RockStatus,
   Role,
   RolePermission,
+  ScorecardResponse,
   SmtpSettings,
   Year,
 } from "./types";
@@ -202,6 +203,17 @@ export const api = {
   updateBusinessGoal: (id: string, payload: Partial<{ name: string; description: string; businessUnitIds: string[] }>) =>
     request<BusinessGoal>(`/business-goals/${id}`, { method: "PUT", body: JSON.stringify(payload) }),
   deleteBusinessGoal: (id: string) => request<void>(`/business-goals/${id}`, { method: "DELETE" }),
+
+  // ---------- Executive Scorecard ----------
+  // Condensed, BU-level-only summary for a C-Level/BOD audience. Default
+  // access is Superadmin + Group Integrator; a BU Integrator needs a Custom
+  // Role that grants SCORECARD view to see it at all (403 otherwise).
+  scorecard: (params: { yearId: string; quarter: number; businessUnitId?: string }) => {
+    // quarter === 0 means "All Quarters" (full year) in the UI, same convention as the Revenue dashboard.
+    const qs = new URLSearchParams({ yearId: params.yearId, quarter: params.quarter === 0 ? "all" : String(params.quarter) });
+    if (params.businessUnitId) qs.set("businessUnitId", params.businessUnitId);
+    return request<ScorecardResponse>(`/scorecard?${qs.toString()}`);
+  },
 
   // ---------- Rocks ----------
   rocks: (params: {

@@ -4,6 +4,7 @@ import Layout from "./components/Layout";
 import Login from "./pages/Login";
 import ChangePassword from "./pages/ChangePassword";
 import Dashboard from "./pages/Dashboard";
+import Scorecard from "./pages/Scorecard";
 import Rocks from "./pages/Rocks";
 import IntegratorPortal from "./pages/IntegratorPortal";
 import TargetConfig from "./pages/TargetConfig";
@@ -56,6 +57,7 @@ export default function App() {
         }
       >
         <Route index element={<Dashboard />} />
+        <Route path="scorecard" element={<Scorecard />} />
         <Route path="rocks" element={<Rocks />} />
         <Route path="data-entry" element={<IntegratorPortal />} />
         <Route path="targets" element={<TargetConfig />} />

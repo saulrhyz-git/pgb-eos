@@ -1,8 +1,10 @@
 export type Role = "SUPERADMIN" | "GROUP_INTEGRATOR" | "BU_INTEGRATOR";
 
-// The five gate-able areas of the app a Custom Role's permission matrix can
-// grant View/Edit/Delete over, independently, per Business Unit or Company.
-export type Resource = "TARGETS" | "REVENUE" | "COLLECTIONS" | "EXPENSES" | "ROCKS";
+// The gate-able areas of the app a Custom Role's permission matrix can grant
+// View/Edit/Delete over, independently, per Business Unit or Company.
+// SCORECARD gates the Executive Scorecard page itself; only its View flag is
+// meaningful (there's nothing to edit/delete on a read-only summary page).
+export type Resource = "TARGETS" | "REVENUE" | "COLLECTIONS" | "EXPENSES" | "ROCKS" | "SCORECARD";
 
 export interface AuthUser {
   id: string;
@@ -181,6 +183,82 @@ export interface BusinessGoal {
   createdAt: string;
   // Empty = global (usable anywhere). Non-empty = scoped to just these BUs.
   businessUnits: { id: string; name: string }[];
+}
+
+// ---------- Executive Scorecard ----------
+// A condensed, BU-level-only (no Company drill-down) re-shaping of the same
+// Revenue dashboard + Rocks data, aimed at a C-Level/BOD audience.
+export interface ScorecardChartPoint {
+  quarter: number;
+  label: string;
+  targetTotal: number;
+  actualTotal: number;
+}
+
+export interface ScorecardRevenueBuRow {
+  businessUnitId: string;
+  businessUnitName: string;
+  annualTarget: number;
+  quarterTarget: number;
+  quarterActual: number;
+  quarterAttainmentPct: number;
+  ytdActual: number;
+  ytdVsAnnualPct: number;
+}
+
+export interface ScorecardRevenue {
+  kpis: {
+    annualRevenueTarget: number;
+    annualCollectionsTarget: number;
+    annualExpensesTarget: number;
+    quarterTarget: number;
+    quarterCollectionsTarget: number;
+    quarterExpensesTarget: number;
+    quarterActual: number;
+    ytdTarget: number;
+    ytdActual: number;
+    attainmentPct: number;
+    ytdAttainmentPct: number;
+  };
+  chart: ScorecardChartPoint[];
+  businessUnits: ScorecardRevenueBuRow[];
+}
+
+export interface ScorecardRocksSummary {
+  total: number;
+  targetMet: number;
+  onTrack: number;
+  atRisk: number;
+  pending: number;
+  avgProgressPct: number;
+}
+
+export interface ScorecardRocksBuRow extends ScorecardRocksSummary {
+  businessUnitId: string;
+  businessUnitName: string;
+}
+
+export interface ScorecardAttentionRock {
+  id: string;
+  title: string;
+  companyName: string;
+  businessUnitName: string;
+  ownerName: string;
+  status: RockStatus;
+  progressPct: number;
+  quarter: number;
+}
+
+export interface ScorecardRocks {
+  summary: ScorecardRocksSummary;
+  businessUnits: ScorecardRocksBuRow[];
+  attentionNeeded: ScorecardAttentionRock[];
+}
+
+export interface ScorecardResponse {
+  scope: { yearId: string; quarter: number; allQuarters: boolean; businessUnitId: string | null };
+  revenue: ScorecardRevenue;
+  rocks: ScorecardRocks;
 }
 
 export interface Rock {
