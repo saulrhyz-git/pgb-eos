@@ -3,7 +3,14 @@ import { prisma } from "../lib/prisma";
 // Mirrors the Prisma PermissionResource enum. Kept as a plain string union
 // here (rather than importing the generated enum) so this file has no
 // Prisma-client-generation-order dependency.
-export type Resource = "TARGETS" | "REVENUE" | "COLLECTIONS" | "EXPENSES" | "ROCKS" | "SCORECARD";
+export type Resource = "TARGETS" | "REVENUE" | "COLLECTIONS" | "EXPENSES" | "ROCKS" | "SCORECARD" | "AUDIT_LOG";
+// Deliberately excludes AUDIT_LOG: ALL_RESOURCES feeds `canAny()`, which
+// meta.ts uses to decide whether a Business Unit/Company should show up in
+// dropdowns at all ("does this role have any view grant here"). Unlike the
+// other resources (including SCORECARD), AUDIT_LOG isn't really about any
+// one Business Unit/Company's data — it's a global security log — so a role
+// that only grants AUDIT_LOG view shouldn't cause an otherwise-invisible BU
+// to start appearing in unrelated dropdowns.
 export const ALL_RESOURCES: Resource[] = ["TARGETS", "REVENUE", "COLLECTIONS", "EXPENSES", "ROCKS", "SCORECARD"];
 // The three financial categories a single QuarterActual record covers at
 // once. Its PUT endpoint submits all three together, so — since permissions

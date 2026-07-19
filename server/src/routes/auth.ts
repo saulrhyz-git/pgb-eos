@@ -3,6 +3,7 @@ import bcrypt from "bcryptjs";
 import { z } from "zod";
 import { prisma } from "../lib/prisma";
 import { AuthUser, requireAuth, signToken } from "../middleware/auth";
+import { logAudit } from "../utils/auditLog";
 
 const router = Router();
 
@@ -55,6 +56,13 @@ router.post("/login", async (req, res) => {
 
   const authUser = toAuthUser(user);
   const token = signToken(authUser);
+  await logAudit({
+    user: authUser,
+    action: "LOGIN",
+    entityType: "User",
+    entityId: authUser.id,
+    summary: `${authUser.name} logged in`,
+  });
   res.json({ token, user: authUser });
 });
 

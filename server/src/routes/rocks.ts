@@ -11,6 +11,7 @@ import {
   scopedBusinessUnitFilter,
 } from "../middleware/auth";
 import { assertPermission, can } from "../utils/permissions";
+import { logAudit } from "../utils/auditLog";
 
 // Rocks (EOS-style 90-day priorities) tracked per Company/Year/Quarter.
 // Read access follows the same Business-Unit scoping as the rest of the app;
@@ -142,6 +143,13 @@ router.post("/", async (req, res) => {
     data: { ...parsed.data, createdById: req.user!.id, updatedById: req.user!.id },
     include: rockInclude,
   });
+  await logAudit({
+    user: req.user,
+    action: "ROCK_CREATE",
+    entityType: "Rock",
+    entityId: rock.id,
+    summary: `Created Rock "${rock.title}"`,
+  });
   res.status(201).json(rock);
 });
 
@@ -252,6 +260,14 @@ router.post("/rollover", requireRole("GROUP_INTEGRATOR", "SUPERADMIN"), async (r
     )
   );
 
+  await logAudit({
+    user: req.user,
+    action: "ROCK_ROLLOVER",
+    entityType: "Rock",
+    summary: `Rolled over ${created.length} Rock(s) to Q${targetQuarter} ${targetYearId}`,
+    metadata: { yearId, quarter, businessUnitId, companyId, businessGoalId, targetYearId, targetQuarter, rolledOver: created.length },
+  });
+
   res.json({ rolledOver: created.length, targetYearId, targetQuarter, rocks: created });
 });
 
@@ -288,6 +304,14 @@ router.put("/:id", async (req, res) => {
     data: { ...parsed.data, updatedById: req.user!.id },
     include: rockInclude,
   });
+  await logAudit({
+    user: req.user,
+    action: "ROCK_UPDATE",
+    entityType: "Rock",
+    entityId: rock.id,
+    summary: `Updated Rock "${rock.title}"`,
+    metadata: { changedFields: Object.keys(parsed.data) },
+  });
   res.json(rock);
 });
 
@@ -305,6 +329,13 @@ router.delete("/:id", async (req, res) => {
   }
 
   await prisma.rock.delete({ where: { id: req.params.id } });
+  await logAudit({
+    user: req.user,
+    action: "ROCK_DELETE",
+    entityType: "Rock",
+    entityId: existing.id,
+    summary: `Deleted Rock "${existing.title}"`,
+  });
   res.status(204).send();
 });
 

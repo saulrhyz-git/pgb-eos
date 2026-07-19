@@ -10,6 +10,7 @@ import {
   scopedBusinessUnitFilter,
 } from "../middleware/auth";
 import { can, canAnyOf, FINANCIAL_RESOURCES, PermissionError } from "../utils/permissions";
+import { logAudit } from "../utils/auditLog";
 
 const router = Router();
 router.use(requireAuth);
@@ -113,6 +114,14 @@ router.put("/", async (req, res) => {
     update: { ...figures, updatedById: req.user!.id },
     create: { companyId, yearId, quarter, ...figures, updatedById: req.user!.id },
   });
+  await logAudit({
+    user: req.user,
+    action: "ACTUAL_UPDATE",
+    entityType: "QuarterActual",
+    entityId: actual.id,
+    summary: `Updated Q${quarter} actuals for Company ${companyId}`,
+    metadata: { companyId, yearId, quarter, figures },
+  });
   res.json(actual);
 });
 
@@ -171,6 +180,14 @@ router.patch("/:companyId/:yearId/:quarter/remarks", async (req, res) => {
       ...remarksParsed.data,
       updatedById: req.user!.id,
     },
+  });
+  await logAudit({
+    user: req.user,
+    action: "ACTUAL_REMARKS_UPDATE",
+    entityType: "QuarterActual",
+    entityId: actual.id,
+    summary: `Updated Q${quarter} actuals remarks for Company ${companyId}`,
+    metadata: { companyId, yearId, quarter, changedFields: Object.keys(remarksParsed.data) },
   });
   res.json(actual);
 });

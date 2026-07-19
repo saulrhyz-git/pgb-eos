@@ -1,5 +1,16 @@
 import { Link, NavLink, Outlet } from "react-router-dom";
-import { LayoutDashboard, ClipboardEdit, Settings, LogOut, TrendingUp, ShieldCheck, Mountain, Gauge, UserCircle } from "lucide-react";
+import {
+  LayoutDashboard,
+  ClipboardEdit,
+  Settings,
+  LogOut,
+  TrendingUp,
+  ShieldCheck,
+  Mountain,
+  Gauge,
+  UserCircle,
+  ScrollText,
+} from "lucide-react";
 import { useAuth } from "../contexts/AuthContext";
 
 export default function Layout() {
@@ -34,6 +45,18 @@ export default function Layout() {
             <NavLink to="/targets" className={linkClass}>
               <Settings className="h-4 w-4" /> Target Setup
             </NavLink>
+            {/* Superadmins already reach the Audit Log via the Admin tab bar
+                below — this link is only for non-superadmins who've been
+                granted AUDIT_LOG view through a Custom Role, since they can
+                never reach /admin (it's client-side gated to SUPERADMIN).
+                Shown unconditionally to every non-superadmin, same as
+                Scorecard: the backend is the real gate, and anyone without
+                access just sees the "access required" card. */}
+            {user?.role !== "SUPERADMIN" && (
+              <NavLink to="/audit-log" className={linkClass}>
+                <ScrollText className="h-4 w-4" /> Audit Log
+              </NavLink>
+            )}
             {user?.role === "SUPERADMIN" && (
               <NavLink to="/admin" className={linkClass}>
                 <ShieldCheck className="h-4 w-4" /> Admin

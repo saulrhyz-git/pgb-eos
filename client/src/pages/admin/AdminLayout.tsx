@@ -1,5 +1,5 @@
 import { NavLink, Outlet } from "react-router-dom";
-import { Users, Building2, Briefcase, Mail, ShieldCheck } from "lucide-react";
+import { Users, Building2, Briefcase, Mail, ShieldCheck, ScrollText } from "lucide-react";
 
 export default function AdminLayout() {
   const tabClass = ({ isActive }: { isActive: boolean }) =>
@@ -28,6 +28,11 @@ export default function AdminLayout() {
         </NavLink>
         <NavLink to="/admin/smtp" className={tabClass}>
           <Mail className="h-4 w-4" /> SMTP Settings
+        </NavLink>
+        {/* Points outside /admin/* on purpose — see the comment in App.tsx
+            next to the /audit-log route for why. */}
+        <NavLink to="/audit-log" className={tabClass}>
+          <ScrollText className="h-4 w-4" /> Audit Log
         </NavLink>
       </nav>
       <Outlet />

@@ -22,12 +22,14 @@ enum Role {
 // TARGETS covers the Target Setup page (QuarterTarget records); REVENUE/
 // COLLECTIONS/EXPENSES cover their matching figures wherever they appear
 // (Revenue dashboard KPIs/chart/matrix, Operational Grid, Data Entry/actuals,
-// per-category Remarks); ROCKS covers the Rocks page. SCORECARD gates the
-// Executive Scorecard page itself (a coarse "can this user open the page at
-// all" check) — the figures shown once inside are still masked by the
-// REVENUE/COLLECTIONS/EXPENSES/ROCKS grants exactly as everywhere else; only
-// canView is meaningful for SCORECARD (there's nothing to edit or delete on
-// a read-only summary page), canEdit/canDelete are simply ignored for it.
+// per-category Remarks); ROCKS covers the Rocks page. SCORECARD and
+// AUDIT_LOG each gate their own page itself (a coarse "can this user open
+// the page at all" check) — only canView is meaningful for either (nothing
+// to edit or delete on a read-only summary/log page), canEdit/canDelete are
+// simply ignored for them. The Audit Log itself isn't scoped by Business
+// Unit/Company the way the others are (it's a global security log), so a
+// Custom Role's AUDIT_LOG grant is checked without regard to which
+// Business Unit/Company row it's attached to — see routes/auditLog.ts.
 enum PermissionResource {
   TARGETS
   REVENUE
@@ -35,6 +37,7 @@ enum PermissionResource {
   EXPENSES
   ROCKS
   SCORECARD
+  AUDIT_LOG
 }
 
 model User {
@@ -111,6 +114,34 @@ model RolePermission {
   @@index([customRoleId])
   @@index([businessUnitId])
   @@index([companyId])
+}
+
+// Append-only security/activity log. Deliberately has no foreign-key
+// relation to User: a log entry survives (with a readable snapshot of who
+// acted, via userName/userEmail) even after that User is later deleted, and
+// deleting a User is never blocked or complicated by their own audit
+// history. `action`/`entityType` are free-text (not enums) so new action
+// kinds can be added anywhere in the codebase without a schema migration —
+// see utils/auditLog.ts for the writer and the fixed set of action strings
+// currently in use.
+model AuditLog {
+  id        String   @id @default(uuid())
+  createdAt DateTime @default(now())
+
+  userId    String?
+  userName  String  @default("")
+  userEmail String  @default("")
+
+  action     String // e.g. "USER_CREATE", "TARGET_QUARTER_UPDATE", "ROCK_DELETE", "LOGIN"
+  entityType String // e.g. "User", "QuarterTarget", "Rock", "BusinessUnit"
+  entityId   String?
+  summary    String // human-readable one-line description
+  metadata   Json?  // optional structured details (e.g. changed fields, old/new values)
+
+  @@index([createdAt])
+  @@index([userId])
+  @@index([action])
+  @@index([entityType, entityId])
 }
 
 // Singleton row (fixed id "default") holding the outbound SMTP configuration

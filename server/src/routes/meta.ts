@@ -4,6 +4,7 @@ import { prisma } from "../lib/prisma";
 import { blockPendingPasswordChange, loadUserPermissions, requireAuth, requireRole, scopedBusinessUnitFilter } from "../middleware/auth";
 import { canAny } from "../utils/permissions";
 import { currentCalendarQuarter } from "../utils/quarterDates";
+import { logAudit } from "../utils/auditLog";
 
 const router = Router();
 router.use(requireAuth);
@@ -34,6 +35,13 @@ router.post("/years", requireRole("GROUP_INTEGRATOR", "SUPERADMIN"), async (req,
     where: { year: parsed.data.year },
     update: {},
     create: { year: parsed.data.year },
+  });
+  await logAudit({
+    user: req.user,
+    action: "YEAR_CREATE",
+    entityType: "Year",
+    entityId: year.id,
+    summary: `Created Year ${year.year}`,
   });
   res.status(201).json(year);
 });
@@ -76,6 +84,13 @@ router.post("/business-units", requireRole("GROUP_INTEGRATOR", "SUPERADMIN"), as
   const parsed = z.object({ name: z.string().min(1) }).safeParse(req.body);
   if (!parsed.success) return res.status(400).json({ error: "'name' is required" });
   const bu = await prisma.businessUnit.create({ data: { name: parsed.data.name } });
+  await logAudit({
+    user: req.user,
+    action: "BUSINESS_UNIT_CREATE",
+    entityType: "BusinessUnit",
+    entityId: bu.id,
+    summary: `Created Business Unit "${bu.name}"`,
+  });
   res.status(201).json(bu);
 });
 
@@ -124,6 +139,13 @@ router.post("/companies", requireRole("GROUP_INTEGRATOR", "SUPERADMIN"), async (
     .safeParse(req.body);
   if (!parsed.success) return res.status(400).json({ error: "'name' and 'businessUnitId' are required" });
   const company = await prisma.company.create({ data: parsed.data });
+  await logAudit({
+    user: req.user,
+    action: "COMPANY_CREATE",
+    entityType: "Company",
+    entityId: company.id,
+    summary: `Created Company "${company.name}"`,
+  });
   res.status(201).json(company);
 });
 

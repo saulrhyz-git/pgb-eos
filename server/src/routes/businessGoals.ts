@@ -2,6 +2,7 @@ import { Router } from "express";
 import { z } from "zod";
 import { prisma } from "../lib/prisma";
 import { assertBusinessUnitAccess, blockPendingPasswordChange, requireAuth, requireRole, scopedBusinessUnitFilter } from "../middleware/auth";
+import { logAudit } from "../utils/auditLog";
 
 // Business Goals are a shared taxonomy that Rocks can be tagged with (e.g.
 // "Grow Market Share", "Improve Client Retention"). Any authenticated role
@@ -76,6 +77,13 @@ router.post("/", requireRole("GROUP_INTEGRATOR", "SUPERADMIN"), async (req, res)
       },
       include,
     });
+    await logAudit({
+      user: req.user,
+      action: "BUSINESS_GOAL_CREATE",
+      entityType: "BusinessGoal",
+      entityId: goal.id,
+      summary: `Created Business Goal "${goal.name}"`,
+    });
     res.status(201).json(serialize(goal));
   } catch (err: any) {
     if (err.code === "P2002") return res.status(409).json({ error: "A business goal with that name already exists" });
@@ -121,6 +129,14 @@ router.put("/:id", requireRole("GROUP_INTEGRATOR", "SUPERADMIN"), async (req, re
       }
     });
     const goal = await prisma.businessGoal.findUnique({ where: { id: req.params.id }, include });
+    await logAudit({
+      user: req.user,
+      action: "BUSINESS_GOAL_UPDATE",
+      entityType: "BusinessGoal",
+      entityId: req.params.id,
+      summary: `Updated Business Goal "${goal?.name}"`,
+      metadata: { changedFields: Object.keys(parsed.data) },
+    });
     res.json(serialize(goal));
   } catch (err: any) {
     if (err.code === "P2002") return res.status(409).json({ error: "A business goal with that name already exists" });
@@ -132,7 +148,14 @@ router.delete("/:id", requireRole("GROUP_INTEGRATOR", "SUPERADMIN"), async (req,
   try {
     // Rocks tagged with this goal keep existing (businessGoalId is set to
     // null via the schema's onDelete: SetNull), they just lose the tag.
-    await prisma.businessGoal.delete({ where: { id: req.params.id } });
+    const goal = await prisma.businessGoal.delete({ where: { id: req.params.id } });
+    await logAudit({
+      user: req.user,
+      action: "BUSINESS_GOAL_DELETE",
+      entityType: "BusinessGoal",
+      entityId: goal.id,
+      summary: `Deleted Business Goal "${goal.name}"`,
+    });
     res.status(204).send();
   } catch (err: any) {
     if (err.code === "P2025") return res.status(404).json({ error: "Business goal not found" });

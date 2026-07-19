@@ -3,6 +3,7 @@ import nodemailer from "nodemailer";
 import { z } from "zod";
 import { prisma } from "../lib/prisma";
 import { blockPendingPasswordChange, requireAuth, requireRole } from "../middleware/auth";
+import { logAudit } from "../utils/auditLog";
 
 // SMTP configuration used to send email notifications, managed by the
 // superadmin. Stored as a single row keyed by a fixed id so GET/PUT always
@@ -82,6 +83,15 @@ router.put("/smtp", async (req, res) => {
       fromAddress,
       fromName: fromName ?? null,
     },
+  });
+  // Never log the password value itself, just that settings were touched.
+  await logAudit({
+    user: req.user,
+    action: "SMTP_SETTINGS_UPDATE",
+    entityType: "SmtpSettings",
+    entityId: settings.id,
+    summary: `Updated SMTP settings (host: ${host})`,
+    metadata: { host, port, secure, username: username ?? null, fromAddress, fromName: fromName ?? null, passwordChanged: Boolean(password) },
   });
   res.json(serialize(settings));
 });

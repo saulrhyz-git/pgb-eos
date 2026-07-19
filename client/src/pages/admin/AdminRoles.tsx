@@ -3,7 +3,7 @@ import { ChevronDown, ChevronRight, Pencil, Plus, Trash2, X } from "lucide-react
 import { api } from "../../api/client";
 import type { BusinessUnit, CustomRole, Resource, RolePermission } from "../../api/types";
 
-const RESOURCES: Resource[] = ["TARGETS", "REVENUE", "COLLECTIONS", "EXPENSES", "ROCKS", "SCORECARD"];
+const RESOURCES: Resource[] = ["TARGETS", "REVENUE", "COLLECTIONS", "EXPENSES", "ROCKS", "SCORECARD", "AUDIT_LOG"];
 const RESOURCE_LABELS: Record<Resource, string> = {
   TARGETS: "Targets",
   REVENUE: "Revenue",
@@ -11,6 +11,7 @@ const RESOURCE_LABELS: Record<Resource, string> = {
   EXPENSES: "Expenses",
   ROCKS: "Rocks",
   SCORECARD: "Executive Scorecard",
+  AUDIT_LOG: "Audit Log",
 };
 
 type Grants = Record<Resource, { canView: boolean; canEdit: boolean; canDelete: boolean }>;
@@ -191,9 +192,11 @@ export default function AdminRoles() {
           <h3 className="text-base font-semibold text-slate-800">Custom Roles</h3>
           <p className="text-sm text-slate-500">
             Named permission profiles you can assign to any user — pick which Business Units/Companies they can touch, and
-            whether they can View, Edit, or Delete each of Targets, Revenue, Collections, Expenses, Rocks, and the Executive
-            Scorecard there. Only the View column matters for the Executive Scorecard — it's a read-only summary page, so
-            Edit/Delete checkboxes for it are ignored.
+            whether they can View, Edit, or Delete each of Targets, Revenue, Collections, Expenses, Rocks, the Executive
+            Scorecard, and the Audit Log there. Only the View column matters for the Executive Scorecard and the Audit
+            Log — both are read-only pages, so Edit/Delete checkboxes for them are ignored. The Audit Log itself isn't
+            really scoped to any one Business Unit/Company (it's a single global log), so granting it View on any one
+            row here is enough to open the page at all — it's just attached to a scope here to reuse the same picker.
           </p>
         </div>
         <button

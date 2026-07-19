@@ -11,6 +11,7 @@ import {
 } from "../middleware/auth";
 import { assertPermission, can } from "../utils/permissions";
 import { currentCalendarQuarter } from "../utils/quarterDates";
+import { logAudit } from "../utils/auditLog";
 
 const router = Router();
 router.use(requireAuth);
@@ -228,6 +229,15 @@ router.put("/quarter", async (req, res) => {
     return updated;
   });
 
+  await logAudit({
+    user: req.user,
+    action: "TARGET_QUARTER_UPDATE",
+    entityType: "QuarterTarget",
+    entityId: target.id,
+    summary: `Updated Q${quarter} ${yearRow.year} target for Company ${companyId}`,
+    metadata: { companyId, yearId, quarter, figures },
+  });
+
   res.json(target);
 });
 
@@ -287,6 +297,15 @@ router.put("/annual", async (req, res) => {
       })
     )
   );
+
+  await logAudit({
+    user: req.user,
+    action: "TARGET_ANNUAL_UPDATE",
+    entityType: "QuarterTarget",
+    entityId: companyId,
+    summary: `Set annual ${yearRow.year} target for Company ${companyId} (split across ${editableQuarters.length} editable quarter(s))`,
+    metadata: { companyId, yearId, annualFigures, editableQuarters, lockedQuarters },
+  });
 
   res.json({ updated: results, lockedQuarters });
 });

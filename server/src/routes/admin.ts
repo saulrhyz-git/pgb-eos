@@ -3,6 +3,7 @@ import bcrypt from "bcryptjs";
 import { z } from "zod";
 import { prisma } from "../lib/prisma";
 import { blockPendingPasswordChange, requireAuth, requireRole } from "../middleware/auth";
+import { logAudit } from "../utils/auditLog";
 
 // Superadmin-only management surface: full CRUD over Users, Companies, and
 // Business Units. Group Integrators keep their existing (create-only) access
@@ -116,6 +117,14 @@ router.post("/users", async (req, res) => {
       },
       select: userSelect,
     });
+    await logAudit({
+      user: req.user,
+      action: "USER_CREATE",
+      entityType: "User",
+      entityId: user.id,
+      summary: `Created user ${user.name} (${user.email})${role ? ` as ${role}` : " with no base role"}`,
+      metadata: { role, customRoleId: customRoleId || null, businessUnitIds },
+    });
     res.status(201).json(serializeUser(user));
   } catch (err: any) {
     if (err.code === "P2002") return res.status(409).json({ error: "Email or username is already in use" });
@@ -194,6 +203,17 @@ router.put("/users/:id", async (req, res) => {
       }
     });
     const user = await prisma.user.findUnique({ where: { id: req.params.id }, select: userSelect });
+    const changedFields = Object.keys(data).filter((k) => k !== "passwordHash");
+    if (password) changedFields.push("password");
+    if (businessUnitIds) changedFields.push("businessUnitIds");
+    await logAudit({
+      user: req.user,
+      action: "USER_UPDATE",
+      entityType: "User",
+      entityId: req.params.id,
+      summary: `Updated user ${existing.email}${changedFields.length ? ` (${changedFields.join(", ")})` : ""}`,
+      metadata: { changedFields },
+    });
     res.json(serializeUser(user));
   } catch (err: any) {
     if (err.code === "P2002") return res.status(409).json({ error: "Email or username is already in use" });
@@ -219,6 +239,13 @@ router.delete("/users/:id", async (req, res) => {
     prisma.rock.updateMany({ where: { updatedById: req.params.id }, data: { updatedById: null } }),
     prisma.user.delete({ where: { id: req.params.id } }),
   ]);
+  await logAudit({
+    user: req.user,
+    action: "USER_DELETE",
+    entityType: "User",
+    entityId: existing.id,
+    summary: `Deleted user ${existing.name} (${existing.email})`,
+  });
   res.status(204).send();
 });
 
@@ -228,7 +255,15 @@ router.put("/business-units/:id", async (req, res) => {
   const parsed = z.object({ name: z.string().min(1) }).safeParse(req.body);
   if (!parsed.success) return res.status(400).json({ error: "'name' is required" });
   try {
+    const existing = await prisma.businessUnit.findUnique({ where: { id: req.params.id } });
     const bu = await prisma.businessUnit.update({ where: { id: req.params.id }, data: { name: parsed.data.name } });
+    await logAudit({
+      user: req.user,
+      action: "BUSINESS_UNIT_UPDATE",
+      entityType: "BusinessUnit",
+      entityId: bu.id,
+      summary: `Renamed Business Unit "${existing?.name}" to "${bu.name}"`,
+    });
     res.json(bu);
   } catch (err: any) {
     if (err.code === "P2025") return res.status(404).json({ error: "Business unit not found" });
@@ -239,7 +274,14 @@ router.put("/business-units/:id", async (req, res) => {
 
 router.delete("/business-units/:id", async (req, res) => {
   try {
-    await prisma.businessUnit.delete({ where: { id: req.params.id } });
+    const bu = await prisma.businessUnit.delete({ where: { id: req.params.id } });
+    await logAudit({
+      user: req.user,
+      action: "BUSINESS_UNIT_DELETE",
+      entityType: "BusinessUnit",
+      entityId: bu.id,
+      summary: `Deleted Business Unit "${bu.name}"`,
+    });
     res.status(204).send();
   } catch (err: any) {
     if (err.code === "P2025") return res.status(404).json({ error: "Business unit not found" });
@@ -260,6 +302,14 @@ router.put("/companies/:id", async (req, res) => {
   if (!parsed.success) return res.status(400).json({ error: "Invalid company payload" });
   try {
     const company = await prisma.company.update({ where: { id: req.params.id }, data: parsed.data });
+    await logAudit({
+      user: req.user,
+      action: "COMPANY_UPDATE",
+      entityType: "Company",
+      entityId: company.id,
+      summary: `Updated Company "${company.name}"`,
+      metadata: { changedFields: Object.keys(parsed.data) },
+    });
     res.json(company);
   } catch (err: any) {
     if (err.code === "P2025") return res.status(404).json({ error: "Company not found" });
@@ -270,7 +320,14 @@ router.put("/companies/:id", async (req, res) => {
 
 router.delete("/companies/:id", async (req, res) => {
   try {
-    await prisma.company.delete({ where: { id: req.params.id } });
+    const company = await prisma.company.delete({ where: { id: req.params.id } });
+    await logAudit({
+      user: req.user,
+      action: "COMPANY_DELETE",
+      entityType: "Company",
+      entityId: company.id,
+      summary: `Deleted Company "${company.name}"`,
+    });
     res.status(204).send();
   } catch (err: any) {
     if (err.code === "P2025") return res.status(404).json({ error: "Company not found" });

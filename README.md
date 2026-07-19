@@ -19,9 +19,14 @@ Integrators (always tied to at least one assigned Business Unit, with data
 entry, target-setup, and Rock-tracking rights scoped to it). On top of that,
 a Superadmin can build named **Custom Roles** — a tickbox matrix granting
 View/Edit/Delete over Targets/Revenue/Collections/Expenses/Rocks (plus a
-View-only toggle for the Executive Scorecard) per Business Unit or
-individual Company — and assign one to any user for accountability finer
-than a blanket Business Unit assignment.
+View-only toggle for the Executive Scorecard and for the **Audit Log**) per
+Business Unit or individual Company — and assign one to any user for
+accountability finer than a blanket Business Unit assignment. Every
+mutating action across the app (user/company/business-unit/role changes,
+target and actuals edits, Rock changes, SMTP settings, logins) is recorded
+in an append-only **Audit Log**, visible to Superadmins by default under
+Admin and, like the Executive Scorecard, assignable to other users via a
+Custom Role's View toggle.
 
 **Stack:** React (Vite) + Tailwind + Recharts + Lucide on the front end;
 Express + TypeScript + Prisma + PostgreSQL on the back end.
@@ -163,18 +168,21 @@ real data — the app starts completely empty.
   selected — a Company-level grant takes precedence over a Business-Unit-level
   one for the same resource when both exist, so a role can grant BU-wide
   access with a narrower or wider carve-out for one Company), independently
-  choose View/Edit/Delete for each of six resources — **Targets** (the
+  choose View/Edit/Delete for each of seven resources — **Targets** (the
   Target Setup page), **Revenue**, **Collections**, **Expenses** (each
   financial category wherever it appears — Revenue dashboard KPIs/chart/
   matrix/Operational Grid, Data Entry, per-category Remarks), **Rocks**
-  (the Rocks page), and **Executive Scorecard** (a coarse "can this user open
-  the page at all" toggle — only its View flag is meaningful, since the page
-  itself is read-only; the figures shown once inside are still masked by the
-  Revenue/Collections/Expenses/Rocks grants like everywhere else). Admin →
+  (the Rocks page), **Executive Scorecard**, and **Audit Log** (the latter two
+  are both coarse "can this user open the page at all" toggles — only their
+  View flag is meaningful, since both pages are read-only; the Executive
+  Scorecard's figures are still masked by the Revenue/Collections/Expenses/
+  Rocks grants like everywhere else, while the Audit Log shows the same
+  unfiltered log to anyone granted View on it, since it isn't Business-Unit/
+  Company-scoped data in the first place). Admin →
   Roles presents this as the requested tickbox matrix: pick a Business Unit
   or Company on the left (a tree with Business Units expandable to their
   Companies, both independently selectable), and each pick gets its own
-  6-resource x View/Edit/Delete grid on the right;
+  7-resource x View/Edit/Delete grid on the right;
   saving flattens the selections into `RolePermission` rows (only rows with
   at least one box checked are kept). A role is assigned to a user via a
   "Custom Role" dropdown on Admin → Users (hidden for Superadmins, who always
@@ -226,6 +234,36 @@ real data — the app starts completely empty.
   "access required" message otherwise); once inside, the actual figures
   shown are still masked by that role's Revenue/Collections/Expenses/Rocks
   grants exactly like the Revenue dashboard and Rocks page.
+- **Audit Log** (`AuditLog` in `schema.prisma`, `server/src/utils/auditLog.ts`,
+  `server/src/routes/auditLog.ts`, `client/src/pages/admin/AdminAuditLog.tsx`):
+  an append-only record of every mutating action taken in the app — who did
+  what, to what, and when. Each entry stores a denormalized snapshot of the
+  acting user (`userId`/`userName`/`userEmail`) rather than a live foreign
+  key, so the log stays readable even after that user is later deleted, and
+  deleting a user is never blocked or complicated by their own audit history.
+  `action`/`entityType` are free-text (e.g. `USER_CREATE`, `TARGET_QUARTER_UPDATE`,
+  `ROCK_ROLLOVER`, `LOGIN`) rather than enums, so new kinds can be added
+  anywhere without a migration. Instrumented actions currently cover: user
+  create/update/delete, business unit/company create/update/delete, custom
+  role create/update/delete, quarter and annual target edits, actuals figure
+  and remarks edits, rock create/update/delete/rollover, business goal
+  create/update/delete, SMTP settings updates (the password value itself is
+  never logged, only that it changed), and successful logins. Writing an
+  audit entry never throws — a failed write is caught and logged to the
+  server console rather than breaking the request that triggered it. The
+  Admin → Audit Log page is a paginated, filterable table (by free-text
+  search over summary/user, action, entity type, and date range) with each
+  row expandable to show its raw metadata. Default access is Superadmin;
+  like the Executive Scorecard, a non-superadmin can be granted access via a
+  Custom Role's Audit Log View toggle. Because the whole Admin section
+  (`/admin/*`) is client-side gated to Superadmin only, the Audit Log page is
+  deliberately wired as its own top-level route (`/audit-log`, alongside
+  `/scorecard`) rather than nested under `/admin` — nesting it there would
+  block exactly the non-superadmin, Custom-Role-granted users this feature
+  also exists for. It still appears as a tab inside Admin → (for Superadmins
+  browsing there) and as its own link in the main nav for everyone else; the
+  backend is the real gate either way, surfacing a 403 with an in-page
+  "access required" message for anyone without it.
 - **API** (`server/src/routes`): JWT auth (login accepts email or username),
   a `PUT /api/auth/profile` self-service endpoint (any authenticated user can
   update their own name/email/username; deliberately excludes `role`,
@@ -675,3 +713,39 @@ name in the header the next time they load the app (after their token
 refreshes, e.g. next login — same staleness as editing anyone's name/role
 today); leaving a user's description blank shows nothing under their name in
 the header rather than an empty line or a fallback to their role.
+
+**Audit Log** (the `AuditLog` model and the `AUDIT_LOG` addition to the
+`PermissionResource` enum in `schema.prisma`, `server/src/utils/auditLog.ts`,
+`server/src/routes/auditLog.ts`, the `logAudit(...)` calls added across
+`admin.ts`/`meta.ts`/`customRoles.ts`/`targets.ts`/`actuals.ts`/`rocks.ts`/
+`businessGoals.ts`/`settings.ts`/`auth.ts`, and
+`client/src/pages/admin/AdminAuditLog.tsx`) needs a fresh
+`npm run prisma:migrate` to pick up the new enum value and table (two
+separate migrations — Postgres won't allow using a freshly-added enum value
+in the same transaction it was added in, so the `AUDIT_LOG` enum addition and
+the `AuditLog` table creation are deliberately split into two migration
+files, matching the same split used for the earlier `SCORECARD` addition).
+This is unverified end-to-end. Worth checking by hand: logging in as the
+Superadmin shows an "Audit Log" tab under Admin, and opening it shows recent
+entries (including the login that just happened) with Time/User/Action/
+Entity/Summary columns; clicking a row expands it to show that entry's raw
+metadata as formatted JSON; the Search box filters by summary/user name/
+email, the Action and Entity type dropdowns are populated from
+`GET /api/audit-log/meta` (only options with real matches show up — no
+hardcoded/stale list), the From/To date filters narrow the range, and
+Pagination moves between pages of 50; making a change anywhere instrumented
+(e.g. editing a Quarter Target, creating a Rock, updating SMTP settings)
+shows up as a new entry without needing a page refresh of the underlying
+data (a fresh load of Audit Log picks it up); the SMTP settings entry never
+shows the actual password value, only that settings were updated and
+whether the password changed; logging in as a BU Integrator with no Custom
+Role gets a 403 and the "access required" message on `/audit-log` (the nav
+link is still shown to them, same as Scorecard — the backend is the real
+gate); assigning that BU Integrator a Custom Role with Audit Log view
+checked grants access immediately (no re-login needed); deleting a user who
+has existing audit log entries succeeds without error, and their old entries
+still show their name/email (the snapshot), not a broken reference; a
+Superadmin's own Admin → Audit Log tab link still works as expected since
+`/audit-log` is a top-level route outside the Superadmin-gated `/admin/*`
+block (this is deliberate — see the comments in `App.tsx` and
+`AdminLayout.tsx` next to it).

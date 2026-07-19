@@ -2,6 +2,7 @@ import { Router } from "express";
 import { z } from "zod";
 import { prisma } from "../lib/prisma";
 import { blockPendingPasswordChange, requireAuth, requireRole } from "../middleware/auth";
+import { logAudit } from "../utils/auditLog";
 
 // Superadmin-only CRUD over Custom Roles: named permission profiles that can
 // be assigned to any User (see admin.ts's user create/update) as an
@@ -15,7 +16,7 @@ router.use(requireAuth);
 router.use(blockPendingPasswordChange);
 router.use(requireRole("SUPERADMIN"));
 
-const resourceEnum = z.enum(["TARGETS", "REVENUE", "COLLECTIONS", "EXPENSES", "ROCKS", "SCORECARD"]);
+const resourceEnum = z.enum(["TARGETS", "REVENUE", "COLLECTIONS", "EXPENSES", "ROCKS", "SCORECARD", "AUDIT_LOG"]);
 
 // Each entry grants access to exactly one scope: either a whole Business Unit
 // (companyId omitted) or one specific Company within it (both ids present,
@@ -101,6 +102,14 @@ router.post("/", async (req, res) => {
       },
       include: roleInclude,
     });
+    await logAudit({
+      user: req.user,
+      action: "CUSTOM_ROLE_CREATE",
+      entityType: "CustomRole",
+      entityId: role.id,
+      summary: `Created Custom Role "${role.name}"`,
+      metadata: { permissionCount: permissions.length },
+    });
     res.status(201).json(serializeRole(role));
   } catch (err: any) {
     if (err.code === "P2002") return res.status(409).json({ error: "A role with that name already exists" });
@@ -141,6 +150,14 @@ router.put("/:id", async (req, res) => {
         include: roleInclude,
       });
     });
+    await logAudit({
+      user: req.user,
+      action: "CUSTOM_ROLE_UPDATE",
+      entityType: "CustomRole",
+      entityId: role.id,
+      summary: `Updated Custom Role "${role.name}"`,
+      metadata: { permissionCount: permissions.length },
+    });
     res.json(serializeRole(role));
   } catch (err: any) {
     if (err.code === "P2002") return res.status(409).json({ error: "A role with that name already exists" });
@@ -157,6 +174,13 @@ router.delete("/:id", async (req, res) => {
     });
   }
   await prisma.customRole.delete({ where: { id: req.params.id } });
+  await logAudit({
+    user: req.user,
+    action: "CUSTOM_ROLE_DELETE",
+    entityType: "CustomRole",
+    entityId: existing.id,
+    summary: `Deleted Custom Role "${existing.name}"`,
+  });
   res.status(204).send();
 });
 

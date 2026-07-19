@@ -4,7 +4,12 @@ export type Role = "SUPERADMIN" | "GROUP_INTEGRATOR" | "BU_INTEGRATOR";
 // View/Edit/Delete over, independently, per Business Unit or Company.
 // SCORECARD gates the Executive Scorecard page itself; only its View flag is
 // meaningful (there's nothing to edit/delete on a read-only summary page).
-export type Resource = "TARGETS" | "REVENUE" | "COLLECTIONS" | "EXPENSES" | "ROCKS" | "SCORECARD";
+// AUDIT_LOG likewise only has a meaningful View flag, and (unlike every other
+// resource here) isn't really about any one Business Unit/Company's data —
+// see permissions.ts on the backend for why it's excluded from
+// visibility-filtering logic despite still being requested through the same
+// per-BU/Company matrix UI.
+export type Resource = "TARGETS" | "REVENUE" | "COLLECTIONS" | "EXPENSES" | "ROCKS" | "SCORECARD" | "AUDIT_LOG";
 
 export interface AuthUser {
   id: string;
@@ -285,4 +290,33 @@ export interface Rock {
   businessGoal: { id: string; name: string } | null;
   createdBy: { id: string; name: string } | null;
   updatedBy: { id: string; name: string } | null;
+}
+
+// ---------- Audit Log ----------
+// One append-only record of a mutating action taken in the app. userId/
+// userName/userEmail are a snapshot at the time of the action (no live FK to
+// User), so entries stay readable even after the acting user is deleted.
+export interface AuditLogEntry {
+  id: string;
+  createdAt: string;
+  userId: string | null;
+  userName: string;
+  userEmail: string;
+  action: string;
+  entityType: string;
+  entityId: string | null;
+  summary: string;
+  metadata: Record<string, unknown> | null;
+}
+
+export interface AuditLogPage {
+  entries: AuditLogEntry[];
+  total: number;
+  page: number;
+  pageSize: number;
+}
+
+export interface AuditLogMeta {
+  actions: string[];
+  entityTypes: string[];
 }

@@ -1,5 +1,7 @@
 import type {
   AdminUser,
+  AuditLogMeta,
+  AuditLogPage,
   AuthUser,
   BusinessGoal,
   BusinessUnit,
@@ -295,4 +297,32 @@ export const api = {
       method: "POST",
       body: JSON.stringify(payload),
     }),
+
+  // ---------- Audit Log ----------
+  // Default access is Superadmin; a non-superadmin needs a Custom Role that
+  // grants AUDIT_LOG view to see this at all (403 otherwise). Not scoped to
+  // any particular Business Unit/Company.
+  auditLog: (params: {
+    page?: number;
+    pageSize?: number;
+    action?: string;
+    entityType?: string;
+    userId?: string;
+    from?: string;
+    to?: string;
+    q?: string;
+  }) => {
+    const qs = new URLSearchParams();
+    if (params.page) qs.set("page", String(params.page));
+    if (params.pageSize) qs.set("pageSize", String(params.pageSize));
+    if (params.action) qs.set("action", params.action);
+    if (params.entityType) qs.set("entityType", params.entityType);
+    if (params.userId) qs.set("userId", params.userId);
+    if (params.from) qs.set("from", params.from);
+    if (params.to) qs.set("to", params.to);
+    if (params.q) qs.set("q", params.q);
+    const query = qs.toString();
+    return request<AuditLogPage>(`/audit-log${query ? `?${query}` : ""}`);
+  },
+  auditLogMeta: () => request<AuditLogMeta>("/audit-log/meta"),
 };
