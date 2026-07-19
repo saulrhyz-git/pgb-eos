@@ -104,20 +104,41 @@ export default function AdminRoles() {
 
   function toggleScope(bu: BusinessUnit, companyId?: string) {
     const key = scopeKey(bu.id, companyId);
+
+    // Toggling one specific Company's checkbox only ever affects that one
+    // entry, independent of whatever its parent Business Unit is set to.
+    if (companyId) {
+      setScopeEntries((prev) => {
+        if (prev.some((e) => e.key === key)) return prev.filter((e) => e.key !== key);
+        const company = bu.companies?.find((c) => c.id === companyId);
+        return [
+          ...prev,
+          { key, businessUnitId: bu.id, businessUnitName: bu.name, companyId, companyName: company?.name, grants: emptyGrants() },
+        ];
+      });
+      return;
+    }
+
+    // Checking the whole Business Unit checkbox also checks every Company
+    // beneath it (and unchecking it clears them all together) — a BU-level
+    // grant already covers every Company in it, so the tree should reflect
+    // that at a glance instead of leaving its Companies looking unselected.
+    const companies = bu.companies || [];
+    const companyKeys = new Set(companies.map((c) => scopeKey(bu.id, c.id)));
+
     setScopeEntries((prev) => {
-      if (prev.some((e) => e.key === key)) return prev.filter((e) => e.key !== key);
-      const company = companyId ? bu.companies?.find((c) => c.id === companyId) : undefined;
-      return [
-        ...prev,
-        {
-          key,
-          businessUnitId: bu.id,
-          businessUnitName: bu.name,
-          companyId,
-          companyName: company?.name,
-          grants: emptyGrants(),
-        },
-      ];
+      const alreadySelected = prev.some((e) => e.key === key);
+      if (alreadySelected) {
+        return prev.filter((e) => e.key !== key && !companyKeys.has(e.key));
+      }
+      const next = [...prev, { key, businessUnitId: bu.id, businessUnitName: bu.name, companyId: undefined, companyName: undefined, grants: emptyGrants() }];
+      for (const c of companies) {
+        const cKey = scopeKey(bu.id, c.id);
+        if (!next.some((e) => e.key === cKey)) {
+          next.push({ key: cKey, businessUnitId: bu.id, businessUnitName: bu.name, companyId: c.id, companyName: c.name, grants: emptyGrants() });
+        }
+      }
+      return next;
     });
   }
 
