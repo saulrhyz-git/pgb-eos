@@ -64,15 +64,16 @@ export default function App() {
         <Route path="rocks" element={<Rocks />} />
         <Route path="data-entry" element={<IntegratorPortal />} />
         <Route path="targets" element={<TargetConfig />} />
-        {/* Audit Log lives visually "under Admin" (it's listed in
-            AdminLayout's tab bar for superadmins navigating there), but is
-            deliberately wired as its own top-level route rather than nested
-            inside the block below — that block is entirely gated by
-            RequireSuperAdmin, which would block exactly the non-superadmin,
-            Custom-Role-granted users this feature is also meant for. The
-            backend enforces the real access check (SUPERADMIN or a Custom
-            Role with AUDIT_LOG view); see AdminAuditLog.tsx's "forbidden"
-            state for anyone without it, same pattern as /scorecard. */}
+        {/* This top-level /audit-log route exists only so a non-superadmin
+            granted AUDIT_LOG view through a Custom Role has a way to reach
+            the page at all, since /admin/* below is entirely gated by
+            RequireSuperAdmin. Superadmins should use the nested
+            /admin/audit-log route instead (linked from AdminLayout's tab
+            bar) so the tab bar stays visible while they're on it, same as
+            every other Admin tab — see the note there. The backend is the
+            real access check either way (SUPERADMIN or a Custom Role with
+            AUDIT_LOG view); AdminAuditLog.tsx's "forbidden" state covers
+            anyone without it, same pattern as /scorecard. */}
         <Route path="audit-log" element={<AdminAuditLog />} />
         <Route
           path="admin"
@@ -88,6 +89,10 @@ export default function App() {
           <Route path="companies" element={<AdminCompanies />} />
           <Route path="business-units" element={<AdminBusinessUnits />} />
           <Route path="smtp" element={<AdminSmtp />} />
+          {/* Nested (unlike the top-level /audit-log above) so the tab bar
+              in AdminLayout stays mounted/visible while a Superadmin is on
+              this page, exactly like every other Admin tab. */}
+          <Route path="audit-log" element={<AdminAuditLog />} />
         </Route>
       </Route>
       <Route path="*" element={<Navigate to="/" replace />} />
