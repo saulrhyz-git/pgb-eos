@@ -156,7 +156,8 @@ export const api = {
     email: string;
     username?: string;
     name: string;
-    role: Role;
+    // Omit or pass null for a "blank" role user (Custom Role only).
+    role: Role | null;
     password: string;
     businessUnitIds?: string[];
     customRoleId?: string | null;
@@ -167,7 +168,7 @@ export const api = {
       email: string;
       username: string | null;
       name: string;
-      role: Role;
+      role: Role | null;
       businessUnitIds: string[];
       password: string;
       customRoleId: string | null;

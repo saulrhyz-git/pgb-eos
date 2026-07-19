@@ -8,7 +8,10 @@ export interface AuthUser {
   email: string;
   username?: string | null;
   name: string;
-  role: "SUPERADMIN" | "GROUP_INTEGRATOR" | "BU_INTEGRATOR";
+  // null = "blank" role — no base-role-derived access at all. Such a user
+  // relies entirely on their assigned Custom Role (customRoleId below); with
+  // no Custom Role assigned either, they have no access to anything.
+  role: "SUPERADMIN" | "GROUP_INTEGRATOR" | "BU_INTEGRATOR" | null;
   businessUnitIds: string[];
   mustChangePassword: boolean;
   // Optional, additional layer on top of `role` (see CustomRole/RolePermission
@@ -80,11 +83,22 @@ export function blockPendingPasswordChange(req: Request, res: Response, next: Ne
  * assigned, that Group Integrator is scoped to just those BUs instead of
  * everything. BU Integrators are always scoped to their assignment(s) and
  * are required to have at least one.
+ *
+ * A "blank" role (role === null) has no coarse Business-Unit-assignment
+ * concept of its own — such a user's access is meant to be defined entirely
+ * by their Custom Role's own per-Business-Unit/Company grants. So: if they
+ * have a Custom Role assigned, the coarse BU gate is bypassed entirely (this
+ * function returns true) and the Custom Role's own `can()`/`assertPermission()`
+ * checks downstream are what actually restrict them. If they have no Custom
+ * Role at all, they have no basis for access whatsoever, so this returns
+ * false and — since a blank-role user's businessUnitIds is always empty —
+ * every coarse check below denies them by default.
  */
 function hasGlobalBusinessUnitAccess(user: AuthUser): boolean {
   if (user.role === "SUPERADMIN") return true;
   if (user.role === "GROUP_INTEGRATOR") return user.businessUnitIds.length === 0;
-  return false;
+  if (user.role === null) return Boolean(user.customRoleId);
+  return false; // BU_INTEGRATOR
 }
 
 /**
