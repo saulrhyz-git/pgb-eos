@@ -82,6 +82,17 @@ export interface Year {
   year: number;
 }
 
+// A manual, admin-controlled lock on one Quarter of a Year's Targets (Group
+// Integrator/Superadmin only) — applies to every Company at once. Layered
+// on top of the automatic calendar-based lock; presence of an entry means
+// that quarter is locked regardless of the real calendar date.
+export interface TargetLockEntry {
+  quarter: number;
+  lockedAt: string;
+  lockedById: string | null;
+  lockedByName: string | null;
+}
+
 export interface BusinessUnit {
   id: string;
   name: string;

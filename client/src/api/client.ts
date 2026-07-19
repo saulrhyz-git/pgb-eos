@@ -15,6 +15,7 @@ import type {
   RolePermission,
   ScorecardResponse,
   SmtpSettings,
+  TargetLockEntry,
   Year,
 } from "./types";
 
@@ -126,6 +127,17 @@ export const api = {
       method: "PUT",
       body: JSON.stringify(payload),
     }),
+
+  // ---------- Manual Target Locks (Group Integrator / Superadmin only) ----------
+  // Applies to every Company at once for a given Year+Quarter — layered on
+  // top of the calendar-based lock above, not a replacement for it.
+  targetLocks: (yearId: string) => request<TargetLockEntry[]>(`/targets/locks?yearId=${yearId}`),
+  lockTarget: (payload: { yearId: string; quarter: number }) =>
+    request<{ quarter: number; lockedAt: string }>("/targets/lock", { method: "POST", body: JSON.stringify(payload) }),
+  // `reason` is required — it's written to the Audit Log (TARGET_UNLOCK),
+  // not stored on the lock itself.
+  unlockTarget: (payload: { yearId: string; quarter: number; reason: string }) =>
+    request<void>("/targets/unlock", { method: "POST", body: JSON.stringify(payload) }),
 
   actuals: (params: { yearId: string; quarter?: number; businessUnitId?: string; companyId?: string }) => {
     const qs = new URLSearchParams({ yearId: params.yearId });

@@ -1,8 +1,8 @@
 import { Dispatch, FormEvent, SetStateAction, useEffect, useState } from "react";
-import { AlertTriangle, CheckCircle2, Lock, Plus, Save } from "lucide-react";
+import { AlertTriangle, CheckCircle2, Lock, LockOpen, Plus, Save } from "lucide-react";
 import { api } from "../api/client";
 import { useAuth } from "../contexts/AuthContext";
-import type { BusinessUnit, Company, Year } from "../api/types";
+import type { BusinessUnit, Company, TargetLockEntry, Year } from "../api/types";
 
 type FigureKey =
   | "revenueInternal"
@@ -192,16 +192,83 @@ export default function TargetConfig() {
   const [annualError, setAnnualError] = useState("");
   const [annualLockedQuarters, setAnnualLockedQuarters] = useState<number[]>([]);
 
+  // Group Integrator / Superadmin only: a manual, admin-controlled lock per
+  // Year+Quarter (applies to every Company at once), layered on top of the
+  // automatic calendar-based lock below. See api.targetLocks/lockTarget/
+  // unlockTarget and server/src/routes/targets.ts.
+  const canLockTargets = canManageStructure;
+  const [manualLocks, setManualLocks] = useState<TargetLockEntry[]>([]);
+  const [lockActionError, setLockActionError] = useState("");
+  const [lockActionBusy, setLockActionBusy] = useState<number | null>(null);
+
   const selectedYear = years.find((y) => y.id === yearId);
 
-  function isQuarterLocked(q: number): boolean {
+  function isCalendarLocked(q: number): boolean {
     if (!currentReal || !selectedYear) return false;
     if (selectedYear.year !== currentReal.year) return selectedYear.year < currentReal.year;
     return q < currentReal.quarter;
   }
+  function manualLockInfo(q: number): TargetLockEntry | undefined {
+    return manualLocks.find((l) => l.quarter === q);
+  }
+  function isQuarterLocked(q: number): boolean {
+    return isCalendarLocked(q) || Boolean(manualLockInfo(q));
+  }
   const lockedQuarters = selectedYear ? [1, 2, 3, 4].filter(isQuarterLocked) : [];
   const quarterLocked = isQuarterLocked(quarter);
   const allQuartersLocked = selectedYear ? lockedQuarters.length === 4 : false;
+
+  function refreshManualLocks() {
+    if (!yearId) {
+      setManualLocks([]);
+      return;
+    }
+    api
+      .targetLocks(yearId)
+      .then(setManualLocks)
+      .catch(() => setManualLocks([]));
+  }
+
+  useEffect(() => {
+    refreshManualLocks();
+    // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, [yearId]);
+
+  async function handleLockQuarter(q: number) {
+    if (!yearId) return;
+    setLockActionError("");
+    setLockActionBusy(q);
+    try {
+      await api.lockTarget({ yearId, quarter: q });
+      refreshManualLocks();
+    } catch (err: any) {
+      setLockActionError(err.message || "Failed to lock quarter");
+    } finally {
+      setLockActionBusy(null);
+    }
+  }
+
+  async function handleUnlockQuarter(q: number) {
+    if (!yearId) return;
+    const reason = window.prompt(
+      `Reason for unlocking Q${q} ${selectedYear?.year ?? ""} targets (required — recorded in the Audit Log):`
+    );
+    if (reason === null) return; // cancelled
+    if (!reason.trim()) {
+      setLockActionError("A reason is required to unlock a quarter.");
+      return;
+    }
+    setLockActionError("");
+    setLockActionBusy(q);
+    try {
+      await api.unlockTarget({ yearId, quarter: q, reason: reason.trim() });
+      refreshManualLocks();
+    } catch (err: any) {
+      setLockActionError(err.message || "Failed to unlock quarter");
+    } finally {
+      setLockActionBusy(null);
+    }
+  }
 
   function refreshYears() {
     api.years().then((ys) => {
@@ -398,7 +465,10 @@ export default function TargetConfig() {
         </p>
         <p className="mt-1 text-xs text-slate-500">
           Editing a Quarter automatically adjusts the following quarters so the Q1-Q4 total stays the same. Once a
-          quarter's real calendar date has passed, it's locked and can no longer be edited.
+          quarter's real calendar date has passed, it's locked and can no longer be edited
+          {canLockTargets
+            ? " — a Group Integrator or Superadmin can also manually lock a quarter early (see Target Locks below), and unlocking it always requires a reason, recorded in the Audit Log."
+            : "."}
         </p>
       </div>
 
@@ -495,6 +565,58 @@ export default function TargetConfig() {
           </div>
         </div>
 
+        {canLockTargets && selectedYear && (
+          <div className="rounded-md border border-slate-200 p-4">
+            <div className="mb-3 flex flex-wrap items-center justify-between gap-2">
+              <div className="text-sm font-semibold text-slate-700">Target Locks — {selectedYear.year}</div>
+              <span className="text-xs text-slate-400">Locking/unlocking applies to every Company's targets for that quarter</span>
+            </div>
+            <div className="grid grid-cols-2 gap-3 sm:grid-cols-4">
+              {[1, 2, 3, 4].map((q) => {
+                const manual = manualLockInfo(q);
+                const pastCalendar = isCalendarLocked(q);
+                const busy = lockActionBusy === q;
+                return (
+                  <div key={q} className="flex flex-col gap-2 rounded-md border border-slate-100 bg-slate-50/60 p-3">
+                    <div className="text-sm font-medium text-slate-700">Q{q}</div>
+                    {manual ? (
+                      <>
+                        <div className="flex items-center gap-1 text-xs text-amber-700">
+                          <Lock className="h-3.5 w-3.5 shrink-0" />
+                          Locked{manual.lockedByName ? ` by ${manual.lockedByName}` : ""}
+                        </div>
+                        <button
+                          type="button"
+                          disabled={busy}
+                          onClick={() => handleUnlockQuarter(q)}
+                          className="flex items-center justify-center gap-1 rounded-md border border-slate-300 px-2 py-1 text-xs font-medium text-slate-600 hover:bg-slate-100 disabled:opacity-50"
+                        >
+                          <LockOpen className="h-3.5 w-3.5" /> Unlock
+                        </button>
+                      </>
+                    ) : (
+                      <>
+                        <div className="text-xs text-slate-500">{pastCalendar ? "Locked (past quarter)" : "Open"}</div>
+                        <button
+                          type="button"
+                          disabled={busy}
+                          onClick={() => handleLockQuarter(q)}
+                          className="flex items-center justify-center gap-1 rounded-md border border-slate-300 px-2 py-1 text-xs font-medium text-slate-600 hover:bg-slate-100 disabled:opacity-50"
+                        >
+                          <Lock className="h-3.5 w-3.5" /> Lock
+                        </button>
+                      </>
+                    )}
+                  </div>
+                );
+              })}
+            </div>
+            {lockActionError && (
+              <div className="mt-3 rounded-md bg-red-50 px-3 py-2 text-xs text-red-600">{lockActionError}</div>
+            )}
+          </div>
+        )}
+
         <div className="flex rounded-md border border-slate-200 p-0.5 text-sm sm:w-fit">
           <button
             type="button"
@@ -533,7 +655,13 @@ export default function TargetConfig() {
             {quarterLocked && (
               <div className="flex items-center gap-2 rounded-md bg-amber-50 px-3 py-2 text-sm text-amber-700">
                 <Lock className="h-4 w-4 shrink-0" />
-                This quarter's real calendar date has passed, so it's locked and can no longer be edited.
+                {isCalendarLocked(quarter) && manualLockInfo(quarter)
+                  ? "This quarter has passed and has also been manually locked — it can no longer be edited."
+                  : isCalendarLocked(quarter)
+                  ? "This quarter's real calendar date has passed, so it's locked and can no longer be edited."
+                  : `This quarter was manually locked${
+                      manualLockInfo(quarter)?.lockedByName ? ` by ${manualLockInfo(quarter)!.lockedByName}` : ""
+                    } and can no longer be edited until it's unlocked.`}
               </div>
             )}
 
@@ -560,22 +688,23 @@ export default function TargetConfig() {
           <form onSubmit={handleSubmitAnnual} className="flex flex-col gap-6">
             <p className="text-xs text-slate-500">
               Enter the year's total per category — it will split evenly across this Company's still-editable
-              quarters. Quarters already locked by the calendar keep their existing values (subtracted from the
-              total first).
+              quarters. Quarters already locked by the calendar, or manually locked by an admin, keep their existing
+              values (subtracted from the total first).
             </p>
 
             {allQuartersLocked && (
               <div className="flex items-center gap-2 rounded-md bg-amber-50 px-3 py-2 text-sm text-amber-700">
                 <AlertTriangle className="h-4 w-4 shrink-0" />
-                Every quarter in this year has already passed — there's nothing left to distribute an annual target
-                into.
+                Every quarter in this year is locked (past the calendar, manually locked, or both) — there's nothing
+                left to distribute an annual target into.
               </div>
             )}
             {!allQuartersLocked && lockedQuarters.length > 0 && (
               <div className="flex items-center gap-2 rounded-md bg-slate-50 px-3 py-2 text-xs text-slate-600">
                 <Lock className="h-4 w-4 shrink-0" />
-                Q{lockedQuarters.join(", Q")} already passed and will keep their current values; the remaining total
-                splits across Q{[1, 2, 3, 4].filter((q) => !lockedQuarters.includes(q)).join(", Q")}.
+                Q{lockedQuarters.join(", Q")} {lockedQuarters.length === 1 ? "is" : "are"} locked (already passed, manually locked, or both) and will keep{" "}
+                {lockedQuarters.length === 1 ? "its" : "their"} current values; the remaining total splits across Q
+                {[1, 2, 3, 4].filter((q) => !lockedQuarters.includes(q)).join(", Q")}.
               </div>
             )}
 

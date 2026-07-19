@@ -6,6 +6,7 @@ import {
   blockPendingPasswordChange,
   loadUserPermissions,
   requireAuth,
+  requireRole,
   resolveCompanyBusinessUnit,
   scopedBusinessUnitFilter,
 } from "../middleware/auth";
@@ -49,11 +50,24 @@ function toFigures(row: any): Figures {
 
 // A Quarter is editable if it's the real current calendar quarter or a
 // future one — once the real calendar has moved past it, it's locked
-// (read-only) forever. Applies only to Targets, not Actuals.
+// (read-only) forever. Applies only to Targets, not Actuals. This is one of
+// two independent gates on editability — see getManuallyLockedQuarters
+// below for the other (an admin-controlled manual lock, layered on top).
 function isQuarterEditable(year: number, quarter: number): boolean {
   const { year: curYear, quarter: curQuarter } = currentCalendarQuarter();
   if (year !== curYear) return year > curYear;
   return quarter >= curQuarter;
+}
+
+// Which quarters of this Year have an active manual lock (see the
+// TargetLock model comment in schema.prisma). Independent of the calendar
+// lock above — a manually-locked Quarter is not editable even if the
+// calendar would otherwise still allow it (and unlocking it here doesn't
+// override the calendar lock if that quarter has separately already
+// passed).
+async function getManuallyLockedQuarters(yearId: string): Promise<Set<number>> {
+  const rows = await prisma.targetLock.findMany({ where: { yearId }, select: { quarter: true } });
+  return new Set(rows.map((r) => r.quarter));
 }
 
 // Splits `total` into `n` non-negative parts that sum to exactly `total`
@@ -184,6 +198,10 @@ router.put("/quarter", async (req, res) => {
   if (!isQuarterEditable(yearRow.year, quarter)) {
     return res.status(403).json({ error: "This quarter has already passed and can no longer be edited" });
   }
+  const manualLock = await prisma.targetLock.findUnique({ where: { yearId_quarter: { yearId, quarter } } });
+  if (manualLock) {
+    return res.status(403).json({ error: "This quarter has been manually locked by an admin and can no longer be edited" });
+  }
 
   const target = await prisma.$transaction(async (tx) => {
     const existing = await tx.quarterTarget.findUnique({
@@ -262,7 +280,10 @@ router.put("/annual", async (req, res) => {
   const yearRow = await prisma.year.findUnique({ where: { id: yearId }, select: { year: true } });
   if (!yearRow) return res.status(404).json({ error: "Year not found" });
 
-  const editableQuarters = [1, 2, 3, 4].filter((q) => isQuarterEditable(yearRow.year, q));
+  const manuallyLockedQuarters = await getManuallyLockedQuarters(yearId);
+  const editableQuarters = [1, 2, 3, 4].filter(
+    (q) => isQuarterEditable(yearRow.year, q) && !manuallyLockedQuarters.has(q)
+  );
   const lockedQuarters = [1, 2, 3, 4].filter((q) => !editableQuarters.includes(q));
   if (editableQuarters.length === 0) {
     return res.status(400).json({ error: "This Year has no editable quarters remaining — every quarter is in the past" });
@@ -308,6 +329,100 @@ router.put("/annual", async (req, res) => {
   });
 
   res.json({ updated: results, lockedQuarters });
+});
+
+// ---------- Manual Target Locks (Group Integrator / Superadmin only) ----------
+// A separate, admin-controlled lock on top of the calendar-based one above —
+// see the TargetLock model comment in schema.prisma. Applies to every
+// Company at once for a given Year+Quarter (no Business Unit/Company
+// scoping), so these three endpoints don't take a companyId at all.
+
+router.get("/locks", async (req, res) => {
+  const { yearId } = req.query as Record<string, string | undefined>;
+  if (!yearId) return res.status(400).json({ error: "yearId is required" });
+
+  const locks = await prisma.targetLock.findMany({
+    where: { yearId },
+    include: { lockedBy: { select: { id: true, name: true } } },
+    orderBy: { quarter: "asc" },
+  });
+  res.json(
+    locks.map((l) => ({
+      quarter: l.quarter,
+      lockedAt: l.createdAt,
+      lockedById: l.lockedById,
+      lockedByName: l.lockedBy?.name ?? null,
+    }))
+  );
+});
+
+const lockSchema = z.object({
+  yearId: z.string().uuid(),
+  quarter: z.number().int().min(1).max(4),
+});
+
+router.post("/lock", requireRole("GROUP_INTEGRATOR", "SUPERADMIN"), async (req, res) => {
+  const parsed = lockSchema.safeParse(req.body);
+  if (!parsed.success) return res.status(400).json({ error: "Invalid lock payload", details: parsed.error.issues });
+  const { yearId, quarter } = parsed.data;
+
+  const yearRow = await prisma.year.findUnique({ where: { id: yearId }, select: { year: true } });
+  if (!yearRow) return res.status(404).json({ error: "Year not found" });
+
+  // Idempotent: locking an already-locked quarter is a no-op, not an error —
+  // simpler for the frontend than needing to check state before every click.
+  const existing = await prisma.targetLock.findUnique({ where: { yearId_quarter: { yearId, quarter } } });
+  if (existing) return res.json({ quarter, lockedAt: existing.createdAt });
+
+  const lock = await prisma.targetLock.create({
+    data: { yearId, quarter, lockedById: req.user!.id },
+  });
+
+  await logAudit({
+    user: req.user,
+    action: "TARGET_LOCK",
+    entityType: "TargetLock",
+    entityId: lock.id,
+    summary: `Locked Q${quarter} ${yearRow.year} targets for every Company`,
+    metadata: { yearId, quarter },
+  });
+
+  res.status(201).json({ quarter, lockedAt: lock.createdAt });
+});
+
+const unlockSchema = z.object({
+  yearId: z.string().uuid(),
+  quarter: z.number().int().min(1).max(4),
+  // Required — this is the whole point: unlocking immutable targets needs a
+  // recorded justification, since it's meant to prevent quiet after-the-fact
+  // changes. Not stored on TargetLock itself (that table only reflects
+  // current state); it's written straight to the Audit Log instead.
+  reason: z.string().trim().min(3, "A reason of at least 3 characters is required to unlock a quarter"),
+});
+
+router.post("/unlock", requireRole("GROUP_INTEGRATOR", "SUPERADMIN"), async (req, res) => {
+  const parsed = unlockSchema.safeParse(req.body);
+  if (!parsed.success) return res.status(400).json({ error: parsed.error.issues[0]?.message || "Invalid unlock payload", details: parsed.error.issues });
+  const { yearId, quarter, reason } = parsed.data;
+
+  const yearRow = await prisma.year.findUnique({ where: { id: yearId }, select: { year: true } });
+  if (!yearRow) return res.status(404).json({ error: "Year not found" });
+
+  const existing = await prisma.targetLock.findUnique({ where: { yearId_quarter: { yearId, quarter } } });
+  if (!existing) return res.status(404).json({ error: "This quarter isn't manually locked" });
+
+  await prisma.targetLock.delete({ where: { yearId_quarter: { yearId, quarter } } });
+
+  await logAudit({
+    user: req.user,
+    action: "TARGET_UNLOCK",
+    entityType: "TargetLock",
+    entityId: existing.id,
+    summary: `Unlocked Q${quarter} ${yearRow.year} targets — reason: ${reason}`,
+    metadata: { yearId, quarter, reason },
+  });
+
+  res.status(204).send();
 });
 
 export default router;

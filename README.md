@@ -28,7 +28,12 @@ in an append-only **Audit Log**, visible to Superadmins by default under
 Admin and, like the Executive Scorecard, assignable to other users via a
 Custom Role's View toggle. The login screen enforces a **lockout**: 3
 consecutive invalid-password attempts on an account locks it for 60 seconds,
-after which the count resets automatically.
+after which the count resets automatically. A Group Integrator or Superadmin
+can also manually **lock/unlock Targets** for a given Year+Quarter (across
+every Company at once) — a governance layer on top of the automatic
+calendar-based lock, meant to guarantee immutability once numbers are
+committed; unlocking always requires a reason, which is recorded in the
+Audit Log.
 
 **Stack:** React (Vite) + Tailwind + Recharts + Lucide on the front end;
 Express + TypeScript + Prisma + PostgreSQL on the back end.
@@ -39,7 +44,9 @@ Express + TypeScript + Prisma + PostgreSQL on the back end.
 on the Login page (`client/src/pages/Login.tsx`). Both are served as static
 files straight out of Vite's `public/` folder, so swapping either logo is
 just replacing that file in place — no code change needed unless the
-filename itself changes.
+filename itself changes. The header nav order (`Layout.tsx`) is Scorecard,
+Revenue, Rocks, Data Entry, Target Setup, then Admin — Scorecard leads since
+it's the board-level summary view.
 
 ## Prerequisites
 
@@ -293,6 +300,38 @@ real data — the app starts completely empty.
   authenticated actor to attribute the entry to (the credentials never
   validated), so a Superadmin reviewing the log can still see which account
   was targeted and how many attempts it took.
+- **Manual Target Locks** (`TargetLock` in `schema.prisma`, the
+  `GET /api/targets/locks` / `POST /api/targets/lock` /
+  `POST /api/targets/unlock` endpoints in `server/src/routes/targets.ts`,
+  the "Target Locks" panel in `client/src/pages/TargetConfig.tsx`): a
+  Group Integrator or Superadmin can lock or unlock a Year+Quarter's
+  Targets directly — a governance layer on top of the existing automatic
+  calendar-based lock (`isQuarterEditable`), meant to guarantee Targets stay
+  immutable once everyone's committed to their numbers rather than relying
+  solely on the calendar to eventually catch up. A lock applies to every
+  Company's Targets for that Year+Quarter at once (there's no per-Business-
+  Unit/Company scoping, matching the calendar lock's own granularity) and is
+  base-role-gated only — `requireRole("GROUP_INTEGRATOR", "SUPERADMIN")`, not
+  something a Custom Role can grant, since this is a governance action, not
+  a data-editing one. Locking is a simple, idempotent create (`TargetLock`
+  existing for that Year+Quarter = locked); unlocking always requires a
+  reason (minimum 3 characters), which isn't stored on `TargetLock` itself
+  (that table only ever reflects *current* lock state) but is written
+  straight to the Audit Log (`TARGET_UNLOCK`, alongside `TARGET_LOCK` for
+  locking) — so there's a permanent, reviewable record of who unlocked what
+  and why, even though the lock can be freely re-applied afterward. The two
+  lock mechanisms are independent: unlocking a manually-locked Quarter here
+  does not make an already-calendar-passed Quarter editable again — both
+  gates have to be clear for an edit to go through, and `PUT /targets/quarter`
+  / `PUT /targets/annual` both check both. The Target Setup page's "Target
+  Locks" panel (visible only to a Group Integrator/Superadmin) shows all
+  four quarters of the selected Year with their current state — Open, Locked
+  (past quarter), or Locked by *name* — with Lock/Unlock buttons; clicking
+  Unlock prompts for the required reason before calling the API. The
+  existing Quarter/Annual lock messaging and disabled-state logic
+  (`isQuarterLocked`, `lockedQuarters`, `allQuartersLocked`) now factors in
+  both the calendar and the manual lock, so the rest of the page didn't need
+  restructuring.
 - **API** (`server/src/routes`): JWT auth (login accepts email or username),
   a `PUT /api/auth/profile` self-service endpoint (any authenticated user can
   update their own name/email/username; deliberately excludes `role`,
@@ -801,3 +840,27 @@ succeeding) starts counting from 1 again, not from wherever it left off;
 Admin → Audit Log shows a `LOGIN_FAILED` entry for each of the first two
 wrong attempts and a `LOGIN_LOCKED` entry for the 3rd, all attributed to the
 target account's name/email even though no session was ever established.
+
+**Manual Target Locks** (the `TargetLock` model in `schema.prisma`, the
+three new endpoints in `server/src/routes/targets.ts`, the "Target Locks"
+panel in `client/src/pages/TargetConfig.tsx`) needs a fresh
+`npm run prisma:migrate` to pick up the new table (purely additive — no
+existing data is affected, every Year+Quarter starts unlocked). This is
+unverified end-to-end. Worth checking by hand: logging in as a Group
+Integrator or Superadmin shows a "Target Locks" panel on Target Setup with
+Q1-Q4 for the selected Year, each either "Open" or "Locked (past quarter)";
+clicking Lock on an open quarter immediately shows it as "Locked by
+*your name*" with an Unlock button, and switching to Quarter mode for that
+quarter now shows the locked banner and disables its inputs/Save — for
+every Company, not just the one currently selected; clicking Unlock prompts
+for a reason, cancelling the prompt does nothing, submitting it blank shows
+a validation message without calling the API, and submitting a real reason
+unlocks the quarter immediately (button reverts to "Lock"); logging in as a
+BU Integrator (no Custom Role, or one with TARGETS edit) does not show the
+Target Locks panel at all, and if they somehow call the lock/unlock API
+directly they get a 403; a manually-locked quarter that's also past the
+real calendar date shows the combined "has passed and has also been
+manually locked" message, and unlocking it does *not* make it editable
+(the calendar lock still applies independently); Admin → Audit Log shows a
+`TARGET_LOCK` entry when locking and a `TARGET_UNLOCK` entry (with the
+reason in its metadata, visible when the row is expanded) when unlocking.

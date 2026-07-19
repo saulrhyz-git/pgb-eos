@@ -29,11 +29,11 @@ export default function Layout() {
             <span className="text-lg font-semibold text-slate-800">Executive Dashboard</span>
           </div>
           <nav className="flex items-center gap-2">
-            <NavLink to="/" end className={linkClass}>
-              <LayoutDashboard className="h-4 w-4" /> Revenue
-            </NavLink>
             <NavLink to="/scorecard" className={linkClass}>
               <Gauge className="h-4 w-4" /> Scorecard
+            </NavLink>
+            <NavLink to="/" end className={linkClass}>
+              <LayoutDashboard className="h-4 w-4" /> Revenue
             </NavLink>
             <NavLink to="/rocks" className={linkClass}>
               <Mountain className="h-4 w-4" /> Rocks

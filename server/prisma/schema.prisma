@@ -80,6 +80,7 @@ model User {
   actualEdits   QuarterActual[]    @relation("ActualEditedBy")
   rockCreations Rock[]             @relation("RockCreatedBy")
   rockEdits     Rock[]             @relation("RockUpdatedBy")
+  targetLocks   TargetLock[]
 
   @@index([role])
   @@index([customRoleId])
@@ -214,6 +215,35 @@ model Year {
   quarterTargets QuarterTarget[]
   quarterActuals QuarterActual[]
   rocks          Rock[]
+  targetLocks    TargetLock[]
+}
+
+// A manual, admin-controlled lock on a Year+Quarter's Targets — layered on
+// top of the automatic calendar-based lock in routes/targets.ts
+// (isQuarterEditable). Applies to every Company at once for that Year+
+// Quarter (no per-Business-Unit/Company scoping), matching the calendar
+// lock's own granularity. Only a Group Integrator or Superadmin can lock or
+// unlock (see requireRole in routes/targets.ts) — this is a governance
+// action, not something a Custom Role can grant. Existence of a row means
+// locked; there's no separate "unlocked" state to store. Locking is a
+// plain create; unlocking deletes the row, but requires a reason from the
+// caller — that reason isn't persisted here (this table only ever reflects
+// *current* state), it's written to the Audit Log instead (TARGET_UNLOCK),
+// so there's a permanent record of who unlocked what and why even though
+// the lock itself can be freely re-applied afterward. Note this lock is
+// independent of, not a substitute for, the calendar lock: unlocking a
+// Quarter here doesn't make an already-past Quarter editable again.
+model TargetLock {
+  id         String   @id @default(uuid())
+  yearId     String
+  quarter    Int // 1-4
+  lockedById String?
+  createdAt  DateTime @default(now())
+
+  year     Year  @relation(fields: [yearId], references: [id], onDelete: Cascade)
+  lockedBy User? @relation(fields: [lockedById], references: [id], onDelete: SetNull)
+
+  @@unique([yearId, quarter])
 }
 
 // Quarter target: set once per Company per Year+Quarter (Group Integrator,
