@@ -93,7 +93,9 @@ real data — the app starts completely empty.
 ## What's included
 
 - **Schema** (`server/prisma/schema.prisma`): `User` (now with `username`,
-  `mustChangePassword`), `BusinessUnit`, `UserBusinessUnit` (many-to-many BU
+  `mustChangePassword`, and a superadmin-only free-text `description` field —
+  shown in the app header in place of the user's role, editable only via
+  Admin → Users, not by the user themselves), `BusinessUnit`, `UserBusinessUnit` (many-to-many BU
   assignment), `Company` (with an optional free-text `description` field, set
   on create and editable afterward), `Year`, `QuarterTarget`,
   `QuarterActual`, `SmtpSettings` (singleton row), `BusinessGoal`,
@@ -225,6 +227,11 @@ real data — the app starts completely empty.
   shown are still masked by that role's Revenue/Collections/Expenses/Rocks
   grants exactly like the Revenue dashboard and Rocks page.
 - **API** (`server/src/routes`): JWT auth (login accepts email or username),
+  a `PUT /api/auth/profile` self-service endpoint (any authenticated user can
+  update their own name/email/username; deliberately excludes `role`,
+  `description`, Business Unit assignment, and Custom Role, which stay
+  superadmin-only via `PUT /api/admin/users/:id` — returns a fresh token
+  since those fields travel in it, same as login/change-password),
   a `POST /api/auth/change-password` flow that's enforced whenever a user's
   `mustChangePassword` flag is set (e.g. the seeded superadmin's first
   login, or any account an admin resets), CRUD for Years/BUs/Companies
@@ -633,7 +640,38 @@ page shows nothing/403; assigning that user a Custom Role with, say,
 REVENUE view on one Company immediately (no re-login) shows just that
 Company's Revenue figures and hides everything else, exactly as if the
 Custom Role were the user's entire identity; the Admin → Users table shows
-a "No base role" pill instead of crashing; the top-right role label in the
-header shows "No base role" for such a user instead of misreporting them as
-a BU Integrator; demoting the last remaining Superadmin to blank is
-rejected the same way demoting them to any other role is.
+a "No base role" pill instead of crashing; demoting the last remaining
+Superadmin to blank is rejected the same way demoting them to any other
+role is. (The app header no longer shows a role label at all — see the
+Profile/description feature below for what replaced it.)
+
+**Self-service Profile page + User descriptions** (`User.description` in
+`schema.prisma`, `PUT /api/auth/profile` in `server/src/routes/auth.ts`,
+`client/src/pages/Profile.tsx`, `client/src/components/Layout.tsx`) needs a
+fresh `npm run prisma:migrate` to add the `description` column (purely
+additive, defaults every existing row to `""`). Two related changes:
+1. Any logged-in user can now manage their own account under a new "My
+   Profile" page (linked from a profile icon and their name/description in
+   the header) — update their own name/email/username, and change their
+   password (reusing the existing change-password flow). `PUT
+   /api/auth/profile` is deliberately narrower than the superadmin's `PUT
+   /api/admin/users/:id`: it can't touch `role`, `description`, Business
+   Unit assignment, or Custom Role.
+2. A Superadmin can set a free-text `description` per user from Admin →
+   Users (a new field in the create/edit form, plus a column in the table)
+   — e.g. their title or team. The app header's top-right corner, which
+   used to show the user's role (Superadmin/Group Integrator/BU
+   Integrator/No base role), now shows this description instead, and shows
+   nothing at all if it's blank — the role is no longer displayed there
+   (still visible in Admin → Users' Role column for anyone who needs it).
+
+This is unverified end-to-end. Worth checking by hand: a non-superadmin user
+can open My Profile and update their name/email, and the header updates
+immediately without a re-login; changing password from My Profile works the
+same as the existing forced first-login flow; a user cannot set their own
+description (no field for it exists on My Profile); a Superadmin setting a
+user's description in Admin → Users immediately shows up under that user's
+name in the header the next time they load the app (after their token
+refreshes, e.g. next login — same staleness as editing anyone's name/role
+today); leaving a user's description blank shows nothing under their name in
+the header rather than an empty line or a fallback to their role.

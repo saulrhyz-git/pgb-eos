@@ -30,6 +30,7 @@ const userSelect = {
   username: true,
   name: true,
   role: true,
+  description: true,
   mustChangePassword: true,
   createdAt: true,
   businessUnits: { select: { businessUnit: { select: { id: true, name: true } } } },
@@ -43,6 +44,7 @@ function serializeUser(user: any) {
     username: user.username,
     name: user.name,
     role: user.role,
+    description: user.description,
     mustChangePassword: user.mustChangePassword,
     createdAt: user.createdAt,
     businessUnits: user.businessUnits.map((b: any) => b.businessUnit),
@@ -65,6 +67,10 @@ const createUserSchema = z
     // Optional — omit (or pass null) to create a "blank" role user whose
     // access is defined entirely by the Custom Role assigned below.
     role: nullableRoleSchema.optional(),
+    // Superadmin-authored note about this user (title, team, etc.) — shown
+    // in the app header in place of their role. The user themselves cannot
+    // set this (no field for it on the self-service profile update).
+    description: z.string().max(2000).optional().default(""),
     password: passwordSchema,
     businessUnitIds: z.array(z.string().uuid()).optional().default([]),
     // Optional additional layer on top of `role` — a Custom Role's
@@ -89,7 +95,7 @@ router.post("/users", async (req, res) => {
   const parsed = createUserSchema.safeParse(req.body);
   if (!parsed.success) return res.status(400).json({ error: parsed.error.issues[0]?.message || "Invalid user payload", details: parsed.error.issues });
 
-  const { email, username, name, password, businessUnitIds, customRoleId } = parsed.data;
+  const { email, username, name, description, password, businessUnitIds, customRoleId } = parsed.data;
   const role = parsed.data.role ?? null;
   const passwordHash = await bcrypt.hash(password, 10);
 
@@ -100,6 +106,7 @@ router.post("/users", async (req, res) => {
         username: username ? username.toLowerCase() : undefined,
         name,
         role,
+        description,
         passwordHash,
         mustChangePassword: true,
         customRoleId: customRoleId || null,
@@ -123,6 +130,7 @@ const updateUserSchema = z.object({
   // Omit entirely to leave the role unchanged; pass `null` explicitly to
   // clear it to "blank" (Custom Role only).
   role: nullableRoleSchema.optional(),
+  description: z.string().max(2000).optional(),
   businessUnitIds: z.array(z.string().uuid()).optional(),
   password: passwordSchema.optional(),
   customRoleId: z.string().uuid().nullable().optional(),
@@ -132,7 +140,7 @@ router.put("/users/:id", async (req, res) => {
   const parsed = updateUserSchema.safeParse(req.body);
   if (!parsed.success) return res.status(400).json({ error: parsed.error.issues[0]?.message || "Invalid user payload", details: parsed.error.issues });
 
-  const { email, username, name, role, businessUnitIds, password, customRoleId } = parsed.data;
+  const { email, username, name, role, description, businessUnitIds, password, customRoleId } = parsed.data;
   const existing = await prisma.user.findUnique({ where: { id: req.params.id } });
   if (!existing) return res.status(404).json({ error: "User not found" });
 
@@ -165,6 +173,7 @@ router.put("/users/:id", async (req, res) => {
   if (username !== undefined) data.username = username ? username.toLowerCase() : null;
   if (name) data.name = name;
   if (role !== undefined) data.role = role;
+  if (description !== undefined) data.description = description;
   if (customRoleId !== undefined) data.customRoleId = customRoleId || null;
   if (password) {
     data.passwordHash = await bcrypt.hash(password, 10);

@@ -8,6 +8,7 @@ interface AuthContextValue {
   login: (identifier: string, password: string) => Promise<void>;
   logout: () => void;
   changePassword: (currentPassword: string, newPassword: string) => Promise<void>;
+  updateProfile: (payload: Partial<{ name: string; email: string; username: string | null }>) => Promise<void>;
 }
 
 const AuthContext = createContext<AuthContextValue | undefined>(undefined);
@@ -46,8 +47,16 @@ export function AuthProvider({ children }: { children: ReactNode }) {
     setUser(user);
   }
 
+  async function updateProfile(payload: Partial<{ name: string; email: string; username: string | null }>) {
+    const { token, user } = await api.updateProfile(payload);
+    setToken(token);
+    setUser(user);
+  }
+
   return (
-    <AuthContext.Provider value={{ user, loading, login, logout, changePassword }}>{children}</AuthContext.Provider>
+    <AuthContext.Provider value={{ user, loading, login, logout, changePassword, updateProfile }}>
+      {children}
+    </AuthContext.Provider>
   );
 }
 

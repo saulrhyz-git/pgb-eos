@@ -48,6 +48,10 @@ model User {
   // below). A blank-role user with no CustomRole assigned has no access to
   // anything (see hasGlobalBusinessUnitAccess in middleware/auth.ts).
   role               Role?
+  // Superadmin-authored free-text note about this user (e.g. their title or
+  // team) — shown in the app header in place of their role. Not editable by
+  // the user themselves; see PUT /api/admin/users/:id.
+  description        String   @default("")
   mustChangePassword Boolean  @default(false)
   createdAt          DateTime @default(now())
 

@@ -68,6 +68,10 @@ export const api = {
       method: "POST",
       body: JSON.stringify({ currentPassword, newPassword }),
     }),
+  // Self-service profile update — name/email/username only. Description,
+  // role, and Custom Role stay superadmin-only (see adminUpdateUser below).
+  updateProfile: (payload: Partial<{ name: string; email: string; username: string | null }>) =>
+    request<{ token: string; user: AuthUser }>("/auth/profile", { method: "PUT", body: JSON.stringify(payload) }),
 
   years: () => request<Year[]>("/years"),
   createYear: (year: number) => request<Year>("/years", { method: "POST", body: JSON.stringify({ year }) }),
@@ -158,6 +162,9 @@ export const api = {
     name: string;
     // Omit or pass null for a "blank" role user (Custom Role only).
     role: Role | null;
+    // Superadmin-authored note about this user, shown in the app header in
+    // place of their role. Not user-editable.
+    description?: string;
     password: string;
     businessUnitIds?: string[];
     customRoleId?: string | null;
@@ -169,6 +176,7 @@ export const api = {
       username: string | null;
       name: string;
       role: Role | null;
+      description: string;
       businessUnitIds: string[];
       password: string;
       customRoleId: string | null;

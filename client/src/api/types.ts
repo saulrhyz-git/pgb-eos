@@ -14,6 +14,9 @@ export interface AuthUser {
   // null = "blank" role — no base-role-derived access; relies entirely on
   // an assigned Custom Role.
   role: Role | null;
+  // Superadmin-authored note (title, team, etc.), shown in the app header
+  // in place of the role label. Not editable by the user themselves.
+  description: string;
   businessUnitIds: string[];
   mustChangePassword: boolean;
   customRoleId?: string | null;
@@ -25,6 +28,7 @@ export interface AdminUser {
   username: string | null;
   name: string;
   role: Role | null;
+  description: string;
   mustChangePassword: boolean;
   createdAt: string;
   businessUnits: { id: string; name: string }[];

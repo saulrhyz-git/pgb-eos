@@ -19,6 +19,9 @@ const emptyForm = {
   username: "",
   name: "",
   role: "" as Role | "",
+  // Superadmin-authored note about this user, shown in the app header in
+  // place of the role label. Not editable by the user themselves.
+  description: "",
   password: "",
   businessUnitIds: [] as string[],
   customRoleId: "" as string,
@@ -55,6 +58,7 @@ export default function AdminUsers() {
       username: u.username || "",
       name: u.name,
       role: u.role ?? "",
+      description: u.description || "",
       password: "",
       businessUnitIds: u.businessUnits.map((b) => b.id),
       customRoleId: u.customRole?.id || "",
@@ -88,6 +92,7 @@ export default function AdminUsers() {
           username: form.username || null,
           name: form.name,
           role,
+          description: form.description,
           businessUnitIds: form.businessUnitIds,
           customRoleId: form.customRoleId || null,
         };
@@ -99,6 +104,7 @@ export default function AdminUsers() {
           username: form.username || undefined,
           name: form.name,
           role,
+          description: form.description,
           password: form.password,
           businessUnitIds: form.businessUnitIds,
           customRoleId: form.customRoleId || null,
@@ -190,6 +196,16 @@ export default function AdminUsers() {
                   This user has no base-role access at all — assign a Custom Role below so they can see anything.
                 </span>
               )}
+            </div>
+            <div className="flex flex-col gap-1 sm:col-span-2">
+              <label className="text-xs font-medium text-slate-500">Description (optional)</label>
+              <textarea
+                className="rounded-md border border-slate-300 px-3 py-2 text-sm"
+                rows={2}
+                placeholder="e.g. their title or team — shown in the app header instead of their role"
+                value={form.description}
+                onChange={(e) => setForm((f) => ({ ...f, description: e.target.value }))}
+              />
             </div>
             <div className="flex flex-col gap-1 sm:col-span-2">
               <label className="text-xs font-medium text-slate-500">
@@ -293,6 +309,7 @@ export default function AdminUsers() {
           <thead className="bg-slate-50 text-left text-xs font-semibold uppercase text-slate-500">
             <tr>
               <th className="px-4 py-3">Name</th>
+              <th className="px-4 py-3">Description</th>
               <th className="px-4 py-3">Email / Username</th>
               <th className="px-4 py-3">Role</th>
               <th className="px-4 py-3">Custom Role</th>
@@ -305,6 +322,9 @@ export default function AdminUsers() {
             {users.map((u) => (
               <tr key={u.id}>
                 <td className="px-4 py-3 font-medium text-slate-800">{u.name}</td>
+                <td className="px-4 py-3 text-slate-500">
+                  <span className="line-clamp-2 max-w-xs">{u.description || "—"}</span>
+                </td>
                 <td className="px-4 py-3 text-slate-600">
                   <div>{u.email}</div>
                   {u.username && <div className="text-xs text-slate-500">@{u.username}</div>}
@@ -354,7 +374,7 @@ export default function AdminUsers() {
             ))}
             {users.length === 0 && (
               <tr>
-                <td colSpan={7} className="px-4 py-6 text-center text-slate-500">
+                <td colSpan={8} className="px-4 py-6 text-center text-slate-500">
                   No users yet.
                 </td>
               </tr>

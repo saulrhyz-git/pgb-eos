@@ -20,6 +20,7 @@ function toAuthUser(user: {
   username: string | null;
   name: string;
   role: AuthUser["role"];
+  description: string;
   mustChangePassword: boolean;
   customRoleId: string | null;
   businessUnits: { businessUnitId: string }[];
@@ -30,6 +31,7 @@ function toAuthUser(user: {
     username: user.username,
     name: user.name,
     role: user.role,
+    description: user.description,
     businessUnitIds: user.businessUnits.map((b) => b.businessUnitId),
     mustChangePassword: user.mustChangePassword,
     customRoleId: user.customRoleId,
@@ -58,6 +60,44 @@ router.post("/login", async (req, res) => {
 
 router.get("/me", requireAuth, async (req, res) => {
   res.json({ user: req.user });
+});
+
+const updateProfileSchema = z.object({
+  name: z.string().min(1).optional(),
+  email: z.string().email().optional(),
+  username: z.string().min(3).max(50).nullable().optional(),
+});
+
+// Self-service profile update — any authenticated user can change their own
+// name/email/username. Deliberately does NOT include `role`, `description`,
+// `businessUnitIds`, or `customRoleId`: those stay superadmin-only via
+// routes/admin.ts. Returns a fresh token since name/email/username all
+// travel in it.
+router.put("/profile", requireAuth, async (req, res) => {
+  const parsed = updateProfileSchema.safeParse(req.body);
+  if (!parsed.success) {
+    return res.status(400).json({ error: parsed.error.issues[0]?.message || "Invalid profile payload" });
+  }
+
+  const { name, email, username } = parsed.data;
+  const data: any = {};
+  if (name) data.name = name;
+  if (email) data.email = email.toLowerCase();
+  if (username !== undefined) data.username = username ? username.toLowerCase() : null;
+
+  try {
+    const updated = await prisma.user.update({
+      where: { id: req.user!.id },
+      data,
+      include: { businessUnits: { select: { businessUnitId: true } } },
+    });
+    const authUser = toAuthUser(updated);
+    const token = signToken(authUser);
+    res.json({ token, user: authUser });
+  } catch (err: any) {
+    if (err.code === "P2002") return res.status(409).json({ error: "Email or username is already in use" });
+    throw err;
+  }
 });
 
 const changePasswordSchema = z.object({

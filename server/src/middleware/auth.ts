@@ -12,6 +12,10 @@ export interface AuthUser {
   // relies entirely on their assigned Custom Role (customRoleId below); with
   // no Custom Role assigned either, they have no access to anything.
   role: "SUPERADMIN" | "GROUP_INTEGRATOR" | "BU_INTEGRATOR" | null;
+  // Superadmin-authored free-text note (title, team, etc.), shown in the
+  // app header in place of the role label. Not editable by the user
+  // themselves.
+  description: string;
   businessUnitIds: string[];
   mustChangePassword: boolean;
   // Optional, additional layer on top of `role` (see CustomRole/RolePermission
