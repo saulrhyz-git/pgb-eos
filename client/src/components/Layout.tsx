@@ -4,7 +4,6 @@ import {
   ClipboardEdit,
   Settings,
   LogOut,
-  TrendingUp,
   ShieldCheck,
   Mountain,
   Gauge,
@@ -25,9 +24,9 @@ export default function Layout() {
     <div className="min-h-screen bg-slate-50">
       <header className="border-b border-slate-200 bg-white">
         <div className="mx-auto flex max-w-7xl items-center justify-between px-6 py-3">
-          <div className="flex items-center gap-2">
-            <TrendingUp className="h-6 w-6 text-brand-600" />
-            <span className="text-lg font-semibold text-slate-800">EOS Executive Dashboard</span>
+          <div className="flex items-center gap-3">
+            <img src="/EOS-logo.png" alt="EOS" className="h-9 w-auto" />
+            <span className="text-lg font-semibold text-slate-800">Executive Dashboard</span>
           </div>
           <nav className="flex items-center gap-2">
             <NavLink to="/" end className={linkClass}>

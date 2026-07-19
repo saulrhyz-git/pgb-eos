@@ -26,10 +26,20 @@ mutating action across the app (user/company/business-unit/role changes,
 target and actuals edits, Rock changes, SMTP settings, logins) is recorded
 in an append-only **Audit Log**, visible to Superadmins by default under
 Admin and, like the Executive Scorecard, assignable to other users via a
-Custom Role's View toggle.
+Custom Role's View toggle. The login screen enforces a **lockout**: 3
+consecutive invalid-password attempts on an account locks it for 60 seconds,
+after which the count resets automatically.
 
 **Stack:** React (Vite) + Tailwind + Recharts + Lucide on the front end;
 Express + TypeScript + Prisma + PostgreSQL on the back end.
+
+**Branding:** `client/public/EOS-logo.png` is the app's header logo
+(`client/src/components/Layout.tsx`), and both `EOS-logo.png` and
+`client/public/PGB_logo_f.png` (Primary Group of Builders) appear together
+on the Login page (`client/src/pages/Login.tsx`). Both are served as static
+files straight out of Vite's `public/` folder, so swapping either logo is
+just replacing that file in place — no code change needed unless the
+filename itself changes.
 
 ## Prerequisites
 
@@ -255,15 +265,34 @@ real data — the app starts completely empty.
   search over summary/user, action, entity type, and date range) with each
   row expandable to show its raw metadata. Default access is Superadmin;
   like the Executive Scorecard, a non-superadmin can be granted access via a
-  Custom Role's Audit Log View toggle. Because the whole Admin section
-  (`/admin/*`) is client-side gated to Superadmin only, the Audit Log page is
-  deliberately wired as its own top-level route (`/audit-log`, alongside
-  `/scorecard`) rather than nested under `/admin` — nesting it there would
-  block exactly the non-superadmin, Custom-Role-granted users this feature
-  also exists for. It still appears as a tab inside Admin → (for Superadmins
-  browsing there) and as its own link in the main nav for everyone else; the
-  backend is the real gate either way, surfacing a 403 with an in-page
-  "access required" message for anyone without it.
+  Custom Role's Audit Log View toggle. The page is wired to two routes:
+  `/admin/audit-log`, nested inside the Superadmin-only `AdminLayout` so the
+  Admin tab bar stays mounted and the tab behaves exactly like Users/Roles/
+  Companies/etc. (this is the one Superadmins use, linked from that tab
+  bar), and a second, top-level `/audit-log` route (outside `/admin/*`,
+  alongside `/scorecard`) that exists purely so a non-superadmin granted
+  access via a Custom Role has any way to reach the page at all, since the
+  whole `/admin/*` tree is client-side gated to Superadmin only and would
+  otherwise be unreachable for them. The backend is the real gate either
+  way, surfacing a 403 with an in-page "access required" message for anyone
+  without it.
+- **Login lockout** (`failedLoginAttempts`/`lockedUntil` on `User` in
+  `schema.prisma`, `POST /api/auth/login` in `server/src/routes/auth.ts`,
+  `client/src/pages/Login.tsx`): 3 consecutive invalid-password attempts on
+  an account locks it for 60 seconds; a successful login, or the lock simply
+  expiring, resets the count back to 0. Tracked per User row rather than
+  per-IP (no separate rate-limiting infrastructure needed, and it protects
+  the account regardless of where the attempts come from). While locked,
+  `POST /api/auth/login` returns `423` with a "Try again in N seconds"
+  message computed from the actual time remaining, and the Login page
+  disables the Sign in button and runs its own client-side countdown over
+  that window so there's no guessing when to retry. Every failed attempt
+  and every lock event is written to the Audit Log too (`LOGIN_FAILED` /
+  `LOGIN_LOCKED`, alongside the existing `LOGIN` action for successes) —
+  these snapshot the target account's id/name/email even though there's no
+  authenticated actor to attribute the entry to (the credentials never
+  validated), so a Superadmin reviewing the log can still see which account
+  was targeted and how many attempts it took.
 - **API** (`server/src/routes`): JWT auth (login accepts email or username),
   a `PUT /api/auth/profile` self-service endpoint (any authenticated user can
   update their own name/email/username; deliberately excludes `role`,
@@ -744,8 +773,31 @@ link is still shown to them, same as Scorecard — the backend is the real
 gate); assigning that BU Integrator a Custom Role with Audit Log view
 checked grants access immediately (no re-login needed); deleting a user who
 has existing audit log entries succeeds without error, and their old entries
-still show their name/email (the snapshot), not a broken reference; a
-Superadmin's own Admin → Audit Log tab link still works as expected since
-`/audit-log` is a top-level route outside the Superadmin-gated `/admin/*`
-block (this is deliberate — see the comments in `App.tsx` and
-`AdminLayout.tsx` next to it).
+still show their name/email (the snapshot), not a broken reference; clicking
+the Audit Log tab from Admin → Users (or any other Admin tab) navigates to
+`/admin/audit-log` and the tab bar stays visible/mounted the whole time,
+exactly like switching between Users/Roles/Companies (this was a follow-up
+fix — the tab originally pointed at the top-level `/audit-log` route, which
+sits outside `AdminLayout` and made the tab bar disappear on click; see the
+comments in `App.tsx` and `AdminLayout.tsx` next to both routes for why both
+still exist).
+
+**Login lockout** (`failedLoginAttempts`/`lockedUntil` on `User` in
+`schema.prisma`, `POST /api/auth/login` in `server/src/routes/auth.ts`,
+`client/src/pages/Login.tsx`) needs a fresh `npm run prisma:migrate` to pick
+up the two new columns (purely additive — every existing row defaults to 0
+attempts / no lock). This is unverified end-to-end. Worth checking by hand:
+entering a wrong password twice shows "Invalid credentials" both times;
+the 3rd wrong attempt in a row instead shows "Too many failed attempts. Try
+again in 60 seconds." with an amber (not red) message, and the Sign in
+button greys out and counts down from 60 in its own label; trying to log in
+again before the countdown finishes (even with the *correct* password)
+still returns the same locked response with the actual time remaining, not
+a fresh 60 seconds; once the countdown reaches 0, the correct password logs
+in normally and the 3-attempt counter is back at zero (no lingering partial
+count from before the lock); a 4th, 5th, etc. wrong password entered *after*
+a successful login (or after the lock naturally expired without ever
+succeeding) starts counting from 1 again, not from wherever it left off;
+Admin → Audit Log shows a `LOGIN_FAILED` entry for each of the first two
+wrong attempts and a `LOGIN_LOCKED` entry for the 3rd, all attributed to the
+target account's name/email even though no session was ever established.

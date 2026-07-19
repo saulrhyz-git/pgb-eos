@@ -15,6 +15,23 @@ const loginSchema = z.object({
   password: z.string().min(1),
 });
 
+// Login lockout: 3 consecutive invalid-password attempts locks the account
+// for 60 seconds; a successful login (or the lock simply expiring) resets
+// the counter back to 0. Tracked per User row (failedLoginAttempts/
+// lockedUntil in schema.prisma) rather than per-IP — simplest option that
+// matches "3 invalid attempts locks for 60 seconds then resets" without
+// needing separate rate-limiting infrastructure.
+const LOCKOUT_THRESHOLD = 3;
+const LOCKOUT_MS = 60_000;
+
+function secondsRemaining(lockedUntil: Date, now: Date): number {
+  return Math.max(1, Math.ceil((lockedUntil.getTime() - now.getTime()) / 1000));
+}
+
+function lockedMessage(seconds: number): string {
+  return `Too many failed attempts. Try again in ${seconds} second${seconds === 1 ? "" : "s"}.`;
+}
+
 function toAuthUser(user: {
   id: string;
   email: string;
@@ -51,8 +68,51 @@ router.post("/login", async (req, res) => {
   });
   if (!user) return res.status(401).json({ error: "Invalid credentials" });
 
+  const now = new Date();
+  if (user.lockedUntil && user.lockedUntil > now) {
+    return res.status(423).json({ error: lockedMessage(secondsRemaining(user.lockedUntil, now)) });
+  }
+
   const valid = await bcrypt.compare(password, user.passwordHash);
-  if (!valid) return res.status(401).json({ error: "Invalid credentials" });
+
+  if (!valid) {
+    // A lock that's already expired (checked above) means this failure
+    // starts a fresh count of 1 rather than picking up a stale number.
+    const priorAttempts = user.lockedUntil && user.lockedUntil <= now ? 0 : user.failedLoginAttempts;
+    const attempts = priorAttempts + 1;
+    const justLocked = attempts >= LOCKOUT_THRESHOLD;
+
+    await prisma.user.update({
+      where: { id: user.id },
+      data: justLocked
+        ? { failedLoginAttempts: 0, lockedUntil: new Date(now.getTime() + LOCKOUT_MS) }
+        : { failedLoginAttempts: attempts, lockedUntil: null },
+    });
+
+    await logAudit({
+      // Not a real authenticated actor (credentials never validated) — but
+      // the log should still say whose account this was, so this passes
+      // just the target User's id/name/email rather than null.
+      user: { id: user.id, name: user.name, email: user.email },
+      action: justLocked ? "LOGIN_LOCKED" : "LOGIN_FAILED",
+      entityType: "User",
+      entityId: user.id,
+      summary: justLocked
+        ? `${user.name} locked out after ${LOCKOUT_THRESHOLD} failed login attempts`
+        : `Failed login attempt for ${user.name} (${attempts}/${LOCKOUT_THRESHOLD})`,
+      metadata: { attempts, threshold: LOCKOUT_THRESHOLD },
+    });
+
+    if (justLocked) {
+      return res.status(423).json({ error: lockedMessage(Math.ceil(LOCKOUT_MS / 1000)) });
+    }
+    return res.status(401).json({ error: "Invalid credentials" });
+  }
+
+  // A successful login clears any lingering failure count/lock.
+  if (user.failedLoginAttempts > 0 || user.lockedUntil) {
+    await prisma.user.update({ where: { id: user.id }, data: { failedLoginAttempts: 0, lockedUntil: null } });
+  }
 
   const authUser = toAuthUser(user);
   const token = signToken(authUser);

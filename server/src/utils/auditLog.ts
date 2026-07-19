@@ -9,7 +9,12 @@ import { AuthUser } from "../middleware/auth";
 // SCREAMING_SNAKE_CASE and prefixed by entity (e.g. "USER_CREATE",
 // "ROCK_ROLLOVER") so the Audit Log page's filters stay predictable.
 export async function logAudit(params: {
-  user: AuthUser | null | undefined;
+  // Accepts a full AuthUser (the normal case — the authenticated actor who
+  // triggered the action) or just the id/name/email of the User record the
+  // entry is about, for the rare case there's no authenticated actor at all
+  // (e.g. a failed/locked login attempt, where credentials never validated
+  // into a real session, but the log should still say whose account it was).
+  user: Pick<AuthUser, "id" | "name" | "email"> | null | undefined;
   action: string;
   entityType: string;
   entityId?: string | null;

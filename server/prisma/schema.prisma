@@ -58,6 +58,15 @@ model User {
   mustChangePassword Boolean  @default(false)
   createdAt          DateTime @default(now())
 
+  // Login lockout: 3 consecutive invalid-password attempts locks the
+  // account for 60 seconds. failedLoginAttempts counts consecutive
+  // failures since the last success (or since the last lock expired);
+  // lockedUntil is set the moment the 3rd failure happens and cleared
+  // again once a login succeeds or the lock naturally expires. See
+  // POST /api/auth/login in routes/auth.ts for the enforcement.
+  failedLoginAttempts Int       @default(0)
+  lockedUntil         DateTime?
+
   // Optional, additional layer on top of `role`. When set (typically for a
   // GROUP_INTEGRATOR or BU_INTEGRATOR), the user's effective View/Edit/Delete
   // access to Targets/Revenue/Collections/Expenses/Rocks per Business Unit or
