@@ -152,10 +152,12 @@ function FigureFieldsEditor({
 // (KPI cards, Target Distribution Matrix, Operational Grid). This page has
 // two ways to *set* that sum: entering Quarter targets one at a time, or
 // entering an Annual Target which splits evenly across the Year's still-
-// editable quarters. Either way, once a Quarter's real calendar date has
-// passed, it's locked; editing an editable Quarter redistributes the
-// change across that Company's *subsequent* Quarters only, so the Q1-Q4
-// sum for the Year never drifts from what it was before the edit.
+// editable quarters. Editing an editable Quarter redistributes the change
+// across that Company's *subsequent* Quarters only, so the Q1-Q4 sum for
+// the Year never drifts from what it was before the edit. A Quarter is
+// only ever locked if a Group Integrator/Superadmin has explicitly locked
+// it via the Target Locks panel below — there's no automatic calendar-based
+// lock, so past quarters stay editable indefinitely unless locked by hand.
 export default function TargetConfig() {
   const { user } = useAuth();
   const canManageStructure = user?.role === "GROUP_INTEGRATOR" || user?.role === "SUPERADMIN";
@@ -175,8 +177,10 @@ export default function TargetConfig() {
   const [annualForm, setAnnualForm] = useState(emptyForm);
   const [annualFieldModes, setAnnualFieldModes] = useState<Record<string, FieldMode>>(emptyFieldModes);
 
-  // The real calendar quarter "right now" (server clock) — used to work out
-  // which quarters of the selected Year are locked. null until loaded.
+  // The real calendar quarter "right now" (server clock) — used only to
+  // default the initial Year/Quarter selection to the current one. It has
+  // no bearing on locking: quarters are never auto-locked by the calendar,
+  // only by the manual Target Lock mechanism below. null until loaded.
   const [currentReal, setCurrentReal] = useState<{ year: number; quarter: number } | null>(null);
 
   const [newYear, setNewYear] = useState(new Date().getFullYear() + 1);
@@ -193,8 +197,10 @@ export default function TargetConfig() {
   const [annualLockedQuarters, setAnnualLockedQuarters] = useState<number[]>([]);
 
   // Group Integrator / Superadmin only: a manual, admin-controlled lock per
-  // Year+Quarter (applies to every Company at once), layered on top of the
-  // automatic calendar-based lock below. See api.targetLocks/lockTarget/
+  // Year+Quarter (applies to every Company at once). This is the *only*
+  // way a Quarter's Targets can be locked — there is no automatic
+  // calendar-based lock, so a past Quarter stays editable indefinitely
+  // unless locked by hand here. See api.targetLocks/lockTarget/
   // unlockTarget and server/src/routes/targets.ts.
   const canLockTargets = canManageStructure;
   const [manualLocks, setManualLocks] = useState<TargetLockEntry[]>([]);
@@ -203,16 +209,11 @@ export default function TargetConfig() {
 
   const selectedYear = years.find((y) => y.id === yearId);
 
-  function isCalendarLocked(q: number): boolean {
-    if (!currentReal || !selectedYear) return false;
-    if (selectedYear.year !== currentReal.year) return selectedYear.year < currentReal.year;
-    return q < currentReal.quarter;
-  }
   function manualLockInfo(q: number): TargetLockEntry | undefined {
     return manualLocks.find((l) => l.quarter === q);
   }
   function isQuarterLocked(q: number): boolean {
-    return isCalendarLocked(q) || Boolean(manualLockInfo(q));
+    return Boolean(manualLockInfo(q));
   }
   const lockedQuarters = selectedYear ? [1, 2, 3, 4].filter(isQuarterLocked) : [];
   const quarterLocked = isQuarterLocked(quarter);
@@ -464,11 +465,11 @@ export default function TargetConfig() {
             : "Set Quarter targets for the companies in your assigned Business Unit(s), or set an Annual Target to split it evenly across the year."}
         </p>
         <p className="mt-1 text-xs text-slate-500">
-          Editing a Quarter automatically adjusts the following quarters so the Q1-Q4 total stays the same. Once a
-          quarter's real calendar date has passed, it's locked and can no longer be edited
+          Editing a Quarter automatically adjusts the following quarters so the Q1-Q4 total stays the same. Quarters
+          are never locked automatically — they stay editable indefinitely, past or future
           {canLockTargets
-            ? " — a Group Integrator or Superadmin can also manually lock a quarter early (see Target Locks below), and unlocking it always requires a reason, recorded in the Audit Log."
-            : "."}
+            ? ", unless a Group Integrator or Superadmin manually locks one (see Target Locks below); unlocking it always requires a reason, recorded in the Audit Log."
+            : ", unless a Group Integrator or Superadmin has manually locked it."}
         </p>
       </div>
 
@@ -574,7 +575,6 @@ export default function TargetConfig() {
             <div className="grid grid-cols-2 gap-3 sm:grid-cols-4">
               {[1, 2, 3, 4].map((q) => {
                 const manual = manualLockInfo(q);
-                const pastCalendar = isCalendarLocked(q);
                 const busy = lockActionBusy === q;
                 return (
                   <div key={q} className="flex flex-col gap-2 rounded-md border border-slate-100 bg-slate-50/60 p-3">
@@ -596,7 +596,7 @@ export default function TargetConfig() {
                       </>
                     ) : (
                       <>
-                        <div className="text-xs text-slate-500">{pastCalendar ? "Locked (past quarter)" : "Open"}</div>
+                        <div className="text-xs text-slate-500">Open</div>
                         <button
                           type="button"
                           disabled={busy}
@@ -655,13 +655,9 @@ export default function TargetConfig() {
             {quarterLocked && (
               <div className="flex items-center gap-2 rounded-md bg-amber-50 px-3 py-2 text-sm text-amber-700">
                 <Lock className="h-4 w-4 shrink-0" />
-                {isCalendarLocked(quarter) && manualLockInfo(quarter)
-                  ? "This quarter has passed and has also been manually locked — it can no longer be edited."
-                  : isCalendarLocked(quarter)
-                  ? "This quarter's real calendar date has passed, so it's locked and can no longer be edited."
-                  : `This quarter was manually locked${
-                      manualLockInfo(quarter)?.lockedByName ? ` by ${manualLockInfo(quarter)!.lockedByName}` : ""
-                    } and can no longer be edited until it's unlocked.`}
+                {`This quarter was manually locked${
+                  manualLockInfo(quarter)?.lockedByName ? ` by ${manualLockInfo(quarter)!.lockedByName}` : ""
+                } and can no longer be edited until it's unlocked.`}
               </div>
             )}
 
@@ -688,23 +684,23 @@ export default function TargetConfig() {
           <form onSubmit={handleSubmitAnnual} className="flex flex-col gap-6">
             <p className="text-xs text-slate-500">
               Enter the year's total per category — it will split evenly across this Company's still-editable
-              quarters. Quarters already locked by the calendar, or manually locked by an admin, keep their existing
-              values (subtracted from the total first).
+              quarters. Quarters manually locked by an admin keep their existing values (subtracted from the total
+              first).
             </p>
 
             {allQuartersLocked && (
               <div className="flex items-center gap-2 rounded-md bg-amber-50 px-3 py-2 text-sm text-amber-700">
                 <AlertTriangle className="h-4 w-4 shrink-0" />
-                Every quarter in this year is locked (past the calendar, manually locked, or both) — there's nothing
-                left to distribute an annual target into.
+                Every quarter in this year has been manually locked — there's nothing left to distribute an annual
+                target into.
               </div>
             )}
             {!allQuartersLocked && lockedQuarters.length > 0 && (
               <div className="flex items-center gap-2 rounded-md bg-slate-50 px-3 py-2 text-xs text-slate-600">
                 <Lock className="h-4 w-4 shrink-0" />
-                Q{lockedQuarters.join(", Q")} {lockedQuarters.length === 1 ? "is" : "are"} locked (already passed, manually locked, or both) and will keep{" "}
-                {lockedQuarters.length === 1 ? "its" : "their"} current values; the remaining total splits across Q
-                {[1, 2, 3, 4].filter((q) => !lockedQuarters.includes(q)).join(", Q")}.
+                Q{lockedQuarters.join(", Q")} {lockedQuarters.length === 1 ? "is" : "are"} manually locked and will
+                keep {lockedQuarters.length === 1 ? "its" : "their"} current values; the remaining total splits
+                across Q{[1, 2, 3, 4].filter((q) => !lockedQuarters.includes(q)).join(", Q")}.
               </div>
             )}
 

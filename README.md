@@ -30,10 +30,10 @@ Custom Role's View toggle. The login screen enforces a **lockout**: 3
 consecutive invalid-password attempts on an account locks it for 60 seconds,
 after which the count resets automatically. A Group Integrator or Superadmin
 can also manually **lock/unlock Targets** for a given Year+Quarter (across
-every Company at once) — a governance layer on top of the automatic
-calendar-based lock, meant to guarantee immutability once numbers are
-committed; unlocking always requires a reason, which is recorded in the
-Audit Log.
+every Company at once) — this is the only mechanism that locks Targets (there
+is no automatic calendar-based lock; a Quarter stays editable indefinitely,
+past or future, until an admin locks it by hand); unlocking always requires a
+reason, which is recorded in the Audit Log.
 
 **Stack:** React (Vite) + Tailwind + Recharts + Lucide on the front end;
 Express + TypeScript + Prisma + PostgreSQL on the back end.
@@ -305,33 +305,27 @@ real data — the app starts completely empty.
   `POST /api/targets/unlock` endpoints in `server/src/routes/targets.ts`,
   the "Target Locks" panel in `client/src/pages/TargetConfig.tsx`): a
   Group Integrator or Superadmin can lock or unlock a Year+Quarter's
-  Targets directly — a governance layer on top of the existing automatic
-  calendar-based lock (`isQuarterEditable`), meant to guarantee Targets stay
-  immutable once everyone's committed to their numbers rather than relying
-  solely on the calendar to eventually catch up. A lock applies to every
-  Company's Targets for that Year+Quarter at once (there's no per-Business-
-  Unit/Company scoping, matching the calendar lock's own granularity) and is
-  base-role-gated only — `requireRole("GROUP_INTEGRATOR", "SUPERADMIN")`, not
-  something a Custom Role can grant, since this is a governance action, not
-  a data-editing one. Locking is a simple, idempotent create (`TargetLock`
+  Targets directly, and this is the *only* thing that locks a Quarter's
+  Targets — there is no automatic calendar-based lock. A Quarter, past or
+  future, stays editable indefinitely until an admin locks it by hand. A
+  lock applies to every Company's Targets for that Year+Quarter at once
+  (there's no per-Business-Unit/Company scoping) and is base-role-gated
+  only — `requireRole("GROUP_INTEGRATOR", "SUPERADMIN")`, not something a
+  Custom Role can grant, since this is a governance action, not a
+  data-editing one. Locking is a simple, idempotent create (`TargetLock`
   existing for that Year+Quarter = locked); unlocking always requires a
   reason (minimum 3 characters), which isn't stored on `TargetLock` itself
   (that table only ever reflects *current* lock state) but is written
   straight to the Audit Log (`TARGET_UNLOCK`, alongside `TARGET_LOCK` for
   locking) — so there's a permanent, reviewable record of who unlocked what
-  and why, even though the lock can be freely re-applied afterward. The two
-  lock mechanisms are independent: unlocking a manually-locked Quarter here
-  does not make an already-calendar-passed Quarter editable again — both
-  gates have to be clear for an edit to go through, and `PUT /targets/quarter`
-  / `PUT /targets/annual` both check both. The Target Setup page's "Target
-  Locks" panel (visible only to a Group Integrator/Superadmin) shows all
-  four quarters of the selected Year with their current state — Open, Locked
-  (past quarter), or Locked by *name* — with Lock/Unlock buttons; clicking
-  Unlock prompts for the required reason before calling the API. The
-  existing Quarter/Annual lock messaging and disabled-state logic
-  (`isQuarterLocked`, `lockedQuarters`, `allQuartersLocked`) now factors in
-  both the calendar and the manual lock, so the rest of the page didn't need
-  restructuring.
+  and why, even though the lock can be freely re-applied afterward. The
+  Target Setup page's "Target Locks" panel (visible only to a Group
+  Integrator/Superadmin) shows all four quarters of the selected Year with
+  their current state — Open, or Locked by *name* — with Lock/Unlock
+  buttons; clicking Unlock prompts for the required reason before calling
+  the API. The existing Quarter/Annual lock messaging and disabled-state
+  logic (`isQuarterLocked`, `lockedQuarters`, `allQuartersLocked`) reads
+  purely off the manual lock now.
 - **API** (`server/src/routes`): JWT auth (login accepts email or username),
   a `PUT /api/auth/profile` self-service endpoint (any authenticated user can
   update their own name/email/username; deliberately excludes `role`,
@@ -356,18 +350,19 @@ real data — the app starts completely empty.
   dashboard remains purely a derived sum of Q1-Q4 — but `PUT
   /api/targets/annual` offers a convenience way to *enter* one: it splits
   the submitted total evenly across the Year's still-editable quarters
-  (already-passed quarters keep their existing values, subtracted from the
+  (manually-locked quarters keep their existing values, subtracted from the
   total first; if the request has zero editable quarters left, it 400s).
-  Both endpoints enforce a Quarter-locking rule — once the real calendar
-  date (per `quarterDates.ts`) has moved past a Quarter, it's rejected with
-  a 403 on any further direct edit — and both keep every Company's Q1-Q4
-  sum for a Year invariant across edits: saving one Quarter's target
-  redistributes the delta across that Company's *subsequent* Quarters only
-  (never prior ones), split evenly and clamped at zero, so the annual total
-  doesn't drift. This logic lives in `targets.ts` itself
-  (`isQuarterEditable`, `splitEvenly`, `distributeAdjustment` — no schema
-  changes were needed since it's pure business logic over the existing
-  `QuarterTarget` rows), `server/src/routes/actuals.ts`
+  Both endpoints enforce the manual Target Lock rule — a Quarter with a
+  `TargetLock` row for it is rejected with a 403 on any further direct
+  edit, and otherwise stays editable indefinitely regardless of calendar
+  date — and both keep every Company's Q1-Q4 sum for a Year invariant
+  across edits: saving one Quarter's target redistributes the delta across
+  that Company's *subsequent* Quarters only (never prior ones), split
+  evenly and clamped at zero, so the annual total doesn't drift. This logic
+  lives in `targets.ts` itself (`getManuallyLockedQuarters`, `splitEvenly`,
+  `distributeAdjustment` — no schema changes were needed since it's pure
+  business logic over the existing `QuarterTarget` rows),
+  `server/src/routes/actuals.ts`
   (quarterly actuals + per-category remarks upserts keyed by `companyId` +
   `yearId` + `quarter`, BU Integrator scoped to their assigned BUs), a
   superadmin-only `server/src/routes/admin.ts` with full CRUD over
@@ -703,27 +698,29 @@ only to Targets (Actuals are untouched):
    separately-stored Annual Target row — the invariant is maintained
    procedurally, not by storing a target-and-lock-it figure the old
    `AnnualTarget` table used to.
-3. Both endpoints reject edits to a Quarter once the real calendar date (per
-   `quarterDates.ts`) has moved past it (`isQuarterEditable`) — a 403 on
-   direct edits, and locked Quarters are simply excluded from the annual
-   split's target set. `pages/TargetConfig.tsx` mirrors this client-side
-   using the existing `GET /api/current-quarter`: the Quarter dropdown
-   marks locked quarters "(locked)" and disables their form + Save button,
-   and Annual mode calls out which quarters will be left untouched before
-   saving.
+3. **(Superseded — see "Manual Target Locks" above.)** This point originally
+   had both endpoints reject edits to a Quarter once the real calendar date
+   (per `quarterDates.ts`) had moved past it (`isQuarterEditable`), with
+   `pages/TargetConfig.tsx` marking locked quarters "(locked)" in the
+   Quarter dropdown accordingly. That automatic calendar-based lock has
+   since been removed entirely: a Quarter now stays editable indefinitely,
+   past or future, unless a Group Integrator/Superadmin has explicitly
+   locked it via the manual `TargetLock` mechanism described above. Locked
+   Quarters (manual locks only, now) are still excluded from the annual
+   split's target set the same way.
 
 This is unverified end-to-end (no npm registry access in this sandbox — see
 the note at the top of this section). Worth checking by hand: setting an
 Annual Target of ₱400,000 Revenue on a Company with no prior targets splits
 into ₱100,000 per quarter; raising Q2 to ₱150,000 afterward drops Q3 and Q4
 to ₱75,000 each (Q1 stays at ₱100,000) so the total stays ₱400,000; lowering
-Q2 back down raises Q3/Q4 again the same way; once the server's real
-calendar date is inside Q2 (or later), Q1's Quarter-mode inputs and Save
-button are disabled with a lock message, and a direct `PUT
-/api/targets/quarter` for Q1 returns 403; setting a new Annual Target in
-that state leaves Q1 untouched and splits only across Q2-Q4; on a Company
-with all four quarters already at zero, saving Q1 for the first time
-doesn't push Q2-Q4 negative (clamped, so they simply stay at zero).
+Q2 back down raises Q3/Q4 again the same way; manually locking Q1 via the
+Target Locks panel disables its Quarter-mode inputs and Save button with a
+lock message, and a direct `PUT /api/targets/quarter` for Q1 then returns
+403; setting a new Annual Target in that state leaves Q1 untouched and
+splits only across Q2-Q4; on a Company with all four quarters already at
+zero, saving Q1 for the first time doesn't push Q2-Q4 negative (clamped, so
+they simply stay at zero).
 
 **Blank ("no base role") Users** (`role Role?` on `User` in
 `schema.prisma`, `server/src/middleware/auth.ts`,
@@ -846,21 +843,22 @@ three new endpoints in `server/src/routes/targets.ts`, the "Target Locks"
 panel in `client/src/pages/TargetConfig.tsx`) needs a fresh
 `npm run prisma:migrate` to pick up the new table (purely additive — no
 existing data is affected, every Year+Quarter starts unlocked). This is
-unverified end-to-end. Worth checking by hand: logging in as a Group
-Integrator or Superadmin shows a "Target Locks" panel on Target Setup with
-Q1-Q4 for the selected Year, each either "Open" or "Locked (past quarter)";
-clicking Lock on an open quarter immediately shows it as "Locked by
-*your name*" with an Unlock button, and switching to Quarter mode for that
-quarter now shows the locked banner and disables its inputs/Save — for
-every Company, not just the one currently selected; clicking Unlock prompts
+the only mechanism that locks a Quarter's Targets — there is no automatic
+calendar-based lock, so a past Quarter stays editable indefinitely unless
+locked by hand. This is unverified end-to-end. Worth checking by hand:
+logging in as a Group Integrator or Superadmin shows a "Target Locks" panel
+on Target Setup with Q1-Q4 for the selected Year, each either "Open" or
+"Locked by *name*"; clicking Lock on an open quarter immediately shows it as
+"Locked by *your name*" with an Unlock button, and switching to Quarter mode
+for that quarter now shows the locked banner and disables its inputs/Save —
+for every Company, not just the one currently selected; a past quarter with
+no lock stays fully editable ("Open") indefinitely; clicking Unlock prompts
 for a reason, cancelling the prompt does nothing, submitting it blank shows
 a validation message without calling the API, and submitting a real reason
-unlocks the quarter immediately (button reverts to "Lock"); logging in as a
-BU Integrator (no Custom Role, or one with TARGETS edit) does not show the
-Target Locks panel at all, and if they somehow call the lock/unlock API
-directly they get a 403; a manually-locked quarter that's also past the
-real calendar date shows the combined "has passed and has also been
-manually locked" message, and unlocking it does *not* make it editable
-(the calendar lock still applies independently); Admin → Audit Log shows a
+unlocks the quarter immediately (button reverts to "Lock", and the quarter
+becomes editable again right away since there's no calendar lock underneath
+it); logging in as a BU Integrator (no Custom Role, or one with TARGETS
+edit) does not show the Target Locks panel at all, and if they somehow call
+the lock/unlock API directly they get a 403; Admin → Audit Log shows a
 `TARGET_LOCK` entry when locking and a `TARGET_UNLOCK` entry (with the
 reason in its metadata, visible when the row is expanded) when unlocking.

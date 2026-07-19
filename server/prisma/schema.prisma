@@ -218,21 +218,22 @@ model Year {
   targetLocks    TargetLock[]
 }
 
-// A manual, admin-controlled lock on a Year+Quarter's Targets — layered on
-// top of the automatic calendar-based lock in routes/targets.ts
-// (isQuarterEditable). Applies to every Company at once for that Year+
-// Quarter (no per-Business-Unit/Company scoping), matching the calendar
-// lock's own granularity. Only a Group Integrator or Superadmin can lock or
-// unlock (see requireRole in routes/targets.ts) — this is a governance
-// action, not something a Custom Role can grant. Existence of a row means
-// locked; there's no separate "unlocked" state to store. Locking is a
-// plain create; unlocking deletes the row, but requires a reason from the
-// caller — that reason isn't persisted here (this table only ever reflects
-// *current* state), it's written to the Audit Log instead (TARGET_UNLOCK),
-// so there's a permanent record of who unlocked what and why even though
-// the lock itself can be freely re-applied afterward. Note this lock is
-// independent of, not a substitute for, the calendar lock: unlocking a
-// Quarter here doesn't make an already-past Quarter editable again.
+// A manual, admin-controlled lock on a Year+Quarter's Targets. This is the
+// *only* mechanism that locks a Quarter's Targets — routes/targets.ts has
+// no automatic calendar-based lock, so a Quarter stays editable
+// indefinitely, past or future, unless a Group Integrator/Superadmin has
+// explicitly locked it here. Applies to every Company at once for that
+// Year+Quarter (no per-Business-Unit/Company scoping). Only a Group
+// Integrator or Superadmin can lock or unlock (see requireRole in
+// routes/targets.ts) — this is a governance action, not something a Custom
+// Role can grant. Existence of a row means locked; there's no separate
+// "unlocked" state to store. Locking is a plain create; unlocking deletes
+// the row, but requires a reason from the caller — that reason isn't
+// persisted here (this table only ever reflects *current* state), it's
+// written to the Audit Log instead (TARGET_UNLOCK), so there's a permanent
+// record of who unlocked what and why even though the lock itself can be
+// freely re-applied afterward. Unlocking a Quarter here makes it
+// immediately editable again, since there's no other lock underneath it.
 model TargetLock {
   id         String   @id @default(uuid())
   yearId     String

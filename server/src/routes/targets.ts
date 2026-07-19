@@ -11,7 +11,6 @@ import {
   scopedBusinessUnitFilter,
 } from "../middleware/auth";
 import { assertPermission, can } from "../utils/permissions";
-import { currentCalendarQuarter } from "../utils/quarterDates";
 import { logAudit } from "../utils/auditLog";
 
 const router = Router();
@@ -48,23 +47,11 @@ function toFigures(row: any): Figures {
   return out;
 }
 
-// A Quarter is editable if it's the real current calendar quarter or a
-// future one — once the real calendar has moved past it, it's locked
-// (read-only) forever. Applies only to Targets, not Actuals. This is one of
-// two independent gates on editability — see getManuallyLockedQuarters
-// below for the other (an admin-controlled manual lock, layered on top).
-function isQuarterEditable(year: number, quarter: number): boolean {
-  const { year: curYear, quarter: curQuarter } = currentCalendarQuarter();
-  if (year !== curYear) return year > curYear;
-  return quarter >= curQuarter;
-}
-
-// Which quarters of this Year have an active manual lock (see the
-// TargetLock model comment in schema.prisma). Independent of the calendar
-// lock above — a manually-locked Quarter is not editable even if the
-// calendar would otherwise still allow it (and unlocking it here doesn't
-// override the calendar lock if that quarter has separately already
-// passed).
+// Quarters are never auto-locked by the calendar — a past Quarter stays
+// editable indefinitely unless a Group Integrator/Superadmin has explicitly
+// locked it via the manual TargetLock mechanism below (see the TargetLock
+// model comment in schema.prisma). This is the *only* editability gate for
+// Targets now.
 async function getManuallyLockedQuarters(yearId: string): Promise<Set<number>> {
   const rows = await prisma.targetLock.findMany({ where: { yearId }, select: { quarter: true } });
   return new Set(rows.map((r) => r.quarter));
@@ -117,9 +104,11 @@ function distributeAdjustment(currentValues: number[], adjustment: number): numb
 // (whether it came from that split or a direct PUT /quarter) preserves
 // whatever the annual sum was immediately before the edit by redistributing
 // the delta across that Company's *subsequent* Quarters of the same Year
-// (never prior ones) — see distributeAdjustment above. Once the real
-// calendar has moved past a Quarter, it's locked and can no longer be
-// edited directly or via redistribution (see isQuarterEditable).
+// (never prior ones) — see distributeAdjustment above. A Quarter stays
+// editable indefinitely, past or future, unless a Group Integrator/
+// Superadmin has explicitly locked it via the manual TargetLock mechanism
+// (see getManuallyLockedQuarters and the /lock, /unlock, /locks routes
+// below) — there is no automatic calendar-based lock.
 
 router.get("/quarter", async (req, res) => {
   const { yearId, quarter, businessUnitId, companyId } = req.query as Record<string, string | undefined>;
@@ -195,9 +184,6 @@ router.put("/quarter", async (req, res) => {
 
   const yearRow = await prisma.year.findUnique({ where: { id: yearId }, select: { year: true } });
   if (!yearRow) return res.status(404).json({ error: "Year not found" });
-  if (!isQuarterEditable(yearRow.year, quarter)) {
-    return res.status(403).json({ error: "This quarter has already passed and can no longer be edited" });
-  }
   const manualLock = await prisma.targetLock.findUnique({ where: { yearId_quarter: { yearId, quarter } } });
   if (manualLock) {
     return res.status(403).json({ error: "This quarter has been manually locked by an admin and can no longer be edited" });
@@ -281,24 +267,22 @@ router.put("/annual", async (req, res) => {
   if (!yearRow) return res.status(404).json({ error: "Year not found" });
 
   const manuallyLockedQuarters = await getManuallyLockedQuarters(yearId);
-  const editableQuarters = [1, 2, 3, 4].filter(
-    (q) => isQuarterEditable(yearRow.year, q) && !manuallyLockedQuarters.has(q)
-  );
+  const editableQuarters = [1, 2, 3, 4].filter((q) => !manuallyLockedQuarters.has(q));
   const lockedQuarters = [1, 2, 3, 4].filter((q) => !editableQuarters.includes(q));
   if (editableQuarters.length === 0) {
-    return res.status(400).json({ error: "This Year has no editable quarters remaining — every quarter is in the past" });
+    return res.status(400).json({ error: "Every quarter of this Year has been manually locked — unlock at least one before setting an annual target" });
   }
 
   const existingRows = await prisma.quarterTarget.findMany({ where: { companyId, yearId } });
   const rowByQuarter = new Map(existingRows.map((r) => [r.quarter, r]));
 
   // Build up each editable quarter's new Figures one field at a time: the
-  // amount left over after subtracting whatever's already locked into past
-  // quarters, split evenly across the remaining (editable) quarters. If the
-  // locked quarters alone already exceed the requested annual figure, the
-  // editable quarters are best-effort set to 0 for that field rather than
-  // going negative — the resulting annual sum will simply be lower than
-  // requested.
+  // amount left over after subtracting whatever's already locked into
+  // manually-locked quarters, split evenly across the remaining (editable)
+  // quarters. If the locked quarters alone already exceed the requested
+  // annual figure, the editable quarters are best-effort set to 0 for that
+  // field rather than going negative — the resulting annual sum will
+  // simply be lower than requested.
   const quarterFigures = new Map<number, Partial<Figures>>(editableQuarters.map((q) => [q, {}]));
   for (const key of FIGURE_KEYS) {
     const lockedSum = lockedQuarters.reduce((sum, q) => sum + Number(rowByQuarter.get(q)?.[key] ?? 0), 0);
@@ -332,10 +316,10 @@ router.put("/annual", async (req, res) => {
 });
 
 // ---------- Manual Target Locks (Group Integrator / Superadmin only) ----------
-// A separate, admin-controlled lock on top of the calendar-based one above —
-// see the TargetLock model comment in schema.prisma. Applies to every
-// Company at once for a given Year+Quarter (no Business Unit/Company
-// scoping), so these three endpoints don't take a companyId at all.
+// This is the only mechanism that locks a Quarter's Targets — see the
+// TargetLock model comment in schema.prisma. Applies to every Company at
+// once for a given Year+Quarter (no Business Unit/Company scoping), so
+// these three endpoints don't take a companyId at all.
 
 router.get("/locks", async (req, res) => {
   const { yearId } = req.query as Record<string, string | undefined>;
