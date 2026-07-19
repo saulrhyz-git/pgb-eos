@@ -32,7 +32,11 @@ export default function FilterBar({ filters, onChange }: Props) {
         if (current?.yearId && ys.some((y) => y.id === current.yearId)) {
           onChange({ ...filters, yearId: current.yearId, quarter: current.quarter });
         } else {
-          onChange({ ...filters, yearId: ys[0].id });
+          // Today's real Year hasn't been created yet — fall back to the
+          // first available Year, but still default to the real current
+          // quarter number rather than leaving whatever quarter happened to
+          // be in the initial state.
+          onChange({ ...filters, yearId: ys[0].id, quarter: current?.quarter ?? filters.quarter });
         }
       }
     });

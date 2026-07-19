@@ -14,7 +14,7 @@ import {
 } from "lucide-react";
 import { api } from "../api/client";
 import { useAuth } from "../contexts/AuthContext";
-import { attainmentColor } from "../utils/format";
+import { attainmentColor, formatProgressPct } from "../utils/format";
 import type { BusinessGoal, BusinessUnit, Company, Rock, RockStatus, Year } from "../api/types";
 
 const STATUS_LABELS: Record<RockStatus, string> = {
@@ -24,12 +24,22 @@ const STATUS_LABELS: Record<RockStatus, string> = {
   TARGET_MET: "Target Met",
 };
 
+// Orange = Pending, Blue = On Track ("in progress"), Red = At Risk
+// (including Rocks auto-flagged by the 60-day staleness rule — see
+// server/src/utils/rockAutoStatus.ts), Green = Target Met.
 const STATUS_BADGE: Record<RockStatus, string> = {
-  PENDING: "bg-slate-100 text-slate-600",
-  ON_TRACK: "bg-emerald-50 text-emerald-700",
+  PENDING: "bg-orange-50 text-orange-700",
+  ON_TRACK: "bg-blue-50 text-blue-700",
   AT_RISK: "bg-red-50 text-red-700",
-  TARGET_MET: "bg-brand-50 text-brand-700",
+  TARGET_MET: "bg-green-50 text-green-700",
 };
+
+// Progress is entered to up to 2 decimal places — clamp to 0-100 and round
+// away any extra precision from floating-point input (e.g. typing "45.567").
+function clampProgress(n: number): number {
+  if (Number.isNaN(n)) return 0;
+  return Math.round(Math.max(0, Math.min(100, n)) * 100) / 100;
+}
 
 const emptyRockForm = {
   id: "" as string | null,
@@ -684,7 +694,7 @@ export default function Rocks() {
           </div>
 
           <div className="flex flex-col gap-1">
-            <label className="text-xs font-medium text-slate-500">Description (optional)</label>
+            <label className="text-xs font-medium text-slate-500">Target(s) (optional)</label>
             <textarea
               className="min-h-[70px] rounded-md border border-slate-300 px-3 py-2 text-sm"
               value={rockForm.description}
@@ -727,14 +737,17 @@ export default function Rocks() {
               </select>
             </div>
             <div className="flex flex-col gap-1">
-              <label className="text-xs font-medium text-slate-500">Progress %</label>
+              <label className="text-xs font-medium text-slate-500">Progress % (up to 2 decimal places)</label>
               <input
                 type="number"
                 min={0}
                 max={100}
+                step="0.01"
                 className="rounded-md border border-slate-300 px-3 py-2 text-sm"
                 value={rockForm.progressPct}
-                onChange={(e) => setRockForm((f) => ({ ...f, progressPct: Math.max(0, Math.min(100, Number(e.target.value))) }))}
+                onChange={(e) =>
+                  setRockForm((f) => ({ ...f, progressPct: clampProgress(Number(e.target.value)) }))
+                }
               />
             </div>
           </div>
@@ -808,14 +821,17 @@ export default function Rocks() {
                         type="number"
                         min={0}
                         max={100}
-                        className="w-16 rounded-md border border-slate-200 px-2 py-1 text-xs"
+                        step="0.01"
+                        className="w-20 rounded-md border border-slate-200 px-2 py-1 text-xs"
                         defaultValue={r.progressPct}
                         onBlur={(e) => {
-                          const next = Math.max(0, Math.min(100, Number(e.target.value) || 0));
+                          const next = clampProgress(Number(e.target.value) || 0);
                           if (next !== r.progressPct) quickUpdate(r, { progressPct: next });
                         }}
                       />
-                      <span className={`text-xs font-semibold ${attainmentColor(r.progressPct)}`}>{r.progressPct}%</span>
+                      <span className={`text-xs font-semibold ${attainmentColor(r.progressPct)}`}>
+                        {formatProgressPct(r.progressPct)}
+                      </span>
                     </div>
                   </td>
                   <td className="px-4 py-3">

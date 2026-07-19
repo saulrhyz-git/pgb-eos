@@ -8,9 +8,15 @@ import TargetMatrix from "../components/TargetMatrix";
 import OperationalGrid from "../components/OperationalGrid";
 
 export default function Dashboard() {
+  // Placeholder values only — FilterBar's own effect immediately overwrites
+  // yearId/quarter with the real current Year+Quarter (and businessUnitId
+  // for a BU Integrator, who has no "all" option) as soon as it loads, so
+  // this component never actually fetches with these defaults. An empty
+  // yearId/businessUnitId/companyId already means "current"/"all" — see
+  // DashboardFilters above.
   const [filters, setFilters] = useState<DashboardFilters>({
     yearId: "",
-    quarter: 4,
+    quarter: 1,
     businessUnitId: "",
     companyId: "",
   });

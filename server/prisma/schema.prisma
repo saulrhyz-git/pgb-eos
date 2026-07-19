@@ -355,7 +355,14 @@ model Rock {
   remarks        String     @default("")
   ownerName      String     @default("")
   status         RockStatus @default(PENDING)
-  progressPct    Int        @default(0)
+  // Float (not Decimal) so Prisma Client returns a plain JS number here —
+  // Decimal fields come back as Decimal.js objects, which would break the
+  // plain arithmetic (+, -, Math.round, etc.) done on this value throughout
+  // rocks.ts/scorecard.ts and the frontend. Callers are expected to round to
+  // 2 decimal places themselves (see the zod transforms in routes/rocks.ts)
+  // since Float can't enforce that at the column level the way
+  // @db.Decimal(5, 2) would.
+  progressPct    Float      @default(0)
 
   createdById String?
   updatedById String?

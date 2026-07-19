@@ -12,6 +12,7 @@ import {
 } from "../middleware/auth";
 import { assertPermission, can } from "../utils/permissions";
 import { logAudit } from "../utils/auditLog";
+import { escalateStaleRocks } from "../utils/rockAutoStatus";
 
 // Rocks (EOS-style 90-day priorities) tracked per Company/Year/Quarter.
 // Read access follows the same Business-Unit scoping as the rest of the app;
@@ -73,13 +74,7 @@ router.get("/", async (req, res) => {
   }
 
   const where: any = { yearId };
-  if (quarter) where.quarter = Number(quarter);
   if (businessGoalId) where.businessGoalId = businessGoalId;
-  if (status) {
-    const parsedStatus = statusEnum.safeParse(status);
-    if (!parsedStatus.success) return res.status(400).json({ error: "Invalid status filter" });
-    where.status = parsedStatus.data;
-  }
 
   if (companyId) {
     where.companyId = companyId;
@@ -104,6 +99,21 @@ router.get("/", async (req, res) => {
     }
   }
 
+  // Auto-escalate any stale (incomplete, >60 days into their Quarter) Rocks
+  // within this Year+scope before reading the list back, so the response
+  // already reflects any freshly-flagged AT_RISK rows. Runs across every
+  // Quarter in scope regardless of the `quarter` filter below, since it's a
+  // data-integrity check independent of what's currently being viewed. See
+  // utils/rockAutoStatus.ts.
+  await escalateStaleRocks({ ...where });
+
+  if (quarter) where.quarter = Number(quarter);
+  if (status) {
+    const parsedStatus = statusEnum.safeParse(status);
+    if (!parsedStatus.success) return res.status(400).json({ error: "Invalid status filter" });
+    where.status = parsedStatus.data;
+  }
+
   const rocks = await prisma.rock.findMany({
     where,
     include: rockInclude,
@@ -122,7 +132,15 @@ const createSchema = z.object({
   remarks: z.string().max(4000).optional().default(""),
   ownerName: z.string().max(200).optional().default(""),
   status: statusEnum.optional().default("PENDING"),
-  progressPct: z.number().int().min(0).max(100).optional().default(0),
+  // Up to 2 decimal places (e.g. 45.25) — rounded server-side so a client
+  // can't sneak in more precision than the UI exposes.
+  progressPct: z
+    .number()
+    .min(0)
+    .max(100)
+    .optional()
+    .default(0)
+    .transform((v) => Math.round(v * 100) / 100),
 });
 
 router.post("/", async (req, res) => {
@@ -279,7 +297,12 @@ const updateSchema = z.object({
   remarks: z.string().max(4000).optional(),
   ownerName: z.string().max(200).optional(),
   status: statusEnum.optional(),
-  progressPct: z.number().int().min(0).max(100).optional(),
+  progressPct: z
+    .number()
+    .min(0)
+    .max(100)
+    .optional()
+    .transform((v) => (v === undefined ? v : Math.round(v * 100) / 100)),
 });
 
 router.put("/:id", async (req, res) => {

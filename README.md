@@ -134,13 +134,18 @@ real data — the app starts completely empty.
   remarks fields —
   `revenueRemarks`, `collectionsRemarks`, `expensesRemarks` — instead of one
   shared remarks field. A `Rock` belongs to a Company + Year + Quarter,
-  optionally tags a `BusinessGoal`, has its own `remarks` field, and carries
+  optionally tags a `BusinessGoal`, has its own `remarks` field (plus a
+  `description` field, labeled "Target(s)" in the UI — the underlying field
+  name didn't change, just what the person filling it out sees), and carries
   `status` (`PENDING` / `ON_TRACK` / `AT_RISK` / `TARGET_MET`) and
-  `progressPct` (0-100) that get updated over time like a project tracker. A
+  `progressPct` (0-100, a `Float` so it can be entered to 2 decimal places,
+  e.g. 45.25) that get updated over time like a project tracker. A
   `BusinessGoal` with no `BusinessGoalBusinessUnit` rows is global (usable by
   any Rock); assigning it to specific Business Units narrows which Rocks can
   tag it, mirroring the same opt-in scoping pattern used for Group
-  Integrators.
+  Integrators. A Rock that's still `PENDING`/`ON_TRACK` once its own Quarter
+  is more than 60 days old is automatically flagged `AT_RISK` on read (see
+  `server/src/utils/rockAutoStatus.ts`) — see the dedicated bullet below.
 - **Roles**:
   - `SUPERADMIN` — always global. Full system access, including user/company/BU
     management and SMTP settings.
@@ -862,3 +867,72 @@ edit) does not show the Target Locks panel at all, and if they somehow call
 the lock/unlock API directly they get a 403; Admin → Audit Log shows a
 `TARGET_LOCK` entry when locking and a `TARGET_UNLOCK` entry (with the
 reason in its metadata, visible when the row is expanded) when unlocking.
+
+**Revenue dashboard default filters, Rock "Target(s)" relabel, 2-decimal
+Rock progress, and auto-At-Risk escalation** (`client/src/components/
+FilterBar.tsx`, `client/src/pages/Dashboard.tsx`, `client/src/pages/
+Rocks.tsx`, `client/src/pages/Scorecard.tsx`, `client/src/utils/format.ts`,
+`Rock.progressPct` in `schema.prisma`, `server/src/routes/rocks.ts`,
+`server/src/routes/scorecard.ts`, and a new `server/src/utils/
+rockAutoStatus.ts`) needs a fresh `npm run prisma:migrate` to widen
+`progressPct` from `INTEGER` to `DOUBLE PRECISION` (purely additive — every
+existing whole-number value casts cleanly, no data loss). Four small,
+independent changes:
+1. The Revenue dashboard already defaulted Year/Quarter to the real current
+   calendar quarter and Business Unit/Company to "all" for a Group
+   Integrator/Superadmin (a BU Integrator still defaults to their first
+   assigned Business Unit, since "all" isn't a real option for that role) —
+   `FilterBar.tsx`'s effect just didn't carry the real current quarter
+   number into its fallback branch (today's real Year not existing yet in
+   the system). Fixed so that fallback still uses the real current quarter
+   number instead of leaving whatever quarter happened to be in the
+   component's initial state.
+2. The Rock form's "Description (optional)" label now reads "Target(s)
+   (optional)" — purely a label change; the field is still `description`
+   under the hood (`Rocks.tsx`), so no schema/API change was needed.
+3. `progressPct` now accepts up to 2 decimal places (e.g. 45.25%) instead of
+   only whole numbers — the zod schemas in `routes/rocks.ts` dropped `.int()`
+   and round to 2dp server-side via `.transform()` regardless of what a
+   client sends; both the Add/Edit Rock form and the inline table input
+   in `Rocks.tsx` got `step="0.01"`; a new `formatProgressPct` helper in
+   `utils/format.ts` rounds to 2dp and trims trailing zeros for display
+   (`45%` stays `45%`, `45.25%` shows in full) in both `Rocks.tsx` and
+   `Scorecard.tsx`'s "Needs Attention" list. `progressPct` is a Prisma
+   `Float` rather than `Decimal` specifically so Prisma Client keeps
+   returning a plain JS `number` here — a `Decimal` column would come back
+   as a `Decimal.js` object and silently break the existing `+`/`-`/
+   `Math.round` arithmetic on this field throughout the app.
+4. **Auto-At-Risk escalation** (`server/src/utils/rockAutoStatus.ts`,
+   called from both `GET /api/rocks` and `GET /api/scorecard`): a Rock
+   that's still `PENDING` or `ON_TRACK` once its own Quarter started more
+   than 60 days ago is automatically flagged `AT_RISK`. This runs inline on
+   every read rather than on a schedule (the app has no background job
+   runner), so it's at most one page-load stale, and covers every Quarter
+   in the Year being viewed, not just whichever Quarter is currently
+   filtered on. It's a continuously-enforced rule, not a one-time nudge:
+   nothing disables the Status dropdown, so a Group/BU Integrator can
+   freely re-edit the status afterward (including straight back to
+   `ON_TRACK`), but as long as the Rock stays incomplete past the 60-day
+   mark, the next read re-asserts `AT_RISK` — the only thing that actually
+   clears it for good is marking the Rock `TARGET_MET`, since that status is
+   excluded from the check entirely. Each escalation writes one
+   `ROCK_AUTO_AT_RISK` Audit Log entry (metadata lists the affected Rock
+   ids) with no attributed user, the same "system action" pattern already
+   used for `LOGIN_FAILED`/`LOGIN_LOCKED` entries. Status badge colors were
+   also standardized across `Rocks.tsx` and `Scorecard.tsx`: Orange =
+   Pending, Blue = On Track, Red = At Risk, Green = Target Met.
+
+This is unverified end-to-end. Worth checking by hand: opening the Revenue
+dashboard with no filters previously set lands on the real current Year and
+Quarter with Business Unit/Company both on "All" (for a Group Integrator/
+Superadmin); the Rock form shows "Target(s) (optional)" where "Description
+(optional)" used to be; entering `33.33` into a Rock's Progress % field and
+saving keeps `33.33` (not rounded to `33`); creating a Rock dated more than
+60 days into a past Quarter with status left at "Pending" shows as "At Risk"
+(orange no longer) the next time the Rocks page loads, and the Audit Log
+shows a `ROCK_AUTO_AT_RISK` entry; manually switching that Rock back to "On
+Track" saves and displays correctly right away, confirming the field isn't
+locked; reloading the page without changing anything else re-flags it "At
+Risk" again, since the Rock is still incomplete past the 60-day mark;
+setting it to "Target Met" instead makes it stick, since Target Met Rocks
+are excluded from the check.

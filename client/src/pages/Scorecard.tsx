@@ -23,14 +23,15 @@ import {
 } from "recharts";
 import { api } from "../api/client";
 import { useAuth } from "../contexts/AuthContext";
-import { attainmentColor, formatCurrency, formatPct } from "../utils/format";
+import { attainmentColor, formatCurrency, formatPct, formatProgressPct } from "../utils/format";
 import type { BusinessUnit, ScorecardResponse, Year } from "../api/types";
 
+// Same Orange/Blue/Red/Green convention as the Rocks page.
 const STATUS_BADGE: Record<string, string> = {
-  PENDING: "bg-slate-100 text-slate-600",
-  ON_TRACK: "bg-emerald-50 text-emerald-700",
+  PENDING: "bg-orange-50 text-orange-700",
+  ON_TRACK: "bg-blue-50 text-blue-700",
   AT_RISK: "bg-red-50 text-red-700",
-  TARGET_MET: "bg-brand-50 text-brand-700",
+  TARGET_MET: "bg-green-50 text-green-700",
 };
 const STATUS_LABELS: Record<string, string> = {
   PENDING: "Pending",
@@ -494,7 +495,7 @@ export default function Scorecard() {
                           <div className="h-1.5 w-16 overflow-hidden rounded-full bg-slate-100">
                             <div className="h-full rounded-full bg-red-500" style={{ width: `${Math.min(100, r.progressPct)}%` }} />
                           </div>
-                          <span className="text-xs font-semibold text-slate-600">{r.progressPct}%</span>
+                          <span className="text-xs font-semibold text-slate-600">{formatProgressPct(r.progressPct)}</span>
                         </div>
                       </div>
                     </div>

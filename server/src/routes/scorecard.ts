@@ -3,6 +3,7 @@ import { prisma } from "../lib/prisma";
 import { blockPendingPasswordChange, loadUserPermissions, requireAuth, scopedBusinessUnitFilter } from "../middleware/auth";
 import { can, canAnyOf, FINANCIAL_RESOURCES } from "../utils/permissions";
 import { addFigures, collectionsTotal, emptyFigures, expensesTotal, Figures, pct, revenueTotal, toFigures } from "../utils/aggregate";
+import { escalateStaleRocks } from "../utils/rockAutoStatus";
 
 const router = Router();
 router.use(requireAuth);
@@ -242,6 +243,15 @@ router.get("/", async (req, res) => {
 
   // ---------- Rocks Performance Summary ----------
   const rockCompanyIds = rockCompanies.map((c) => c.id);
+
+  // Same auto-escalation as GET /api/rocks (see utils/rockAutoStatus.ts) —
+  // covers the whole Year in scope, not just the currently-selected Quarter,
+  // so the Scorecard never shows a stale PENDING/ON_TRACK Rock that GET
+  // /api/rocks would already have flagged AT_RISK.
+  if (rockCompanyIds.length) {
+    await escalateStaleRocks({ yearId, companyId: { in: rockCompanyIds } });
+  }
+
   const rockWhere: any = { yearId };
   if (!isAllQuarters) rockWhere.quarter = quarter;
   if (rockCompanyIds.length) rockWhere.companyId = { in: rockCompanyIds };
