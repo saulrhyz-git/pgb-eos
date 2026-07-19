@@ -1,3 +1,4 @@
+import { Prisma } from "@prisma/client";
 import { prisma } from "../lib/prisma";
 import { AuthUser } from "../middleware/auth";
 
@@ -31,7 +32,13 @@ export async function logAudit(params: {
         entityType: params.entityType,
         entityId: params.entityId ?? null,
         summary: params.summary,
-        metadata: params.metadata ?? undefined,
+        // Prisma's Json input type doesn't structurally accept
+        // Record<string, unknown> (its recursive JsonValue type disallows
+        // `unknown`) — this cast is safe since metadata is always a plain
+        // JSON-serializable object built by callers (numbers, strings,
+        // arrays, nested plain objects), never a class instance or
+        // anything with `unknown`-typed values at runtime.
+        metadata: params.metadata ? (params.metadata as Prisma.InputJsonValue) : undefined,
       },
     });
   } catch (err) {
