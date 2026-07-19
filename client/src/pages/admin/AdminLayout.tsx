@@ -3,7 +3,7 @@ import { Users, Building2, Briefcase, Mail, ShieldCheck, ScrollText } from "luci
 
 export default function AdminLayout() {
   const tabClass = ({ isActive }: { isActive: boolean }) =>
-    `flex items-center gap-2 rounded-md px-3 py-2 text-sm font-medium transition-colors ${
+    `flex items-center gap-1.5 rounded-md px-2.5 py-2 text-xs font-medium transition-colors sm:gap-2 sm:px-3 sm:text-sm ${
       isActive ? "bg-brand-500 text-white" : "text-slate-600 hover:bg-slate-100"
     }`;
 
@@ -13,7 +13,7 @@ export default function AdminLayout() {
         <h2 className="mb-1 text-lg font-semibold text-slate-800">Superadmin</h2>
         <p className="text-sm text-slate-500">Manage users, companies, business units, and system settings.</p>
       </div>
-      <nav className="flex flex-wrap gap-2 border-b border-slate-200 pb-4">
+      <nav className="flex flex-wrap gap-1.5 border-b border-slate-200 pb-4 sm:gap-2">
         <NavLink to="/admin/users" className={tabClass}>
           <Users className="h-4 w-4" /> Users
         </NavLink>

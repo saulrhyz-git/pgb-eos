@@ -42,8 +42,8 @@ export default function Login() {
   const isLocked = lockedSeconds > 0;
 
   return (
-    <div className="flex min-h-screen items-center justify-center bg-slate-50">
-      <div className="w-full max-w-sm rounded-xl border border-slate-200 bg-white p-8 shadow-sm">
+    <div className="flex min-h-screen items-center justify-center bg-slate-50 px-4 py-8">
+      <div className="w-full max-w-sm rounded-xl border border-slate-200 bg-white p-6 shadow-sm sm:p-8">
         <div className="mb-6 flex flex-col items-center gap-3">
           <div className="flex items-center gap-4">
             <img src="/PGB_logo_f.png" alt="Primary Group of Builders" className="h-8 w-auto" />

@@ -116,80 +116,82 @@ export default function AdminAuditLog() {
         </div>
       </div>
 
-      <div className="flex flex-wrap items-end gap-3 rounded-lg border border-slate-200 bg-white p-3 shadow-sm">
-        <div className="flex flex-col gap-1">
-          <label className="text-xs font-medium text-slate-500">Search</label>
-          <input
-            type="text"
-            placeholder="Summary, user name, or email"
-            className="min-w-[220px] rounded-md border border-slate-300 px-3 py-1.5 text-sm"
-            value={q}
-            onChange={(e) => resetToFirstPage(setQ)(e.target.value)}
-          />
+      <div className="rounded-lg border border-slate-200 bg-white p-3 shadow-sm">
+        <div className="grid grid-cols-2 gap-3 sm:flex sm:flex-wrap sm:items-end">
+          <div className="col-span-2 flex flex-col gap-1 sm:col-span-1">
+            <label className="text-xs font-medium text-slate-500">Search</label>
+            <input
+              type="text"
+              placeholder="Summary, user name, or email"
+              className="w-full rounded-md border border-slate-300 px-3 py-1.5 text-sm sm:min-w-[220px]"
+              value={q}
+              onChange={(e) => resetToFirstPage(setQ)(e.target.value)}
+            />
+          </div>
+          <div className="flex flex-col gap-1">
+            <label className="text-xs font-medium text-slate-500">Action</label>
+            <select
+              className="w-full rounded-md border border-slate-300 px-3 py-1.5 text-sm"
+              value={action}
+              onChange={(e) => resetToFirstPage(setAction)(e.target.value)}
+            >
+              <option value="">All actions</option>
+              {actions.map((a) => (
+                <option key={a} value={a}>
+                  {a}
+                </option>
+              ))}
+            </select>
+          </div>
+          <div className="flex flex-col gap-1">
+            <label className="text-xs font-medium text-slate-500">Entity type</label>
+            <select
+              className="w-full rounded-md border border-slate-300 px-3 py-1.5 text-sm"
+              value={entityType}
+              onChange={(e) => resetToFirstPage(setEntityType)(e.target.value)}
+            >
+              <option value="">All types</option>
+              {entityTypes.map((t) => (
+                <option key={t} value={t}>
+                  {t}
+                </option>
+              ))}
+            </select>
+          </div>
+          <div className="flex flex-col gap-1">
+            <label className="text-xs font-medium text-slate-500">From</label>
+            <input
+              type="date"
+              className="w-full rounded-md border border-slate-300 px-3 py-1.5 text-sm"
+              value={from}
+              onChange={(e) => resetToFirstPage(setFrom)(e.target.value)}
+            />
+          </div>
+          <div className="flex flex-col gap-1">
+            <label className="text-xs font-medium text-slate-500">To</label>
+            <input
+              type="date"
+              className="w-full rounded-md border border-slate-300 px-3 py-1.5 text-sm"
+              value={to}
+              onChange={(e) => resetToFirstPage(setTo)(e.target.value)}
+            />
+          </div>
+          {(action || entityType || q || from || to) && (
+            <button
+              className="col-span-2 rounded-md px-3 py-1.5 text-sm font-medium text-slate-500 hover:bg-slate-100 sm:col-span-1"
+              onClick={() => {
+                setAction("");
+                setEntityType("");
+                setQ("");
+                setFrom("");
+                setTo("");
+                setPage(1);
+              }}
+            >
+              Clear filters
+            </button>
+          )}
         </div>
-        <div className="flex flex-col gap-1">
-          <label className="text-xs font-medium text-slate-500">Action</label>
-          <select
-            className="rounded-md border border-slate-300 px-3 py-1.5 text-sm"
-            value={action}
-            onChange={(e) => resetToFirstPage(setAction)(e.target.value)}
-          >
-            <option value="">All actions</option>
-            {actions.map((a) => (
-              <option key={a} value={a}>
-                {a}
-              </option>
-            ))}
-          </select>
-        </div>
-        <div className="flex flex-col gap-1">
-          <label className="text-xs font-medium text-slate-500">Entity type</label>
-          <select
-            className="rounded-md border border-slate-300 px-3 py-1.5 text-sm"
-            value={entityType}
-            onChange={(e) => resetToFirstPage(setEntityType)(e.target.value)}
-          >
-            <option value="">All types</option>
-            {entityTypes.map((t) => (
-              <option key={t} value={t}>
-                {t}
-              </option>
-            ))}
-          </select>
-        </div>
-        <div className="flex flex-col gap-1">
-          <label className="text-xs font-medium text-slate-500">From</label>
-          <input
-            type="date"
-            className="rounded-md border border-slate-300 px-3 py-1.5 text-sm"
-            value={from}
-            onChange={(e) => resetToFirstPage(setFrom)(e.target.value)}
-          />
-        </div>
-        <div className="flex flex-col gap-1">
-          <label className="text-xs font-medium text-slate-500">To</label>
-          <input
-            type="date"
-            className="rounded-md border border-slate-300 px-3 py-1.5 text-sm"
-            value={to}
-            onChange={(e) => resetToFirstPage(setTo)(e.target.value)}
-          />
-        </div>
-        {(action || entityType || q || from || to) && (
-          <button
-            className="rounded-md px-3 py-1.5 text-sm font-medium text-slate-500 hover:bg-slate-100"
-            onClick={() => {
-              setAction("");
-              setEntityType("");
-              setQ("");
-              setFrom("");
-              setTo("");
-              setPage(1);
-            }}
-          >
-            Clear filters
-          </button>
-        )}
       </div>
 
       {error && <div className="rounded-md bg-red-50 px-4 py-3 text-sm text-red-600">{error}</div>}
@@ -247,7 +249,7 @@ export default function AdminAuditLog() {
             </tbody>
           </table>
         </div>
-        <div className="flex items-center justify-between border-t border-slate-200 px-4 py-3 text-sm text-slate-500">
+        <div className="flex flex-col gap-2 border-t border-slate-200 px-4 py-3 text-sm text-slate-500 sm:flex-row sm:items-center sm:justify-between">
           <span>
             {total === 0 ? "0 entries" : `Showing ${(page - 1) * PAGE_SIZE + 1}-${Math.min(page * PAGE_SIZE, total)} of ${total}`}
           </span>

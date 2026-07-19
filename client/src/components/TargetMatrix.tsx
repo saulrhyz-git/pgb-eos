@@ -17,7 +17,7 @@ const CATEGORIES: { key: "revenue" | "collections" | "expenses"; label: string; 
 
 export default function TargetMatrix({ rows }: Props) {
   return (
-    <div className="rounded-lg border border-slate-200 bg-white p-4 shadow-sm">
+    <div className="rounded-lg border border-slate-200 bg-white p-3 shadow-sm sm:p-4">
       <h3 className="mb-4 text-sm font-semibold text-slate-700">Target Distribution Matrix (Quarter targets per Business Unit)</h3>
       <div className="overflow-x-auto">
         <table className="w-full min-w-[640px] text-sm">

@@ -151,8 +151,8 @@ export default function IntegratorPortal() {
           : "You can enter or override figures for any company."}
       </p>
 
-      <form onSubmit={handleSubmit} className="flex flex-col gap-6 rounded-lg border border-slate-200 bg-white p-6 shadow-sm">
-        <div className="grid grid-cols-2 gap-4 sm:grid-cols-4">
+      <form onSubmit={handleSubmit} className="flex flex-col gap-6 rounded-lg border border-slate-200 bg-white p-4 shadow-sm sm:p-6">
+        <div className="grid grid-cols-1 gap-4 xs:grid-cols-2 sm:grid-cols-4">
           <div className="flex flex-col gap-1">
             <label className="text-xs font-medium text-slate-500">Year</label>
             <select className="rounded-md border border-slate-300 px-3 py-2 text-sm" value={yearId} onChange={(e) => setYearId(e.target.value)}>
@@ -201,9 +201,9 @@ export default function IntegratorPortal() {
 
         <div className="grid grid-cols-1 gap-4">
           {FIELD_GROUPS.map((group) => (
-            <div key={group.title} className="rounded-md border border-slate-100 bg-slate-50/60 p-4">
+            <div key={group.title} className="rounded-md border border-slate-100 bg-slate-50/60 p-3 sm:p-4">
               <div className="mb-2 text-sm font-semibold text-slate-700">{group.title}</div>
-              <div className="grid grid-cols-2 gap-4">
+              <div className="grid grid-cols-1 gap-4 xs:grid-cols-2">
                 <div className="flex flex-col gap-1">
                   <label className="text-xs font-medium text-slate-500">Internal</label>
                   <input

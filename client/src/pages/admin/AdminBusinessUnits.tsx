@@ -61,7 +61,7 @@ export default function AdminBusinessUnits() {
         <h3 className="text-base font-semibold text-slate-800">Business Units</h3>
       </div>
 
-      <form onSubmit={handleAdd} className="flex gap-2 rounded-lg border border-slate-200 bg-white p-4 shadow-sm">
+      <form onSubmit={handleAdd} className="flex flex-col gap-2 rounded-lg border border-slate-200 bg-white p-4 shadow-sm xs:flex-row">
         <input
           className="w-full max-w-xs rounded-md border border-slate-300 px-3 py-2 text-sm"
           placeholder="e.g. Retail"
@@ -76,7 +76,8 @@ export default function AdminBusinessUnits() {
       {error && <div className="rounded-md bg-red-50 px-3 py-2 text-sm text-red-600">{error}</div>}
 
       <div className="overflow-hidden rounded-lg border border-slate-200 bg-white shadow-sm">
-        <table className="w-full text-sm">
+        <div className="overflow-x-auto">
+        <table className="w-full min-w-[480px] text-sm">
           <thead className="bg-slate-50 text-left text-xs font-semibold uppercase text-slate-500">
             <tr>
               <th className="px-4 py-3">Name</th>
@@ -138,6 +139,7 @@ export default function AdminBusinessUnits() {
             )}
           </tbody>
         </table>
+        </div>
       </div>
     </div>
   );

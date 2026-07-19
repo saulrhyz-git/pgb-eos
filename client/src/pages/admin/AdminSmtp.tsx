@@ -86,7 +86,7 @@ export default function AdminSmtp() {
         <p className="text-sm text-slate-500">Used to send email notifications from the dashboard.</p>
       </div>
 
-      <form onSubmit={handleSubmit} className="flex flex-col gap-4 rounded-lg border border-slate-200 bg-white p-6 shadow-sm">
+      <form onSubmit={handleSubmit} className="flex flex-col gap-4 rounded-lg border border-slate-200 bg-white p-4 shadow-sm sm:p-6">
         <div className="grid grid-cols-1 gap-4 sm:grid-cols-2">
           <div className="flex flex-col gap-1">
             <label className="text-xs font-medium text-slate-500">SMTP Host</label>
@@ -174,20 +174,20 @@ export default function AdminSmtp() {
         </button>
       </form>
 
-      <div className="flex flex-col gap-3 rounded-lg border border-slate-200 bg-white p-6 shadow-sm">
+      <div className="flex flex-col gap-3 rounded-lg border border-slate-200 bg-white p-4 shadow-sm sm:p-6">
         <div className="text-sm font-semibold text-slate-700">Send a test email</div>
-        <div className="flex gap-2">
+        <div className="flex flex-col gap-2 xs:flex-row">
           <input
             type="email"
             placeholder="you@example.com"
-            className="w-full max-w-xs rounded-md border border-slate-300 px-3 py-2 text-sm"
+            className="w-full rounded-md border border-slate-300 px-3 py-2 text-sm xs:max-w-xs"
             value={testTo}
             onChange={(e) => setTestTo(e.target.value)}
           />
           <button
             onClick={handleTest}
             disabled={testing || !testTo.trim()}
-            className="flex items-center gap-2 rounded-md bg-slate-800 px-4 py-2 text-sm font-medium text-white hover:bg-slate-900 disabled:opacity-50"
+            className="flex items-center justify-center gap-2 rounded-md bg-slate-800 px-4 py-2 text-sm font-medium text-white hover:bg-slate-900 disabled:opacity-50"
           >
             <Send className="h-4 w-4" /> {testing ? "Sending..." : "Send Test"}
           </button>

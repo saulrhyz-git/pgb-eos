@@ -37,8 +37,8 @@ export default function ChangePassword() {
   }
 
   return (
-    <div className="flex min-h-screen items-center justify-center bg-slate-50">
-      <div className="w-full max-w-sm rounded-xl border border-slate-200 bg-white p-8 shadow-sm">
+    <div className="flex min-h-screen items-center justify-center bg-slate-50 px-4 py-8">
+      <div className="w-full max-w-sm rounded-xl border border-slate-200 bg-white p-6 shadow-sm sm:p-8">
         <div className="mb-2 flex items-center gap-2">
           <KeyRound className="h-7 w-7 text-brand-600" />
           <span className="text-xl font-semibold text-slate-800">Set a new password</span>

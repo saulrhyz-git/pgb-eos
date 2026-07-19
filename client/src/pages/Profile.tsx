@@ -79,7 +79,7 @@ export default function Profile() {
         <p className="text-sm text-slate-500">Update your account details or change your password.</p>
       </div>
 
-      <div className="flex items-start gap-4 rounded-lg border border-slate-200 bg-white p-6 shadow-sm">
+      <div className="flex items-start gap-4 rounded-lg border border-slate-200 bg-white p-4 shadow-sm sm:p-6">
         <UserCircle className="h-10 w-10 shrink-0 text-brand-500" />
         <div className="flex flex-col gap-1">
           <div className="text-sm font-semibold text-slate-800">
@@ -95,7 +95,7 @@ export default function Profile() {
         </div>
       </div>
 
-      <form onSubmit={handleSaveProfile} className="flex flex-col gap-4 rounded-lg border border-slate-200 bg-white p-6 shadow-sm">
+      <form onSubmit={handleSaveProfile} className="flex flex-col gap-4 rounded-lg border border-slate-200 bg-white p-4 shadow-sm sm:p-6">
         <div className="text-sm font-semibold text-slate-700">Account details</div>
         <div className="grid grid-cols-1 gap-4 sm:grid-cols-2">
           <div className="flex flex-col gap-1">
@@ -139,7 +139,7 @@ export default function Profile() {
         </button>
       </form>
 
-      <form onSubmit={handleChangePassword} className="flex flex-col gap-4 rounded-lg border border-slate-200 bg-white p-6 shadow-sm">
+      <form onSubmit={handleChangePassword} className="flex flex-col gap-4 rounded-lg border border-slate-200 bg-white p-4 shadow-sm sm:p-6">
         <div className="text-sm font-semibold text-slate-700">Change password</div>
         <div className="grid grid-cols-1 gap-4 sm:grid-cols-3">
           <div className="flex flex-col gap-1">

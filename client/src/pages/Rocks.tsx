@@ -387,85 +387,87 @@ export default function Rocks() {
         </p>
       </div>
 
-      <div className="flex flex-wrap items-end gap-4 rounded-lg border border-slate-200 bg-white p-4 shadow-sm">
-        <div className="flex flex-col gap-1">
-          <label className="text-xs font-medium text-slate-500">Year</label>
-          <select
-            className="rounded-md border border-slate-300 px-3 py-1.5 text-sm"
-            value={yearId}
-            onChange={(e) => setYearId(e.target.value)}
-          >
-            {years.map((y) => (
-              <option key={y.id} value={y.id}>
-                {y.year}
-              </option>
-            ))}
-          </select>
+      <div className="flex flex-col gap-4 rounded-lg border border-slate-200 bg-white p-4 shadow-sm">
+        <div className="grid grid-cols-2 gap-3 sm:flex sm:flex-wrap sm:items-end sm:gap-4">
+          <div className="flex flex-col gap-1">
+            <label className="text-xs font-medium text-slate-500">Year</label>
+            <select
+              className="w-full rounded-md border border-slate-300 px-3 py-1.5 text-sm sm:w-auto"
+              value={yearId}
+              onChange={(e) => setYearId(e.target.value)}
+            >
+              {years.map((y) => (
+                <option key={y.id} value={y.id}>
+                  {y.year}
+                </option>
+              ))}
+            </select>
+          </div>
+          <div className="flex flex-col gap-1">
+            <label className="text-xs font-medium text-slate-500">Quarter</label>
+            <select
+              className="w-full rounded-md border border-slate-300 px-3 py-1.5 text-sm sm:w-auto"
+              value={quarter}
+              onChange={(e) => setQuarter(Number(e.target.value))}
+            >
+              <option value={0}>All Quarters</option>
+              {[1, 2, 3, 4].map((q) => (
+                <option key={q} value={q}>
+                  Q{q}
+                </option>
+              ))}
+            </select>
+          </div>
+          <div className="col-span-2 flex flex-col gap-1 sm:col-span-1">
+            <label className="text-xs font-medium text-slate-500">Business Unit</label>
+            <select
+              className="w-full rounded-md border border-slate-300 px-3 py-1.5 text-sm sm:min-w-[180px]"
+              value={businessUnitId}
+              onChange={(e) => {
+                setBusinessUnitId(e.target.value);
+                setCompanyId("");
+              }}
+            >
+              {canSeeAllBUs && <option value="">All Business Units</option>}
+              {businessUnits.map((bu) => (
+                <option key={bu.id} value={bu.id}>
+                  {bu.name}
+                </option>
+              ))}
+            </select>
+          </div>
+          <div className="col-span-2 flex flex-col gap-1 sm:col-span-1">
+            <label className="text-xs font-medium text-slate-500">Company</label>
+            <select
+              className="w-full rounded-md border border-slate-300 px-3 py-1.5 text-sm sm:min-w-[180px]"
+              value={companyId}
+              onChange={(e) => setCompanyId(e.target.value)}
+            >
+              <option value="">All Companies</option>
+              {companies.map((c) => (
+                <option key={c.id} value={c.id}>
+                  {c.name}
+                </option>
+              ))}
+            </select>
+          </div>
+          <div className="col-span-2 flex flex-col gap-1 sm:col-span-1">
+            <label className="text-xs font-medium text-slate-500">Business Goal</label>
+            <select
+              className="w-full rounded-md border border-slate-300 px-3 py-1.5 text-sm sm:min-w-[180px]"
+              value={businessGoalId}
+              onChange={(e) => setBusinessGoalId(e.target.value)}
+            >
+              <option value="">All Business Goals</option>
+              {businessGoals.map((g) => (
+                <option key={g.id} value={g.id}>
+                  {g.name}
+                </option>
+              ))}
+            </select>
+          </div>
         </div>
-        <div className="flex flex-col gap-1">
-          <label className="text-xs font-medium text-slate-500">Quarter</label>
-          <select
-            className="rounded-md border border-slate-300 px-3 py-1.5 text-sm"
-            value={quarter}
-            onChange={(e) => setQuarter(Number(e.target.value))}
-          >
-            <option value={0}>All Quarters</option>
-            {[1, 2, 3, 4].map((q) => (
-              <option key={q} value={q}>
-                Q{q}
-              </option>
-            ))}
-          </select>
-        </div>
-        <div className="flex flex-col gap-1">
-          <label className="text-xs font-medium text-slate-500">Business Unit</label>
-          <select
-            className="min-w-[180px] rounded-md border border-slate-300 px-3 py-1.5 text-sm"
-            value={businessUnitId}
-            onChange={(e) => {
-              setBusinessUnitId(e.target.value);
-              setCompanyId("");
-            }}
-          >
-            {canSeeAllBUs && <option value="">All Business Units</option>}
-            {businessUnits.map((bu) => (
-              <option key={bu.id} value={bu.id}>
-                {bu.name}
-              </option>
-            ))}
-          </select>
-        </div>
-        <div className="flex flex-col gap-1">
-          <label className="text-xs font-medium text-slate-500">Company</label>
-          <select
-            className="min-w-[180px] rounded-md border border-slate-300 px-3 py-1.5 text-sm"
-            value={companyId}
-            onChange={(e) => setCompanyId(e.target.value)}
-          >
-            <option value="">All Companies</option>
-            {companies.map((c) => (
-              <option key={c.id} value={c.id}>
-                {c.name}
-              </option>
-            ))}
-          </select>
-        </div>
-        <div className="flex flex-col gap-1">
-          <label className="text-xs font-medium text-slate-500">Business Goal</label>
-          <select
-            className="min-w-[180px] rounded-md border border-slate-300 px-3 py-1.5 text-sm"
-            value={businessGoalId}
-            onChange={(e) => setBusinessGoalId(e.target.value)}
-          >
-            <option value="">All Business Goals</option>
-            {businessGoals.map((g) => (
-              <option key={g.id} value={g.id}>
-                {g.name}
-              </option>
-            ))}
-          </select>
-        </div>
-        <div className="ml-auto flex items-center gap-2">
+        <div className="flex flex-col gap-2 xs:flex-row sm:justify-end">
           {canManageStructure && (
             <button
               onClick={handleRollover}
@@ -475,7 +477,7 @@ export default function Rocks() {
                   ? "Select a specific Quarter (not All Quarters) to roll over"
                   : "Carry every incomplete Rock in this scope forward to the next quarter"
               }
-              className="flex items-center gap-2 rounded-md border border-slate-300 bg-white px-3 py-2 text-sm font-medium text-slate-700 hover:bg-slate-50 disabled:cursor-not-allowed disabled:opacity-50"
+              className="flex items-center justify-center gap-2 rounded-md border border-slate-300 bg-white px-3 py-2 text-sm font-medium text-slate-700 hover:bg-slate-50 disabled:cursor-not-allowed disabled:opacity-50"
             >
               {rollingOver ? <Loader2 className="h-4 w-4 animate-spin" /> : <SkipForward className="h-4 w-4" />}
               {rollingOver ? "Rolling over..." : "Rollover"}
@@ -483,7 +485,7 @@ export default function Rocks() {
           )}
           <button
             onClick={startAddRock}
-            className="flex items-center gap-2 rounded-md bg-brand-500 px-3 py-2 text-sm font-medium text-white hover:bg-brand-600"
+            className="flex items-center justify-center gap-2 rounded-md bg-brand-500 px-3 py-2 text-sm font-medium text-white hover:bg-brand-600"
           >
             <Plus className="h-4 w-4" /> Add Rock
           </button>
@@ -594,7 +596,7 @@ export default function Rocks() {
       )}
 
       {showRockForm && (
-        <form onSubmit={handleRockSubmit} className="flex flex-col gap-4 rounded-lg border border-slate-200 bg-white p-6 shadow-sm">
+        <form onSubmit={handleRockSubmit} className="flex flex-col gap-4 rounded-lg border border-slate-200 bg-white p-4 shadow-sm sm:p-6">
           <div className="flex items-center justify-between">
             <div className="text-sm font-semibold text-slate-700">{rockForm.id ? "Edit Rock" : "New Rock"}</div>
             <button type="button" onClick={() => setShowRockForm(false)} className="text-slate-500 hover:text-slate-600">

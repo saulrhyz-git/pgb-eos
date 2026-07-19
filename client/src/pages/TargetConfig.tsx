@@ -73,8 +73,8 @@ function FigureFieldsEditor({
       {FIELD_GROUPS.map((group) => {
         const isCombined = fieldModes[group.title] !== "split";
         return (
-          <div key={group.title} className="rounded-md border border-slate-100 bg-slate-50/60 p-4">
-            <div className="mb-2 flex items-center justify-between">
+          <div key={group.title} className="rounded-md border border-slate-100 bg-slate-50/60 p-3 sm:p-4">
+            <div className="mb-2 flex flex-wrap items-center justify-between gap-2">
               <div className="text-sm font-semibold text-slate-700">{group.title}</div>
               <div className="flex rounded-md border border-slate-200 p-0.5 text-[11px]">
                 <button
@@ -113,7 +113,7 @@ function FigureFieldsEditor({
                 />
               </div>
             ) : (
-              <div className="grid grid-cols-2 gap-4">
+              <div className="grid grid-cols-1 gap-4 xs:grid-cols-2">
                 <div className="flex flex-col gap-1">
                   <label className="text-xs font-medium text-slate-500">Internal</label>
                   <input
@@ -528,11 +528,11 @@ export default function TargetConfig() {
         </div>
       )}
 
-      <div className="flex flex-col gap-6 rounded-lg border border-slate-200 bg-white p-6 shadow-sm">
+      <div className="flex flex-col gap-6 rounded-lg border border-slate-200 bg-white p-4 shadow-sm sm:p-6">
         <div className="grid grid-cols-2 gap-4 sm:grid-cols-4">
           <div className="flex flex-col gap-1">
             <label className="text-xs font-medium text-slate-500">Year</label>
-            <select className="rounded-md border border-slate-300 px-3 py-2 text-sm" value={yearId} onChange={(e) => setYearId(e.target.value)}>
+            <select className="w-full rounded-md border border-slate-300 px-3 py-2 text-sm" value={yearId} onChange={(e) => setYearId(e.target.value)}>
               {years.map((y) => (
                 <option key={y.id} value={y.id}>
                   {y.year}
@@ -543,7 +543,7 @@ export default function TargetConfig() {
           <div className="flex flex-col gap-1">
             <label className="text-xs font-medium text-slate-500">Business Unit</label>
             <select
-              className="rounded-md border border-slate-300 px-3 py-2 text-sm"
+              className="w-full rounded-md border border-slate-300 px-3 py-2 text-sm"
               value={businessUnitId}
               onChange={(e) => setBusinessUnitId(e.target.value)}
             >
@@ -554,9 +554,9 @@ export default function TargetConfig() {
               ))}
             </select>
           </div>
-          <div className="flex flex-col gap-1 sm:col-span-2">
+          <div className="col-span-2 flex flex-col gap-1">
             <label className="text-xs font-medium text-slate-500">Company</label>
-            <select className="rounded-md border border-slate-300 px-3 py-2 text-sm" value={companyId} onChange={(e) => setCompanyId(e.target.value)}>
+            <select className="w-full rounded-md border border-slate-300 px-3 py-2 text-sm" value={companyId} onChange={(e) => setCompanyId(e.target.value)}>
               {companies.map((c) => (
                 <option key={c.id} value={c.id}>
                   {c.name}
@@ -621,14 +621,14 @@ export default function TargetConfig() {
           <button
             type="button"
             onClick={() => setMode("quarter")}
-            className={`rounded px-3 py-1.5 font-medium ${mode === "quarter" ? "bg-brand-500 text-white" : "text-slate-500"}`}
+            className={`flex-1 rounded px-3 py-1.5 font-medium sm:flex-none ${mode === "quarter" ? "bg-brand-500 text-white" : "text-slate-500"}`}
           >
             Set by Quarter
           </button>
           <button
             type="button"
             onClick={() => setMode("annual")}
-            className={`rounded px-3 py-1.5 font-medium ${mode === "annual" ? "bg-brand-500 text-white" : "text-slate-500"}`}
+            className={`flex-1 rounded px-3 py-1.5 font-medium sm:flex-none ${mode === "annual" ? "bg-brand-500 text-white" : "text-slate-500"}`}
           >
             Set Annual Target
           </button>
@@ -639,7 +639,7 @@ export default function TargetConfig() {
             <div className="flex flex-col gap-1 sm:w-48">
               <label className="text-xs font-medium text-slate-500">Quarter</label>
               <select
-                className="rounded-md border border-slate-300 px-3 py-2 text-sm"
+                className="w-full rounded-md border border-slate-300 px-3 py-2 text-sm"
                 value={quarter}
                 onChange={(e) => setQuarter(Number(e.target.value))}
               >

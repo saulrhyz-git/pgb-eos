@@ -51,11 +51,11 @@ export default function FilterBar({ filters, onChange }: Props) {
   }, [filters.businessUnitId]);
 
   return (
-    <div className="flex flex-wrap items-end gap-4 rounded-lg border border-slate-200 bg-white p-4 shadow-sm">
+    <div className="grid grid-cols-2 gap-3 rounded-lg border border-slate-200 bg-white p-4 shadow-sm sm:flex sm:flex-wrap sm:items-end sm:gap-4">
       <div className="flex flex-col gap-1">
         <label className="text-xs font-medium text-slate-500">Year</label>
         <select
-          className="rounded-md border border-slate-300 px-3 py-1.5 text-sm"
+          className="w-full rounded-md border border-slate-300 px-3 py-1.5 text-sm sm:w-auto"
           value={filters.yearId}
           onChange={(e) => onChange({ ...filters, yearId: e.target.value })}
         >
@@ -70,7 +70,7 @@ export default function FilterBar({ filters, onChange }: Props) {
       <div className="flex flex-col gap-1">
         <label className="text-xs font-medium text-slate-500">Quarter</label>
         <select
-          className="rounded-md border border-slate-300 px-3 py-1.5 text-sm"
+          className="w-full rounded-md border border-slate-300 px-3 py-1.5 text-sm sm:w-auto"
           value={filters.quarter}
           onChange={(e) => onChange({ ...filters, quarter: Number(e.target.value) })}
         >
@@ -83,10 +83,10 @@ export default function FilterBar({ filters, onChange }: Props) {
         </select>
       </div>
 
-      <div className="flex flex-col gap-1">
+      <div className="col-span-2 flex flex-col gap-1 sm:col-span-1">
         <label className="text-xs font-medium text-slate-500">Business Unit</label>
         <select
-          className="rounded-md border border-slate-300 px-3 py-1.5 text-sm min-w-[180px]"
+          className="w-full rounded-md border border-slate-300 px-3 py-1.5 text-sm sm:min-w-[180px]"
           value={filters.businessUnitId}
           onChange={(e) => onChange({ ...filters, businessUnitId: e.target.value, companyId: "" })}
         >
@@ -99,10 +99,10 @@ export default function FilterBar({ filters, onChange }: Props) {
         </select>
       </div>
 
-      <div className="flex flex-col gap-1">
+      <div className="col-span-2 flex flex-col gap-1 sm:col-span-1">
         <label className="text-xs font-medium text-slate-500">Company</label>
         <select
-          className="rounded-md border border-slate-300 px-3 py-1.5 text-sm min-w-[180px]"
+          className="w-full rounded-md border border-slate-300 px-3 py-1.5 text-sm sm:min-w-[180px]"
           value={filters.companyId}
           onChange={(e) => onChange({ ...filters, companyId: e.target.value })}
         >

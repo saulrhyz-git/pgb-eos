@@ -131,7 +131,7 @@ export default function AdminUsers() {
 
   return (
     <div className="flex flex-col gap-6">
-      <div className="flex items-center justify-between">
+      <div className="flex flex-wrap items-center justify-between gap-2">
         <h3 className="text-base font-semibold text-slate-800">Users</h3>
         <button
           onClick={startCreate}
@@ -142,7 +142,7 @@ export default function AdminUsers() {
       </div>
 
       {showForm && (
-        <form onSubmit={handleSubmit} className="flex flex-col gap-4 rounded-lg border border-slate-200 bg-white p-6 shadow-sm">
+        <form onSubmit={handleSubmit} className="flex flex-col gap-4 rounded-lg border border-slate-200 bg-white p-4 shadow-sm sm:p-6">
           <div className="flex items-center justify-between">
             <div className="text-sm font-semibold text-slate-700">{form.id ? "Edit User" : "New User"}</div>
             <button type="button" onClick={() => setShowForm(false)} className="text-slate-500 hover:text-slate-600">
@@ -305,7 +305,8 @@ export default function AdminUsers() {
       )}
 
       <div className="overflow-hidden rounded-lg border border-slate-200 bg-white shadow-sm">
-        <table className="w-full text-sm">
+        <div className="overflow-x-auto">
+        <table className="w-full min-w-[960px] text-sm">
           <thead className="bg-slate-50 text-left text-xs font-semibold uppercase text-slate-500">
             <tr>
               <th className="px-4 py-3">Name</th>
@@ -381,6 +382,7 @@ export default function AdminUsers() {
             )}
           </tbody>
         </table>
+        </div>
       </div>
     </div>
   );

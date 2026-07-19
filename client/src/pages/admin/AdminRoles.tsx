@@ -208,7 +208,7 @@ export default function AdminRoles() {
 
   return (
     <div className="flex flex-col gap-6">
-      <div className="flex items-center justify-between">
+      <div className="flex flex-col items-start gap-3 sm:flex-row sm:items-center sm:justify-between">
         <div>
           <h3 className="text-base font-semibold text-slate-800">Custom Roles</h3>
           <p className="text-sm text-slate-500">
@@ -229,7 +229,7 @@ export default function AdminRoles() {
       </div>
 
       {showForm && (
-        <form onSubmit={handleSubmit} className="flex flex-col gap-5 rounded-lg border border-slate-200 bg-white p-6 shadow-sm">
+        <form onSubmit={handleSubmit} className="flex flex-col gap-5 rounded-lg border border-slate-200 bg-white p-4 shadow-sm sm:p-6">
           <div className="flex items-center justify-between">
             <div className="text-sm font-semibold text-slate-700">{form.id ? "Edit Role" : "New Role"}</div>
             <button type="button" onClick={() => setShowForm(false)} className="text-slate-500 hover:text-slate-600">
@@ -337,32 +337,34 @@ export default function AdminRoles() {
                       <Trash2 className="h-3.5 w-3.5" />
                     </button>
                   </div>
-                  <table className="w-full text-xs">
-                    <thead>
-                      <tr className="text-left text-slate-400">
-                        <th className="py-1 font-medium">Resource</th>
-                        <th className="py-1 text-center font-medium">View</th>
-                        <th className="py-1 text-center font-medium">Edit</th>
-                        <th className="py-1 text-center font-medium">Delete</th>
-                      </tr>
-                    </thead>
-                    <tbody>
-                      {RESOURCES.map((resource) => (
-                        <tr key={resource} className="border-t border-slate-100">
-                          <td className="py-1.5 text-slate-600">{RESOURCE_LABELS[resource]}</td>
-                          {(["canView", "canEdit", "canDelete"] as const).map((action) => (
-                            <td key={action} className="py-1.5 text-center">
-                              <input
-                                type="checkbox"
-                                checked={entry.grants[resource][action]}
-                                onChange={() => toggleGrant(entry.key, resource, action)}
-                              />
-                            </td>
-                          ))}
+                  <div className="overflow-x-auto">
+                    <table className="w-full min-w-[280px] text-xs">
+                      <thead>
+                        <tr className="text-left text-slate-400">
+                          <th className="py-1 font-medium">Resource</th>
+                          <th className="py-1 text-center font-medium">View</th>
+                          <th className="py-1 text-center font-medium">Edit</th>
+                          <th className="py-1 text-center font-medium">Delete</th>
                         </tr>
-                      ))}
-                    </tbody>
-                  </table>
+                      </thead>
+                      <tbody>
+                        {RESOURCES.map((resource) => (
+                          <tr key={resource} className="border-t border-slate-100">
+                            <td className="py-1.5 text-slate-600">{RESOURCE_LABELS[resource]}</td>
+                            {(["canView", "canEdit", "canDelete"] as const).map((action) => (
+                              <td key={action} className="py-1.5 text-center">
+                                <input
+                                  type="checkbox"
+                                  checked={entry.grants[resource][action]}
+                                  onChange={() => toggleGrant(entry.key, resource, action)}
+                                />
+                              </td>
+                            ))}
+                          </tr>
+                        ))}
+                      </tbody>
+                    </table>
+                  </div>
                 </div>
               ))}
             </div>
@@ -390,7 +392,8 @@ export default function AdminRoles() {
       )}
 
       <div className="overflow-hidden rounded-lg border border-slate-200 bg-white shadow-sm">
-        <table className="w-full text-sm">
+        <div className="overflow-x-auto">
+        <table className="w-full min-w-[560px] text-sm">
           <thead className="bg-slate-50 text-left text-xs font-semibold uppercase text-slate-500">
             <tr>
               <th className="px-4 py-3">Name</th>
@@ -438,6 +441,7 @@ export default function AdminRoles() {
             )}
           </tbody>
         </table>
+        </div>
       </div>
     </div>
   );

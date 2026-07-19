@@ -37,29 +37,29 @@ export default function ProgressChart({ chart }: Props) {
   );
 
   return (
-    <div className="rounded-lg border border-slate-200 bg-white p-4 shadow-sm">
-      <div className="mb-4 flex items-center justify-between">
+    <div className="rounded-lg border border-slate-200 bg-white p-3 shadow-sm sm:p-4">
+      <div className="mb-4 flex flex-col gap-2 sm:flex-row sm:items-center sm:justify-between">
         <h3 className="text-sm font-semibold text-slate-700">Quarterly Revenue vs Target</h3>
         <div className="flex rounded-md border border-slate-200 p-0.5 text-xs">
           <button
             onClick={() => setBreakdown("combined")}
-            className={`rounded px-2 py-1 ${breakdown === "combined" ? "bg-brand-500 text-white" : "text-slate-500"}`}
+            className={`flex-1 rounded px-2 py-1 ${breakdown === "combined" ? "bg-brand-500 text-white" : "text-slate-500"}`}
           >
             Combined
           </button>
           <button
             onClick={() => setBreakdown("internal-external")}
-            className={`rounded px-2 py-1 ${breakdown === "internal-external" ? "bg-brand-500 text-white" : "text-slate-500"}`}
+            className={`flex-1 rounded px-2 py-1 ${breakdown === "internal-external" ? "bg-brand-500 text-white" : "text-slate-500"}`}
           >
             Internal vs External
           </button>
         </div>
       </div>
-      <ResponsiveContainer width="100%" height={320}>
-        <ComposedChart data={data} margin={{ top: 8, right: 16, left: 8, bottom: 8 }}>
+      <ResponsiveContainer width="100%" height={280} minWidth={0}>
+        <ComposedChart data={data} margin={{ top: 8, right: 8, left: 0, bottom: 8 }}>
           <CartesianGrid strokeDasharray="3 3" stroke="#e2e8f0" />
-          <XAxis dataKey="label" tick={{ fontSize: 12 }} />
-          <YAxis tickFormatter={(v) => formatCurrency(v)} tick={{ fontSize: 11 }} width={90} />
+          <XAxis dataKey="label" tick={{ fontSize: 11 }} />
+          <YAxis tickFormatter={(v) => formatCurrency(v)} tick={{ fontSize: 10 }} width={64} />
           <Tooltip formatter={(v: number) => formatCurrency(v)} />
           <Legend />
           {breakdown === "combined" ? (

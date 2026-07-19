@@ -63,7 +63,7 @@ export default function OperationalGrid({ rows, yearId, quarter, onRemarksSaved 
   }
 
   return (
-    <div className="rounded-lg border border-slate-200 bg-white p-4 shadow-sm">
+    <div className="rounded-lg border border-slate-200 bg-white p-3 shadow-sm sm:p-4">
       <h3 className="mb-4 text-sm font-semibold text-slate-700">Business Unit Operational Grid</h3>
       <p className="mb-4 text-xs text-slate-500">
         Annual/Quarter targets are set per Company and roll up into their Business Unit's total. Expand a Business

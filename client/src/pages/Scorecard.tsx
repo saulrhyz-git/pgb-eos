@@ -58,15 +58,15 @@ function HeadlineCard({
 }) {
   const badge = attainmentBadge(pct);
   return (
-    <div className="flex flex-col gap-3 rounded-xl border border-slate-200 bg-white p-6 shadow-sm">
-      <div className="flex items-center justify-between">
+    <div className="flex flex-col gap-3 rounded-xl border border-slate-200 bg-white p-4 shadow-sm sm:p-6">
+      <div className="flex flex-wrap items-center justify-between gap-2">
         <div className="flex items-center gap-2 text-slate-500">
           {icon}
           <span className="text-xs font-semibold uppercase tracking-wide">{label}</span>
         </div>
         <span className={`rounded-full px-2.5 py-1 text-xs font-semibold ${badge.className}`}>{badge.label}</span>
       </div>
-      <div className="text-4xl font-bold text-slate-800">{value}</div>
+      <div className="text-3xl font-bold text-slate-800 sm:text-4xl">{value}</div>
       <div className="flex items-center gap-2">
         <div className="h-2 flex-1 overflow-hidden rounded-full bg-slate-100">
           <div
@@ -244,16 +244,16 @@ export default function Scorecard() {
 
   return (
     <div className="flex flex-col gap-6">
-      <div className="flex flex-wrap items-end justify-between gap-4">
+      <div className="flex flex-col gap-4">
         <div>
           <h2 className="mb-1 text-xl font-bold text-slate-800">Executive Scorecard</h2>
           <p className="text-sm text-slate-500">Board-level summary of revenue performance and strategic priorities.</p>
         </div>
-        <div className="flex flex-wrap items-end gap-3 rounded-lg border border-slate-200 bg-white p-3 shadow-sm">
+        <div className="grid grid-cols-2 gap-3 rounded-lg border border-slate-200 bg-white p-3 shadow-sm sm:flex sm:flex-wrap sm:items-end sm:gap-3">
           <div className="flex flex-col gap-1">
             <label className="text-xs font-medium text-slate-500">Year</label>
             <select
-              className="rounded-md border border-slate-300 px-3 py-1.5 text-sm"
+              className="w-full rounded-md border border-slate-300 px-3 py-1.5 text-sm sm:w-auto"
               value={yearId}
               onChange={(e) => setYearId(e.target.value)}
             >
@@ -267,7 +267,7 @@ export default function Scorecard() {
           <div className="flex flex-col gap-1">
             <label className="text-xs font-medium text-slate-500">Quarter</label>
             <select
-              className="rounded-md border border-slate-300 px-3 py-1.5 text-sm"
+              className="w-full rounded-md border border-slate-300 px-3 py-1.5 text-sm sm:w-auto"
               value={quarter}
               onChange={(e) => setQuarter(Number(e.target.value))}
             >
@@ -279,10 +279,10 @@ export default function Scorecard() {
               ))}
             </select>
           </div>
-          <div className="flex flex-col gap-1">
+          <div className="col-span-2 flex flex-col gap-1">
             <label className="text-xs font-medium text-slate-500">Business Unit</label>
             <select
-              className="min-w-[180px] rounded-md border border-slate-300 px-3 py-1.5 text-sm"
+              className="w-full rounded-md border border-slate-300 px-3 py-1.5 text-sm sm:min-w-[180px]"
               value={businessUnitId}
               onChange={(e) => setBusinessUnitId(e.target.value)}
             >
@@ -355,13 +355,13 @@ export default function Scorecard() {
               />
             </div>
 
-            <div className="rounded-lg border border-slate-200 bg-white p-4 shadow-sm">
+            <div className="rounded-lg border border-slate-200 bg-white p-3 shadow-sm sm:p-4">
               <h4 className="mb-3 text-sm font-semibold text-slate-700">Revenue Trend (Actual vs Target)</h4>
-              <ResponsiveContainer width="100%" height={260}>
-                <ComposedChart data={chartData} margin={{ top: 8, right: 16, left: 8, bottom: 8 }}>
+              <ResponsiveContainer width="100%" height={240} minWidth={0}>
+                <ComposedChart data={chartData} margin={{ top: 8, right: 8, left: 0, bottom: 8 }}>
                   <CartesianGrid strokeDasharray="3 3" stroke="#e2e8f0" />
-                  <XAxis dataKey="label" tick={{ fontSize: 12 }} />
-                  <YAxis tickFormatter={(v) => formatCurrency(v)} tick={{ fontSize: 11 }} width={90} />
+                  <XAxis dataKey="label" tick={{ fontSize: 11 }} />
+                  <YAxis tickFormatter={(v) => formatCurrency(v)} tick={{ fontSize: 10 }} width={64} />
                   <Tooltip formatter={(v: number) => formatCurrency(v)} />
                   <Bar dataKey="Actual" fill="#2563eb" radius={[4, 4, 0, 0]} barSize={36} />
                   <Line type="monotone" dataKey="Target" stroke="#ea580c" strokeWidth={2.5} dot={{ r: 4 }} />
