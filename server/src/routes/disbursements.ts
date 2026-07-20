@@ -19,8 +19,9 @@ import { logAudit } from "../utils/auditLog";
 // combined DISBURSEMENTS Custom Role resource — see utils/permissions.ts.
 // Intended as a building block toward a later consolidated financial pane
 // of glass; today it feeds the Disbursement cards on the Revenue dashboard
-// and Executive Scorecard, and has its own three-sub-tab entry pages
-// (Advances/Loans/Interests) on the frontend.
+// and Executive Scorecard, and its three categories are entered as extra
+// field groups on the Data Entry page (client/src/pages/IntegratorPortal.tsx)
+// alongside Revenue/Collections/Expenses, rather than on separate pages.
 const router = Router();
 router.use(requireAuth);
 router.use(blockPendingPasswordChange);
@@ -29,8 +30,9 @@ export const DISBURSEMENT_CATEGORIES = ["ADVANCES", "LOANS", "INTERESTS"] as con
 export type DisbursementCategory = (typeof DISBURSEMENT_CATEGORIES)[number];
 
 // Maps each sub-category to the three columns on the shared DisbursementActual
-// row it owns — every sub-tab's PUT only ever touches its own three columns,
-// leaving the other two categories' figures on the same row untouched.
+// row it owns — every PUT only ever touches its own three columns (one
+// category per call), leaving the other two categories' figures on the same
+// row untouched.
 const CATEGORY_FIELDS: Record<DisbursementCategory, { internal: string; external: string; remarks: string }> = {
   ADVANCES: { internal: "advancesInternal", external: "advancesExternal", remarks: "advancesRemarks" },
   LOANS: { internal: "loansInternal", external: "loansExternal", remarks: "loansRemarks" },
@@ -91,8 +93,8 @@ router.get("/", async (req, res) => {
 });
 
 // Upsert one Disbursement sub-category (Advances/Loans/Interests) for a
-// Company/Year/Quarter — each of the three sub-tab pages submits only its
-// own category, leaving the other two untouched on the shared row.
+// Company/Year/Quarter — the Data Entry page submits one PUT per category
+// (three calls per save), leaving the other two untouched on the shared row.
 const putSchema = z.object({
   companyId: z.string().uuid(),
   yearId: z.string().uuid(),

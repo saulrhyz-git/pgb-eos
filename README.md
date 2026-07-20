@@ -1358,3 +1358,43 @@ Custom-Role user with only `DISBURSEMENTS` (or only `ROCKS`) granted, and no
 a Custom-Role user granted `COMPARISON` view plus, say, only `DISBURSEMENTS`
 (no Revenue/Collections/Expenses/Rocks) sees zeroed financial/Rocks rows but
 correct Disbursements figures — not everything zeroed out.
+
+**Disbursements entry folded into Data Entry — one tab instead of two.**
+Disbursements (Advances/Loan Repayments/Interests) used to be their own
+top-level sidebar tab with three separate sub-pages, each with its own
+Year/Quarter/Business Unit/Company picker. They're now three more field
+groups on the existing Data Entry page (`client/src/pages/
+IntegratorPortal.tsx`), sharing the single scope picker already used for
+Revenue/Collections/Expenses — an integrator now picks a Year/Quarter/
+Business Unit/Company once and sees all six categories at once instead of
+navigating between tabs and re-picking the same scope repeatedly. The
+pre-fill effect now fetches both `api.actuals(...)` and `api.disbursements(...)`
+together for the selected scope. The single "Save All Figures" button
+submits everything at once: one `api.putActual(...)` call (Revenue/
+Collections/Expenses together, as before) plus three `api.putDisbursement(...)`
+calls, one per Disbursement category (the backend only ever accepts one
+category per call — see `routes/disbursements.ts`). These four calls run via
+`Promise.allSettled` rather than `Promise.all`, specifically because REVENUE/
+COLLECTIONS/EXPENSES and DISBURSEMENTS are independently gate-able Custom
+Role resources — a user with edit access to one but not the other should
+still have the categories they ARE allowed to edit save successfully, with
+only the disallowed ones reported as failures, rather than one 403 aborting
+every category's save.
+
+Removed: `client/src/pages/Disbursements.tsx` (the old shared component
+behind the three `/disbursements/*` sub-pages), the three `/disbursements/*`
+routes and their index-redirect in `App.tsx`, and the expandable
+"Disbursements" nav group (plus its `disbOpen` state, the `ChevronDown`/
+`Landmark` icons, and the `subLinkClass` helper and `useLocation` call that
+existed only to support it) in `client/src/components/Layout.tsx`. No schema,
+permissions, or API changes were needed — `DISBURSEMENTS` is still its own
+Custom Role resource, `/api/disbursements` still accepts the same payload
+shape, and the Revenue dashboard cards / Executive Scorecard / Comparison
+tab are all unaffected (they only ever read Disbursement figures, never the
+now-removed entry page). Worth checking by hand: `/data-entry` shows Revenue/
+Collections/Expenses and Advances/Loan Repayments/Interests together under
+one scope picker; changing Year/Quarter/Business Unit/Company reloads all
+six categories' existing figures correctly; "Save All Figures" saves
+everything in one click; the sidebar no longer has a separate Disbursements
+entry; and visiting the old `/disbursements/advances` (etc.) URL directly no
+longer resolves (falls through to the catch-all redirect to `/`).

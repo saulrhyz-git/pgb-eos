@@ -1,7 +1,7 @@
 import { FormEvent, useEffect, useState } from "react";
 import { CheckCircle2, Save } from "lucide-react";
 import { api } from "../api/client";
-import type { BusinessUnit, Company, Year } from "../api/types";
+import type { BusinessUnit, Company, DisbursementCategory, Year } from "../api/types";
 import { useAuth } from "../contexts/AuthContext";
 
 type FigureKey =
@@ -35,6 +35,34 @@ const emptyRemarks: Record<RemarksKey, string> = {
   expensesRemarks: "",
 };
 
+// Disbursements (Advances/Loan Repayments/Interests) live on their own
+// DisbursementActual row (see server/src/routes/disbursements.ts) — recorded,
+// not targeted, so there's no Target-side counterpart to enter alongside
+// them. They used to be their own top-level "Disbursements" nav tab with
+// three sub-pages; they're now folded into this single Data Entry page as
+// three more field groups sharing the same Year/Quarter/Business Unit/
+// Company scope picker as Revenue/Collections/Expenses above, so an
+// integrator only has one tab and one scope selection to work with instead
+// of switching pages per category.
+const DISBURSEMENT_GROUPS: { title: string; category: DisbursementCategory }[] = [
+  { title: "Advances", category: "ADVANCES" },
+  { title: "Loan Repayments", category: "LOANS" },
+  { title: "Interests", category: "INTERESTS" },
+];
+
+interface DisbFields {
+  internal: string;
+  external: string;
+  remarks: string;
+}
+
+const emptyDisbFields: DisbFields = { internal: "", external: "", remarks: "" };
+const emptyDisbForm: Record<DisbursementCategory, DisbFields> = {
+  ADVANCES: emptyDisbFields,
+  LOANS: emptyDisbFields,
+  INTERESTS: emptyDisbFields,
+};
+
 export default function IntegratorPortal() {
   const { user } = useAuth();
   const [years, setYears] = useState<Year[]>([]);
@@ -47,6 +75,7 @@ export default function IntegratorPortal() {
   const [companyId, setCompanyId] = useState("");
   const [form, setForm] = useState(emptyForm);
   const [remarks, setRemarks] = useState(emptyRemarks);
+  const [disbForm, setDisbForm] = useState(emptyDisbForm);
 
   const [saving, setSaving] = useState(false);
   const [saved, setSaved] = useState(false);
@@ -81,47 +110,68 @@ export default function IntegratorPortal() {
     });
   }, [businessUnitId]);
 
-  // Pre-fill the form with any existing actual for the selected scope so the
-  // integrator is editing, not blindly overwriting.
+  // Pre-fill both the actuals form and the disbursements form with any
+  // existing figures for the selected scope, so the integrator is editing,
+  // not blindly overwriting — fetched together since they now share one
+  // scope picker.
   useEffect(() => {
     if (!yearId || !companyId) return;
     setSaved(false);
-    api
-      .actuals({ yearId, quarter, companyId })
-      .then((rows) => {
-        const existing = rows[0] || null;
-        if (existing) {
-          setForm({
-            revenueInternal: String(existing.revenueInternal ?? ""),
-            revenueExternal: String(existing.revenueExternal ?? ""),
-            collectionsInternal: String(existing.collectionsInternal ?? ""),
-            collectionsExternal: String(existing.collectionsExternal ?? ""),
-            expensesInternal: String(existing.expensesInternal ?? ""),
-            expensesExternal: String(existing.expensesExternal ?? ""),
-          });
-          setRemarks({
-            revenueRemarks: existing.revenueRemarks || "",
-            collectionsRemarks: existing.collectionsRemarks || "",
-            expensesRemarks: existing.expensesRemarks || "",
-          });
-        } else {
-          setForm(emptyForm);
-          setRemarks(emptyRemarks);
-        }
-      })
-      .catch(() => {
+    Promise.all([
+      api.actuals({ yearId, quarter, companyId }).catch(() => []),
+      api.disbursements({ yearId, quarter, companyId }).catch(() => []),
+    ]).then(([actualRows, disbRows]) => {
+      const existing = actualRows[0] || null;
+      if (existing) {
+        setForm({
+          revenueInternal: String(existing.revenueInternal ?? ""),
+          revenueExternal: String(existing.revenueExternal ?? ""),
+          collectionsInternal: String(existing.collectionsInternal ?? ""),
+          collectionsExternal: String(existing.collectionsExternal ?? ""),
+          expensesInternal: String(existing.expensesInternal ?? ""),
+          expensesExternal: String(existing.expensesExternal ?? ""),
+        });
+        setRemarks({
+          revenueRemarks: existing.revenueRemarks || "",
+          collectionsRemarks: existing.collectionsRemarks || "",
+          expensesRemarks: existing.expensesRemarks || "",
+        });
+      } else {
         setForm(emptyForm);
         setRemarks(emptyRemarks);
+      }
+
+      const existingDisb = disbRows[0] || null;
+      setDisbForm({
+        ADVANCES: existingDisb
+          ? { internal: String(existingDisb.advancesInternal ?? ""), external: String(existingDisb.advancesExternal ?? ""), remarks: existingDisb.advancesRemarks || "" }
+          : emptyDisbFields,
+        LOANS: existingDisb
+          ? { internal: String(existingDisb.loansInternal ?? ""), external: String(existingDisb.loansExternal ?? ""), remarks: existingDisb.loansRemarks || "" }
+          : emptyDisbFields,
+        INTERESTS: existingDisb
+          ? { internal: String(existingDisb.interestsInternal ?? ""), external: String(existingDisb.interestsExternal ?? ""), remarks: existingDisb.interestsRemarks || "" }
+          : emptyDisbFields,
       });
+    });
   }, [yearId, quarter, companyId, businessUnitId]);
 
+  // Saves everything on the page in one go: the combined Revenue/
+  // Collections/Expenses actual (one PUT, as before) plus each of the three
+  // Disbursement categories (one PUT per category — the backend only ever
+  // accepts one category at a time, see routes/disbursements.ts). Uses
+  // allSettled rather than all/Promise.race so that, if the user's role has
+  // edit access to some categories but not others (REVENUE/COLLECTIONS/
+  // EXPENSES and DISBURSEMENTS are independently gate-able Custom Role
+  // resources), the categories they ARE allowed to edit still save
+  // successfully instead of one 403 aborting everything else.
   async function handleSubmit(e: FormEvent) {
     e.preventDefault();
     setError("");
     setSaving(true);
     setSaved(false);
     try {
-      const payload = {
+      const actualPayload = {
         companyId,
         yearId,
         quarter,
@@ -133,8 +183,35 @@ export default function IntegratorPortal() {
         expensesInternal: Number(form.expensesInternal) || 0,
         expensesExternal: Number(form.expensesExternal) || 0,
       };
-      await api.putActual(payload);
-      setSaved(true);
+
+      const results = await Promise.allSettled([
+        api.putActual(actualPayload),
+        ...DISBURSEMENT_GROUPS.map((g) =>
+          api.putDisbursement({
+            companyId,
+            yearId,
+            quarter,
+            category: g.category,
+            internal: Number(disbForm[g.category].internal) || 0,
+            external: Number(disbForm[g.category].external) || 0,
+            remarks: disbForm[g.category].remarks,
+          })
+        ),
+      ]);
+
+      const labels = ["Revenue/Collections/Expenses", ...DISBURSEMENT_GROUPS.map((g) => g.title)];
+      const failures = results
+        .map((r, i) => (r.status === "rejected" ? `${labels[i]}: ${(r.reason as any)?.message || "failed"}` : null))
+        .filter((x): x is string => Boolean(x));
+
+      if (failures.length === 0) {
+        setSaved(true);
+      } else if (failures.length === results.length) {
+        setError(failures.join("; "));
+      } else {
+        setError(`Saved the rest, but couldn't save — ${failures.join("; ")}`);
+        setSaved(true);
+      }
     } catch (err: any) {
       setError(err.message || "Failed to save quarterly figures");
     } finally {
@@ -147,8 +224,8 @@ export default function IntegratorPortal() {
       <h2 className="mb-1 text-lg font-semibold text-slate-800">Quarterly Data Entry</h2>
       <p className="mb-6 text-sm text-slate-500">
         {user?.role === "BU_INTEGRATOR"
-          ? "Submit Revenue, Collections, and Expenses for the companies in your assigned Business Unit(s)."
-          : "You can enter or override figures for any company."}
+          ? "Submit Revenue, Collections, Expenses, and Disbursements for the companies in your assigned Business Unit(s)."
+          : "You can enter or override Revenue, Collections, Expenses, and Disbursements figures for any company."}
       </p>
 
       <form onSubmit={handleSubmit} className="flex flex-col gap-6 rounded-lg border border-slate-200 bg-white p-4 shadow-sm sm:p-6">
@@ -200,6 +277,7 @@ export default function IntegratorPortal() {
         </div>
 
         <div className="grid grid-cols-1 gap-4">
+          <h3 className="-mb-2 text-xs font-semibold uppercase tracking-wide text-slate-400">Revenue / Collections / Expenses</h3>
           {FIELD_GROUPS.map((group) => (
             <div key={group.title} className="rounded-md border border-slate-100 bg-slate-50/60 p-3 sm:p-4">
               <div className="mb-2 text-sm font-semibold text-slate-700">{group.title}</div>
@@ -240,6 +318,54 @@ export default function IntegratorPortal() {
           ))}
         </div>
 
+        <div className="grid grid-cols-1 gap-4">
+          <h3 className="-mb-2 text-xs font-semibold uppercase tracking-wide text-slate-400">Disbursements</h3>
+          {DISBURSEMENT_GROUPS.map((group) => (
+            <div key={group.title} className="rounded-md border border-slate-100 bg-slate-50/60 p-3 sm:p-4">
+              <div className="mb-2 text-sm font-semibold text-slate-700">{group.title}</div>
+              <div className="grid grid-cols-1 gap-4 xs:grid-cols-2">
+                <div className="flex flex-col gap-1">
+                  <label className="text-xs font-medium text-slate-500">Internal</label>
+                  <input
+                    type="number"
+                    min={0}
+                    step="0.01"
+                    className="rounded-md border border-slate-300 px-3 py-2 text-sm"
+                    value={disbForm[group.category].internal}
+                    onChange={(e) =>
+                      setDisbForm((f) => ({ ...f, [group.category]: { ...f[group.category], internal: e.target.value } }))
+                    }
+                  />
+                </div>
+                <div className="flex flex-col gap-1">
+                  <label className="text-xs font-medium text-slate-500">External</label>
+                  <input
+                    type="number"
+                    min={0}
+                    step="0.01"
+                    className="rounded-md border border-slate-300 px-3 py-2 text-sm"
+                    value={disbForm[group.category].external}
+                    onChange={(e) =>
+                      setDisbForm((f) => ({ ...f, [group.category]: { ...f[group.category], external: e.target.value } }))
+                    }
+                  />
+                </div>
+              </div>
+              <div className="mt-3 flex flex-col gap-1">
+                <label className="text-xs font-medium text-slate-500">{group.title} Remarks</label>
+                <textarea
+                  className="min-h-[60px] rounded-md border border-slate-300 px-3 py-2 text-sm"
+                  value={disbForm[group.category].remarks}
+                  onChange={(e) =>
+                    setDisbForm((f) => ({ ...f, [group.category]: { ...f[group.category], remarks: e.target.value } }))
+                  }
+                  placeholder={`Notes on this quarter's ${group.title.toLowerCase()}...`}
+                />
+              </div>
+            </div>
+          ))}
+        </div>
+
         {error && <div className="rounded-md bg-red-50 px-3 py-2 text-sm text-red-600">{error}</div>}
 
         <button
@@ -248,7 +374,7 @@ export default function IntegratorPortal() {
           className="flex items-center justify-center gap-2 rounded-md bg-brand-500 px-4 py-2 text-sm font-medium text-white hover:bg-brand-600 disabled:opacity-50"
         >
           {saved ? <CheckCircle2 className="h-4 w-4" /> : <Save className="h-4 w-4" />}
-          {saving ? "Saving..." : saved ? "Saved" : "Save Quarterly Figures"}
+          {saving ? "Saving..." : saved ? "Saved" : "Save All Figures"}
         </button>
       </form>
     </div>

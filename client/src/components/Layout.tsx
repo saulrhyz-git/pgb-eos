@@ -1,14 +1,12 @@
 import { useEffect, useState } from "react";
-import { Link, NavLink, Outlet, useLocation } from "react-router-dom";
+import { Link, NavLink, Outlet } from "react-router-dom";
 import {
-  ChevronDown,
   ChevronsLeft,
   ChevronsRight,
   ClipboardEdit,
   FileSpreadsheet,
   Gauge,
   GitCompare,
-  Landmark,
   LayoutDashboard,
   LogOut,
   Menu,
@@ -28,25 +26,13 @@ const SIDEBAR_COLLAPSED_KEY = "eos_sidebar_collapsed";
 
 export default function Layout() {
   const { user, logout } = useAuth();
-  const location = useLocation();
 
   const [mobileOpen, setMobileOpen] = useState(false);
   const [collapsed, setCollapsed] = useState(() => localStorage.getItem(SIDEBAR_COLLAPSED_KEY) === "1");
-  // Disbursements is the one nav item with its own sub-tabs (Advances/Loans/
-  // Interests — see Disbursements.tsx and App.tsx's three /disbursements/*
-  // routes), so it renders as an expandable group rather than a plain link.
-  const [disbOpen, setDisbOpen] = useState(location.pathname.startsWith("/disbursements"));
 
   useEffect(() => {
     localStorage.setItem(SIDEBAR_COLLAPSED_KEY, collapsed ? "1" : "0");
   }, [collapsed]);
-
-  // Keep the Disbursements group auto-expanded while on one of its
-  // sub-pages, so landing there directly (a bookmark, a refresh) doesn't
-  // hide the very sub-nav needed to move between Advances/Loans/Interests.
-  useEffect(() => {
-    if (location.pathname.startsWith("/disbursements")) setDisbOpen(true);
-  }, [location.pathname]);
 
   function closeMobile() {
     setMobileOpen(false);
@@ -55,11 +41,6 @@ export default function Layout() {
   const linkClass = ({ isActive }: { isActive: boolean }) =>
     `flex items-center gap-3 rounded-md px-3 py-2 text-sm font-medium transition-colors ${
       isActive ? "bg-brand-500 text-white" : "text-slate-600 hover:bg-slate-100"
-    }`;
-
-  const subLinkClass = ({ isActive }: { isActive: boolean }) =>
-    `flex items-center gap-2 rounded-md px-3 py-1.5 text-sm font-medium transition-colors ${
-      isActive ? "bg-brand-50 text-brand-700" : "text-slate-500 hover:bg-slate-100"
     }`;
 
   // Rendered twice (desktop sidebar + mobile drawer) so both stay in sync
@@ -85,47 +66,6 @@ export default function Layout() {
           <GitCompare className="h-4 w-4 shrink-0" />
           {showLabels && "Compare"}
         </NavLink>
-
-        <div>
-          <button
-            type="button"
-            // Collapsed sidebar has nowhere to show sub-links, so clicking the
-            // group icon there expands the sidebar itself (and the group)
-            // instead of trying to toggle an invisible sub-list.
-            onClick={() => {
-              if (showLabels) setDisbOpen((v) => !v);
-              else {
-                setCollapsed(false);
-                setDisbOpen(true);
-              }
-            }}
-            className={`flex w-full items-center gap-3 rounded-md px-3 py-2 text-left text-sm font-medium transition-colors hover:bg-slate-100 ${
-              location.pathname.startsWith("/disbursements") ? "text-brand-600" : "text-slate-600"
-            }`}
-            title="Disbursements"
-          >
-            <Landmark className="h-4 w-4 shrink-0" />
-            {showLabels && (
-              <>
-                <span className="flex-1">Disbursements</span>
-                <ChevronDown className={`h-3.5 w-3.5 shrink-0 transition-transform ${disbOpen ? "rotate-180" : ""}`} />
-              </>
-            )}
-          </button>
-          {showLabels && disbOpen && (
-            <div className="ml-4 mt-1 flex flex-col gap-1 border-l border-slate-200 pl-3">
-              <NavLink to="/disbursements/advances" className={subLinkClass} onClick={closeMobile}>
-                Advances
-              </NavLink>
-              <NavLink to="/disbursements/loans" className={subLinkClass} onClick={closeMobile}>
-                Loan Repayments
-              </NavLink>
-              <NavLink to="/disbursements/interests" className={subLinkClass} onClick={closeMobile}>
-                Interests
-              </NavLink>
-            </div>
-          )}
-        </div>
 
         <NavLink to="/data-entry" className={linkClass} onClick={closeMobile} title="Data Entry">
           <ClipboardEdit className="h-4 w-4 shrink-0" />
