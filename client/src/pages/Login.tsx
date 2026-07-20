@@ -102,9 +102,6 @@ export default function Login() {
             {isLocked ? `Locked (${lockedSeconds}s)` : submitting ? "Signing in..." : "Sign in"}
           </button>
         </form>
-        <p className="mt-6 text-xs text-slate-500 dark:text-slate-400">
-          First time here? Log in as the superadmin with username <code>saulrhyz</code>.
-        </p>
       </div>
     </div>
   );
