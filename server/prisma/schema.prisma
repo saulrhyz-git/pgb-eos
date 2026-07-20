@@ -288,18 +288,31 @@ model TargetLock {
 // derived figure, computed on the fly in routes/dashboard.ts by summing a
 // Company's (or Business Unit's) QuarterTarget rows across Q1-Q4, the same
 // way BU-level actuals are a rollup of each Company's QuarterActual.
+// Revenue stays a plain Internal/External pair. Collections is Internal and
+// External, each broken into three recognition types (Earned/Unearned/
+// Others). Expenses dropped the Internal/External split entirely — it's a
+// single value per breakdown (Interest/Depreciation/Other Non-Cash) instead,
+// since expenses aren't meaningfully "internal vs external" the way revenue
+// and collections are.
 model QuarterTarget {
   id        String @id @default(uuid())
   companyId String
   yearId    String
   quarter   Int // 1-4
 
-  revenueInternal     Decimal @default(0) @db.Decimal(14, 2)
-  revenueExternal     Decimal @default(0) @db.Decimal(14, 2)
-  collectionsInternal Decimal @default(0) @db.Decimal(14, 2)
-  collectionsExternal Decimal @default(0) @db.Decimal(14, 2)
-  expensesInternal    Decimal @default(0) @db.Decimal(14, 2)
-  expensesExternal    Decimal @default(0) @db.Decimal(14, 2)
+  revenueInternal Decimal @default(0) @db.Decimal(14, 2)
+  revenueExternal Decimal @default(0) @db.Decimal(14, 2)
+
+  collectionsInternalEarned   Decimal @default(0) @db.Decimal(14, 2)
+  collectionsInternalUnearned Decimal @default(0) @db.Decimal(14, 2)
+  collectionsInternalOthers   Decimal @default(0) @db.Decimal(14, 2)
+  collectionsExternalEarned   Decimal @default(0) @db.Decimal(14, 2)
+  collectionsExternalUnearned Decimal @default(0) @db.Decimal(14, 2)
+  collectionsExternalOthers   Decimal @default(0) @db.Decimal(14, 2)
+
+  expensesInterest     Decimal @default(0) @db.Decimal(14, 2)
+  expensesDepreciation Decimal @default(0) @db.Decimal(14, 2)
+  expensesOtherNonCash Decimal @default(0) @db.Decimal(14, 2)
 
   updatedAt DateTime @updatedAt
 
@@ -311,23 +324,43 @@ model QuarterTarget {
 }
 
 // Quarter actual: entered by the BU Integrator (or overridden by Group Integrator).
+// Same figure shape as QuarterTarget above, plus one Remarks field per
+// breakdown (not one per parent category) — e.g. Collections gets six
+// Remarks fields (Internal/External x Earned/Unearned/Others), Expenses
+// gets three (Interest/Depreciation/Other Non-Cash), mirroring the
+// per-category Remarks pattern already used for Disbursements.
 model QuarterActual {
   id        String @id @default(uuid())
   companyId String
   yearId    String
   quarter   Int // 1-4
 
-  revenueInternal     Decimal @default(0) @db.Decimal(14, 2)
-  revenueExternal     Decimal @default(0) @db.Decimal(14, 2)
-  collectionsInternal Decimal @default(0) @db.Decimal(14, 2)
-  collectionsExternal Decimal @default(0) @db.Decimal(14, 2)
-  expensesInternal    Decimal @default(0) @db.Decimal(14, 2)
-  expensesExternal    Decimal @default(0) @db.Decimal(14, 2)
+  revenueInternal Decimal @default(0) @db.Decimal(14, 2)
+  revenueExternal Decimal @default(0) @db.Decimal(14, 2)
 
-  // Split per financial category rather than one shared note for the whole quarter.
-  revenueRemarks     String @default("")
-  collectionsRemarks String @default("")
-  expensesRemarks    String @default("")
+  collectionsInternalEarned   Decimal @default(0) @db.Decimal(14, 2)
+  collectionsInternalUnearned Decimal @default(0) @db.Decimal(14, 2)
+  collectionsInternalOthers   Decimal @default(0) @db.Decimal(14, 2)
+  collectionsExternalEarned   Decimal @default(0) @db.Decimal(14, 2)
+  collectionsExternalUnearned Decimal @default(0) @db.Decimal(14, 2)
+  collectionsExternalOthers   Decimal @default(0) @db.Decimal(14, 2)
+
+  expensesInterest     Decimal @default(0) @db.Decimal(14, 2)
+  expensesDepreciation Decimal @default(0) @db.Decimal(14, 2)
+  expensesOtherNonCash Decimal @default(0) @db.Decimal(14, 2)
+
+  revenueRemarks String @default("")
+
+  collectionsInternalEarnedRemarks   String @default("")
+  collectionsInternalUnearnedRemarks String @default("")
+  collectionsInternalOthersRemarks   String @default("")
+  collectionsExternalEarnedRemarks   String @default("")
+  collectionsExternalUnearnedRemarks String @default("")
+  collectionsExternalOthersRemarks   String @default("")
+
+  expensesInterestRemarks     String @default("")
+  expensesDepreciationRemarks String @default("")
+  expensesOtherNonCashRemarks String @default("")
 
   updatedById String?
   updatedAt   DateTime @updatedAt

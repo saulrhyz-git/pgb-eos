@@ -20,19 +20,33 @@ router.use(blockPendingPasswordChange);
 const figuresSchema = z.object({
   revenueInternal: z.number().min(0).default(0),
   revenueExternal: z.number().min(0).default(0),
-  collectionsInternal: z.number().min(0).default(0),
-  collectionsExternal: z.number().min(0).default(0),
-  expensesInternal: z.number().min(0).default(0),
-  expensesExternal: z.number().min(0).default(0),
+  collectionsInternalEarned: z.number().min(0).default(0),
+  collectionsInternalUnearned: z.number().min(0).default(0),
+  collectionsInternalOthers: z.number().min(0).default(0),
+  collectionsExternalEarned: z.number().min(0).default(0),
+  collectionsExternalUnearned: z.number().min(0).default(0),
+  collectionsExternalOthers: z.number().min(0).default(0),
+  expensesInterest: z.number().min(0).default(0),
+  expensesDepreciation: z.number().min(0).default(0),
+  expensesOtherNonCash: z.number().min(0).default(0),
 });
 
+// Generic across all 11 figure fields — the cascade/delta-redistribution
+// logic below loops over this list without caring what each key represents,
+// so Collections' six breakdowns and Expenses' three both get the same
+// "keep the Company's Q1-Q4 sum unchanged" treatment as Revenue.
 const FIGURE_KEYS = [
   "revenueInternal",
   "revenueExternal",
-  "collectionsInternal",
-  "collectionsExternal",
-  "expensesInternal",
-  "expensesExternal",
+  "collectionsInternalEarned",
+  "collectionsInternalUnearned",
+  "collectionsInternalOthers",
+  "collectionsExternalEarned",
+  "collectionsExternalUnearned",
+  "collectionsExternalOthers",
+  "expensesInterest",
+  "expensesDepreciation",
+  "expensesOtherNonCash",
 ] as const;
 type FigureKey = (typeof FIGURE_KEYS)[number];
 type Figures = Record<FigureKey, number>;

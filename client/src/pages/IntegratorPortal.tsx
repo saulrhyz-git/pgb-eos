@@ -7,32 +7,89 @@ import { useAuth } from "../contexts/AuthContext";
 type FigureKey =
   | "revenueInternal"
   | "revenueExternal"
-  | "collectionsInternal"
-  | "collectionsExternal"
-  | "expensesInternal"
-  | "expensesExternal";
+  | "collectionsInternalEarned"
+  | "collectionsInternalUnearned"
+  | "collectionsInternalOthers"
+  | "collectionsExternalEarned"
+  | "collectionsExternalUnearned"
+  | "collectionsExternalOthers"
+  | "expensesInterest"
+  | "expensesDepreciation"
+  | "expensesOtherNonCash";
 
-type RemarksKey = "revenueRemarks" | "collectionsRemarks" | "expensesRemarks";
+type RemarksKey =
+  | "revenueRemarks"
+  | "collectionsInternalEarnedRemarks"
+  | "collectionsInternalUnearnedRemarks"
+  | "collectionsInternalOthersRemarks"
+  | "collectionsExternalEarnedRemarks"
+  | "collectionsExternalUnearnedRemarks"
+  | "collectionsExternalOthersRemarks"
+  | "expensesInterestRemarks"
+  | "expensesDepreciationRemarks"
+  | "expensesOtherNonCashRemarks";
 
-const FIELD_GROUPS: { title: string; internal: FigureKey; external: FigureKey; remarks: RemarksKey }[] = [
-  { title: "Revenue", internal: "revenueInternal", external: "revenueExternal", remarks: "revenueRemarks" },
-  { title: "Collections", internal: "collectionsInternal", external: "collectionsExternal", remarks: "collectionsRemarks" },
-  { title: "Expenses", internal: "expensesInternal", external: "expensesExternal", remarks: "expensesRemarks" },
+// Revenue is the only category still shaped as a plain Internal/External
+// pair with one Remarks field — Collections and Expenses each have their own
+// dedicated layout below instead of reusing this group shape (see
+// COLLECTIONS_GROUPS/EXPENSES_FIELDS).
+const REVENUE_GROUP = { title: "Revenue", internal: "revenueInternal" as FigureKey, external: "revenueExternal" as FigureKey, remarks: "revenueRemarks" as RemarksKey };
+
+// Collections is Internal/External, each broken into three recognition
+// types (Earned/Unearned/Others) — one Remarks field per breakdown, same
+// granularity as Disbursements' per-category Remarks.
+const COLLECTIONS_GROUPS: { title: string; fields: { key: FigureKey; remarksKey: RemarksKey; label: string }[] }[] = [
+  {
+    title: "Internal",
+    fields: [
+      { key: "collectionsInternalEarned", remarksKey: "collectionsInternalEarnedRemarks", label: "Revenue - Earned" },
+      { key: "collectionsInternalUnearned", remarksKey: "collectionsInternalUnearnedRemarks", label: "Advance Payments - Unearned" },
+      { key: "collectionsInternalOthers", remarksKey: "collectionsInternalOthersRemarks", label: "Others" },
+    ],
+  },
+  {
+    title: "External",
+    fields: [
+      { key: "collectionsExternalEarned", remarksKey: "collectionsExternalEarnedRemarks", label: "Revenue - Earned" },
+      { key: "collectionsExternalUnearned", remarksKey: "collectionsExternalUnearnedRemarks", label: "Advance Payments - Unearned" },
+      { key: "collectionsExternalOthers", remarksKey: "collectionsExternalOthersRemarks", label: "Others" },
+    ],
+  },
+];
+
+// Expenses has no Internal/External split at all — three single-value
+// breakdowns instead, each with its own Remarks field.
+const EXPENSES_FIELDS: { key: FigureKey; remarksKey: RemarksKey; label: string }[] = [
+  { key: "expensesInterest", remarksKey: "expensesInterestRemarks", label: "Interest" },
+  { key: "expensesDepreciation", remarksKey: "expensesDepreciationRemarks", label: "Depreciation" },
+  { key: "expensesOtherNonCash", remarksKey: "expensesOtherNonCashRemarks", label: "Other Non-Cash Expenses" },
 ];
 
 const emptyForm: Record<FigureKey, string> = {
   revenueInternal: "",
   revenueExternal: "",
-  collectionsInternal: "",
-  collectionsExternal: "",
-  expensesInternal: "",
-  expensesExternal: "",
+  collectionsInternalEarned: "",
+  collectionsInternalUnearned: "",
+  collectionsInternalOthers: "",
+  collectionsExternalEarned: "",
+  collectionsExternalUnearned: "",
+  collectionsExternalOthers: "",
+  expensesInterest: "",
+  expensesDepreciation: "",
+  expensesOtherNonCash: "",
 };
 
 const emptyRemarks: Record<RemarksKey, string> = {
   revenueRemarks: "",
-  collectionsRemarks: "",
-  expensesRemarks: "",
+  collectionsInternalEarnedRemarks: "",
+  collectionsInternalUnearnedRemarks: "",
+  collectionsInternalOthersRemarks: "",
+  collectionsExternalEarnedRemarks: "",
+  collectionsExternalUnearnedRemarks: "",
+  collectionsExternalOthersRemarks: "",
+  expensesInterestRemarks: "",
+  expensesDepreciationRemarks: "",
+  expensesOtherNonCashRemarks: "",
 };
 
 // Disbursements (Advances/Loan Repayments/Interests) live on their own
@@ -62,6 +119,44 @@ const emptyDisbForm: Record<DisbursementCategory, DisbFields> = {
   LOANS: emptyDisbFields,
   INTERESTS: emptyDisbFields,
 };
+
+// One numeric field + its own Remarks input, stacked — the shape reused for
+// every Collections breakdown (6) and Expenses breakdown (3) below.
+function BreakdownField({
+  label,
+  value,
+  remarks,
+  onValueChange,
+  onRemarksChange,
+}: {
+  label: string;
+  value: string;
+  remarks: string;
+  onValueChange: (v: string) => void;
+  onRemarksChange: (v: string) => void;
+}) {
+  return (
+    <div className="flex flex-col gap-2">
+      <div className="flex flex-col gap-1">
+        <label className="text-xs font-medium text-slate-500">{label}</label>
+        <input
+          type="number"
+          min={0}
+          step="0.01"
+          className="rounded-md border border-slate-300 px-3 py-2 text-sm"
+          value={value}
+          onChange={(e) => onValueChange(e.target.value)}
+        />
+      </div>
+      <input
+        className="rounded-md border border-slate-200 px-2 py-1 text-xs"
+        placeholder="Remarks..."
+        value={remarks}
+        onChange={(e) => onRemarksChange(e.target.value)}
+      />
+    </div>
+  );
+}
 
 export default function IntegratorPortal() {
   const { user } = useAuth();
@@ -126,15 +221,27 @@ export default function IntegratorPortal() {
         setForm({
           revenueInternal: String(existing.revenueInternal ?? ""),
           revenueExternal: String(existing.revenueExternal ?? ""),
-          collectionsInternal: String(existing.collectionsInternal ?? ""),
-          collectionsExternal: String(existing.collectionsExternal ?? ""),
-          expensesInternal: String(existing.expensesInternal ?? ""),
-          expensesExternal: String(existing.expensesExternal ?? ""),
+          collectionsInternalEarned: String(existing.collectionsInternalEarned ?? ""),
+          collectionsInternalUnearned: String(existing.collectionsInternalUnearned ?? ""),
+          collectionsInternalOthers: String(existing.collectionsInternalOthers ?? ""),
+          collectionsExternalEarned: String(existing.collectionsExternalEarned ?? ""),
+          collectionsExternalUnearned: String(existing.collectionsExternalUnearned ?? ""),
+          collectionsExternalOthers: String(existing.collectionsExternalOthers ?? ""),
+          expensesInterest: String(existing.expensesInterest ?? ""),
+          expensesDepreciation: String(existing.expensesDepreciation ?? ""),
+          expensesOtherNonCash: String(existing.expensesOtherNonCash ?? ""),
         });
         setRemarks({
           revenueRemarks: existing.revenueRemarks || "",
-          collectionsRemarks: existing.collectionsRemarks || "",
-          expensesRemarks: existing.expensesRemarks || "",
+          collectionsInternalEarnedRemarks: existing.collectionsInternalEarnedRemarks || "",
+          collectionsInternalUnearnedRemarks: existing.collectionsInternalUnearnedRemarks || "",
+          collectionsInternalOthersRemarks: existing.collectionsInternalOthersRemarks || "",
+          collectionsExternalEarnedRemarks: existing.collectionsExternalEarnedRemarks || "",
+          collectionsExternalUnearnedRemarks: existing.collectionsExternalUnearnedRemarks || "",
+          collectionsExternalOthersRemarks: existing.collectionsExternalOthersRemarks || "",
+          expensesInterestRemarks: existing.expensesInterestRemarks || "",
+          expensesDepreciationRemarks: existing.expensesDepreciationRemarks || "",
+          expensesOtherNonCashRemarks: existing.expensesOtherNonCashRemarks || "",
         });
       } else {
         setForm(emptyForm);
@@ -178,10 +285,15 @@ export default function IntegratorPortal() {
         ...remarks,
         revenueInternal: Number(form.revenueInternal) || 0,
         revenueExternal: Number(form.revenueExternal) || 0,
-        collectionsInternal: Number(form.collectionsInternal) || 0,
-        collectionsExternal: Number(form.collectionsExternal) || 0,
-        expensesInternal: Number(form.expensesInternal) || 0,
-        expensesExternal: Number(form.expensesExternal) || 0,
+        collectionsInternalEarned: Number(form.collectionsInternalEarned) || 0,
+        collectionsInternalUnearned: Number(form.collectionsInternalUnearned) || 0,
+        collectionsInternalOthers: Number(form.collectionsInternalOthers) || 0,
+        collectionsExternalEarned: Number(form.collectionsExternalEarned) || 0,
+        collectionsExternalUnearned: Number(form.collectionsExternalUnearned) || 0,
+        collectionsExternalOthers: Number(form.collectionsExternalOthers) || 0,
+        expensesInterest: Number(form.expensesInterest) || 0,
+        expensesDepreciation: Number(form.expensesDepreciation) || 0,
+        expensesOtherNonCash: Number(form.expensesOtherNonCash) || 0,
       };
 
       const results = await Promise.allSettled([
@@ -276,48 +388,89 @@ export default function IntegratorPortal() {
           </div>
         </div>
 
+        {/* ---------- Revenue ---------- */}
         <div className="grid grid-cols-1 gap-4">
-          <h3 className="-mb-2 text-xs font-semibold uppercase tracking-wide text-slate-400">Revenue / Collections / Expenses</h3>
-          {FIELD_GROUPS.map((group) => (
-            <div key={group.title} className="rounded-md border border-slate-100 bg-slate-50/60 p-3 sm:p-4">
-              <div className="mb-2 text-sm font-semibold text-slate-700">{group.title}</div>
-              <div className="grid grid-cols-1 gap-4 xs:grid-cols-2">
-                <div className="flex flex-col gap-1">
-                  <label className="text-xs font-medium text-slate-500">Internal</label>
-                  <input
-                    type="number"
-                    min={0}
-                    step="0.01"
-                    className="rounded-md border border-slate-300 px-3 py-2 text-sm"
-                    value={form[group.internal]}
-                    onChange={(e) => setForm((f) => ({ ...f, [group.internal]: e.target.value }))}
-                  />
-                </div>
-                <div className="flex flex-col gap-1">
-                  <label className="text-xs font-medium text-slate-500">External</label>
-                  <input
-                    type="number"
-                    min={0}
-                    step="0.01"
-                    className="rounded-md border border-slate-300 px-3 py-2 text-sm"
-                    value={form[group.external]}
-                    onChange={(e) => setForm((f) => ({ ...f, [group.external]: e.target.value }))}
-                  />
-                </div>
-              </div>
-              <div className="mt-3 flex flex-col gap-1">
-                <label className="text-xs font-medium text-slate-500">{group.title} Remarks</label>
-                <textarea
-                  className="min-h-[60px] rounded-md border border-slate-300 px-3 py-2 text-sm"
-                  value={remarks[group.remarks]}
-                  onChange={(e) => setRemarks((r) => ({ ...r, [group.remarks]: e.target.value }))}
-                  placeholder={`Notes on this quarter's ${group.title.toLowerCase()}...`}
+          <h3 className="-mb-2 text-xs font-semibold uppercase tracking-wide text-slate-400">Revenue</h3>
+          <div className="rounded-md border border-slate-100 bg-slate-50/60 p-3 sm:p-4">
+            <div className="mb-2 text-sm font-semibold text-slate-700">{REVENUE_GROUP.title}</div>
+            <div className="grid grid-cols-1 gap-4 xs:grid-cols-2">
+              <div className="flex flex-col gap-1">
+                <label className="text-xs font-medium text-slate-500">Internal</label>
+                <input
+                  type="number"
+                  min={0}
+                  step="0.01"
+                  className="rounded-md border border-slate-300 px-3 py-2 text-sm"
+                  value={form[REVENUE_GROUP.internal]}
+                  onChange={(e) => setForm((f) => ({ ...f, [REVENUE_GROUP.internal]: e.target.value }))}
                 />
+              </div>
+              <div className="flex flex-col gap-1">
+                <label className="text-xs font-medium text-slate-500">External</label>
+                <input
+                  type="number"
+                  min={0}
+                  step="0.01"
+                  className="rounded-md border border-slate-300 px-3 py-2 text-sm"
+                  value={form[REVENUE_GROUP.external]}
+                  onChange={(e) => setForm((f) => ({ ...f, [REVENUE_GROUP.external]: e.target.value }))}
+                />
+              </div>
+            </div>
+            <div className="mt-3 flex flex-col gap-1">
+              <label className="text-xs font-medium text-slate-500">Revenue Remarks</label>
+              <textarea
+                className="min-h-[60px] rounded-md border border-slate-300 px-3 py-2 text-sm"
+                value={remarks[REVENUE_GROUP.remarks]}
+                onChange={(e) => setRemarks((r) => ({ ...r, [REVENUE_GROUP.remarks]: e.target.value }))}
+                placeholder="Notes on this quarter's revenue..."
+              />
+            </div>
+          </div>
+        </div>
+
+        {/* ---------- Collections ---------- */}
+        <div className="grid grid-cols-1 gap-4">
+          <h3 className="-mb-2 text-xs font-semibold uppercase tracking-wide text-slate-400">Collections</h3>
+          {COLLECTIONS_GROUPS.map((group) => (
+            <div key={group.title} className="rounded-md border border-slate-100 bg-slate-50/60 p-3 sm:p-4">
+              <div className="mb-2 text-sm font-semibold text-slate-700">Collections — {group.title}</div>
+              <div className="grid grid-cols-1 gap-4 sm:grid-cols-3">
+                {group.fields.map((f) => (
+                  <BreakdownField
+                    key={f.key}
+                    label={f.label}
+                    value={form[f.key]}
+                    remarks={remarks[f.remarksKey]}
+                    onValueChange={(v) => setForm((prev) => ({ ...prev, [f.key]: v }))}
+                    onRemarksChange={(v) => setRemarks((prev) => ({ ...prev, [f.remarksKey]: v }))}
+                  />
+                ))}
               </div>
             </div>
           ))}
         </div>
 
+        {/* ---------- Expenses ---------- */}
+        <div className="grid grid-cols-1 gap-4">
+          <h3 className="-mb-2 text-xs font-semibold uppercase tracking-wide text-slate-400">Expenses</h3>
+          <div className="rounded-md border border-slate-100 bg-slate-50/60 p-3 sm:p-4">
+            <div className="grid grid-cols-1 gap-4 sm:grid-cols-3">
+              {EXPENSES_FIELDS.map((f) => (
+                <BreakdownField
+                  key={f.key}
+                  label={f.label}
+                  value={form[f.key]}
+                  remarks={remarks[f.remarksKey]}
+                  onValueChange={(v) => setForm((prev) => ({ ...prev, [f.key]: v }))}
+                  onRemarksChange={(v) => setRemarks((prev) => ({ ...prev, [f.remarksKey]: v }))}
+                />
+              ))}
+            </div>
+          </div>
+        </div>
+
+        {/* ---------- Disbursements ---------- */}
         <div className="grid grid-cols-1 gap-4">
           <h3 className="-mb-2 text-xs font-semibold uppercase tracking-wide text-slate-400">Disbursements</h3>
           {DISBURSEMENT_GROUPS.map((group) => (

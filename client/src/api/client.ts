@@ -1,4 +1,5 @@
 import type {
+  ActualRemarks,
   AdminUser,
   AuditLogMeta,
   AuditLogPage,
@@ -150,23 +151,10 @@ export const api = {
     if (params.companyId) qs.set("companyId", params.companyId);
     return request<any[]>(`/actuals?${qs.toString()}`);
   },
-  putActual: (
-    payload: {
-      companyId: string;
-      yearId: string;
-      quarter: number;
-      revenueRemarks?: string;
-      collectionsRemarks?: string;
-      expensesRemarks?: string;
-    } & Figures
-  ) => request<any>("/actuals", { method: "PUT", body: JSON.stringify(payload) }),
+  putActual: (payload: { companyId: string; yearId: string; quarter: number } & Figures & Partial<ActualRemarks>) =>
+    request<any>("/actuals", { method: "PUT", body: JSON.stringify(payload) }),
 
-  patchRemarks: (
-    companyId: string,
-    yearId: string,
-    quarter: number,
-    payload: Partial<{ revenueRemarks: string; collectionsRemarks: string; expensesRemarks: string }>
-  ) =>
+  patchRemarks: (companyId: string, yearId: string, quarter: number, payload: Partial<ActualRemarks>) =>
     request<any>(`/actuals/${companyId}/${yearId}/${quarter}/remarks`, {
       method: "PATCH",
       body: JSON.stringify(payload),

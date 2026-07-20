@@ -19,14 +19,28 @@ router.use(blockPendingPasswordChange);
 const figuresSchema = z.object({
   revenueInternal: z.number().min(0).default(0),
   revenueExternal: z.number().min(0).default(0),
-  collectionsInternal: z.number().min(0).default(0),
-  collectionsExternal: z.number().min(0).default(0),
-  expensesInternal: z.number().min(0).default(0),
-  expensesExternal: z.number().min(0).default(0),
-  // Split per category rather than one shared note for the whole quarter.
+  collectionsInternalEarned: z.number().min(0).default(0),
+  collectionsInternalUnearned: z.number().min(0).default(0),
+  collectionsInternalOthers: z.number().min(0).default(0),
+  collectionsExternalEarned: z.number().min(0).default(0),
+  collectionsExternalUnearned: z.number().min(0).default(0),
+  collectionsExternalOthers: z.number().min(0).default(0),
+  expensesInterest: z.number().min(0).default(0),
+  expensesDepreciation: z.number().min(0).default(0),
+  expensesOtherNonCash: z.number().min(0).default(0),
+  // Split per breakdown rather than one shared note per parent category —
+  // one Remarks field per Collections breakdown (6) and per Expenses
+  // breakdown (3), plus Revenue's single field, same granularity Disbursements uses.
   revenueRemarks: z.string().max(2000).optional().default(""),
-  collectionsRemarks: z.string().max(2000).optional().default(""),
-  expensesRemarks: z.string().max(2000).optional().default(""),
+  collectionsInternalEarnedRemarks: z.string().max(2000).optional().default(""),
+  collectionsInternalUnearnedRemarks: z.string().max(2000).optional().default(""),
+  collectionsInternalOthersRemarks: z.string().max(2000).optional().default(""),
+  collectionsExternalEarnedRemarks: z.string().max(2000).optional().default(""),
+  collectionsExternalUnearnedRemarks: z.string().max(2000).optional().default(""),
+  collectionsExternalOthersRemarks: z.string().max(2000).optional().default(""),
+  expensesInterestRemarks: z.string().max(2000).optional().default(""),
+  expensesDepreciationRemarks: z.string().max(2000).optional().default(""),
+  expensesOtherNonCashRemarks: z.string().max(2000).optional().default(""),
 });
 
 router.get("/", async (req, res) => {
@@ -131,8 +145,15 @@ router.put("/", async (req, res) => {
 const remarksPatchSchema = z
   .object({
     revenueRemarks: z.string().max(2000),
-    collectionsRemarks: z.string().max(2000),
-    expensesRemarks: z.string().max(2000),
+    collectionsInternalEarnedRemarks: z.string().max(2000),
+    collectionsInternalUnearnedRemarks: z.string().max(2000),
+    collectionsInternalOthersRemarks: z.string().max(2000),
+    collectionsExternalEarnedRemarks: z.string().max(2000),
+    collectionsExternalUnearnedRemarks: z.string().max(2000),
+    collectionsExternalOthersRemarks: z.string().max(2000),
+    expensesInterestRemarks: z.string().max(2000),
+    expensesDepreciationRemarks: z.string().max(2000),
+    expensesOtherNonCashRemarks: z.string().max(2000),
   })
   .partial()
   .refine((v) => Object.keys(v).length > 0, { message: "At least one remarks field is required" });
@@ -152,12 +173,22 @@ router.patch("/:companyId/:yearId/:quarter/remarks", async (req, res) => {
     const permRows = await loadUserPermissions(req.user!);
     if (hasAnyGrant(permRows, FINANCIAL_RESOURCES)) {
       // Unlike the combined figures PUT above, remarks are submitted one
-      // category at a time, so this can enforce edit access per exact field
-      // instead of "any one of the three".
+      // field at a time, so this can enforce edit access per exact
+      // underlying category resource instead of "any one of the three" —
+      // every Collections breakdown remarks field maps to COLLECTIONS, every
+      // Expenses breakdown remarks field maps to EXPENSES, since there's no
+      // more granular Custom Role resource than the parent category.
       const fieldResource: Record<string, "REVENUE" | "COLLECTIONS" | "EXPENSES"> = {
         revenueRemarks: "REVENUE",
-        collectionsRemarks: "COLLECTIONS",
-        expensesRemarks: "EXPENSES",
+        collectionsInternalEarnedRemarks: "COLLECTIONS",
+        collectionsInternalUnearnedRemarks: "COLLECTIONS",
+        collectionsInternalOthersRemarks: "COLLECTIONS",
+        collectionsExternalEarnedRemarks: "COLLECTIONS",
+        collectionsExternalUnearnedRemarks: "COLLECTIONS",
+        collectionsExternalOthersRemarks: "COLLECTIONS",
+        expensesInterestRemarks: "EXPENSES",
+        expensesDepreciationRemarks: "EXPENSES",
+        expensesOtherNonCashRemarks: "EXPENSES",
       };
       for (const field of Object.keys(remarksParsed.data)) {
         const resource = fieldResource[field];

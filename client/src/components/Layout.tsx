@@ -54,9 +54,12 @@ export default function Layout() {
           <Gauge className="h-4 w-4 shrink-0" />
           {showLabels && "Scorecard"}
         </NavLink>
-        <NavLink to="/revenue" className={linkClass} onClick={closeMobile} title="Revenue">
+        {/* Label-only rename to "Financials" — the route itself stays
+            /revenue (see FinancialsLayout in App.tsx) since nothing else
+            about the URL needed to change. */}
+        <NavLink to="/revenue" className={linkClass} onClick={closeMobile} title="Financials">
           <LayoutDashboard className="h-4 w-4 shrink-0" />
-          {showLabels && "Revenue"}
+          {showLabels && "Financials"}
         </NavLink>
         <NavLink to="/rocks" className={linkClass} onClick={closeMobile} title="Rocks">
           <Mountain className="h-4 w-4 shrink-0" />

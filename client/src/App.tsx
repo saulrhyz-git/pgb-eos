@@ -3,7 +3,11 @@ import { useAuth } from "./contexts/AuthContext";
 import Layout from "./components/Layout";
 import Login from "./pages/Login";
 import ChangePassword from "./pages/ChangePassword";
-import Dashboard from "./pages/Dashboard";
+import FinancialsLayout from "./pages/financials/FinancialsLayout";
+import RevenueTab from "./pages/financials/RevenueTab";
+import CollectionsTab from "./pages/financials/CollectionsTab";
+import ExpensesTab from "./pages/financials/ExpensesTab";
+import DisbursementsTab from "./pages/financials/DisbursementsTab";
 import Profile from "./pages/Profile";
 import Scorecard from "./pages/Scorecard";
 import Compare from "./pages/Compare";
@@ -65,7 +69,18 @@ export default function App() {
         <Route index element={<Scorecard />} />
         <Route path="profile" element={<Profile />} />
         <Route path="compare" element={<Compare />} />
-        <Route path="revenue" element={<Dashboard />} />
+        {/* /revenue keeps its URL (per the user's answer to keep the route
+            name even though the nav label is now "Financials") but is now a
+            layout route: one shared FilterBar + sub-tab nav bar in
+            FinancialsLayout, with 4 real nested routes underneath so each
+            category is bookmarkable and the page doesn't show all of
+            Revenue/Collections/Expenses/Disbursements at once anymore. */}
+        <Route path="revenue" element={<FinancialsLayout />}>
+          <Route index element={<RevenueTab />} />
+          <Route path="collections" element={<CollectionsTab />} />
+          <Route path="expenses" element={<ExpensesTab />} />
+          <Route path="disbursements" element={<DisbursementsTab />} />
+        </Route>
         <Route path="rocks" element={<Rocks />} />
         <Route path="reports" element={<Reports />} />
         {/* Disbursements (Advances/Loan Repayments/Interests) used to be

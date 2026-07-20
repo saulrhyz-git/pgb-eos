@@ -176,6 +176,10 @@ router.get("/", async (req, res) => {
         ytdActual: 0,
         attainmentPct: 0,
         ytdAttainmentPct: 0,
+        quarterCollectionsActual: 0,
+        collectionsAttainmentPct: 0,
+        quarterExpensesActual: 0,
+        expensesAttainmentPct: 0,
         // Unlike every other figure in this early-return branch, these three
         // are NOT hardcoded to 0 — Disbursements visibility is independent
         // of the financial narrowing that emptied businessUnitIds above (see
@@ -216,16 +220,32 @@ router.get("/", async (req, res) => {
   }
 
   const qActualByCompanyQuarter = new Map<string, Figures>();
-  const remarksByCompanyQuarter = new Map<
-    string,
-    { revenueRemarks: string; collectionsRemarks: string; expensesRemarks: string }
-  >();
+  type ActualRemarks = {
+    revenueRemarks: string;
+    collectionsInternalEarnedRemarks: string;
+    collectionsInternalUnearnedRemarks: string;
+    collectionsInternalOthersRemarks: string;
+    collectionsExternalEarnedRemarks: string;
+    collectionsExternalUnearnedRemarks: string;
+    collectionsExternalOthersRemarks: string;
+    expensesInterestRemarks: string;
+    expensesDepreciationRemarks: string;
+    expensesOtherNonCashRemarks: string;
+  };
+  const remarksByCompanyQuarter = new Map<string, ActualRemarks>();
   for (const a of quarterActuals) {
     qActualByCompanyQuarter.set(`${a.companyId}:${a.quarter}`, toFigures(a));
     remarksByCompanyQuarter.set(`${a.companyId}:${a.quarter}`, {
       revenueRemarks: a.revenueRemarks,
-      collectionsRemarks: a.collectionsRemarks,
-      expensesRemarks: a.expensesRemarks,
+      collectionsInternalEarnedRemarks: a.collectionsInternalEarnedRemarks,
+      collectionsInternalUnearnedRemarks: a.collectionsInternalUnearnedRemarks,
+      collectionsInternalOthersRemarks: a.collectionsInternalOthersRemarks,
+      collectionsExternalEarnedRemarks: a.collectionsExternalEarnedRemarks,
+      collectionsExternalUnearnedRemarks: a.collectionsExternalUnearnedRemarks,
+      collectionsExternalOthersRemarks: a.collectionsExternalOthersRemarks,
+      expensesInterestRemarks: a.expensesInterestRemarks,
+      expensesDepreciationRemarks: a.expensesDepreciationRemarks,
+      expensesOtherNonCashRemarks: a.expensesOtherNonCashRemarks,
     });
   }
 
@@ -296,6 +316,13 @@ router.get("/", async (req, res) => {
   let quarterCollectionsTargetTotal = 0;
   let quarterExpensesTargetTotal = 0;
   let quarterActualTotal = 0;
+  // Unlike quarterActualTotal above (revenue-only, and the basis for the
+  // dashboard's long-standing "headline" KPIs), these two are new: a genuine
+  // Quarter Actual + Attainment for Collections and Expenses respectively,
+  // so the Financials sub-tabs for those categories have a real Actual
+  // figure to show (not just their existing Target totals).
+  let quarterCollectionsActualTotal = 0;
+  let quarterExpensesActualTotal = 0;
   let ytdTargetTotal = 0;
   let ytdActualTotal = 0;
   // Note: quarterAdvancesActualTotal/quarterLoansActualTotal/
@@ -315,10 +342,10 @@ router.get("/", async (req, res) => {
       if (isCatAllowed(cid, "REVENUE")) quarterRevenueTargetTotal += revenueTotal(qt);
       if (isCatAllowed(cid, "COLLECTIONS")) quarterCollectionsTargetTotal += collectionsTotal(qt);
       if (isCatAllowed(cid, "EXPENSES")) quarterExpensesTargetTotal += expensesTotal(qt);
-      if (isCatAllowed(cid, "REVENUE")) {
-        const qa = qActualByCompanyQuarter.get(`${cid}:${q}`) || emptyFigures();
-        quarterActualTotal += revenueTotal(qa);
-      }
+      const qa = qActualByCompanyQuarter.get(`${cid}:${q}`) || emptyFigures();
+      if (isCatAllowed(cid, "REVENUE")) quarterActualTotal += revenueTotal(qa);
+      if (isCatAllowed(cid, "COLLECTIONS")) quarterCollectionsActualTotal += collectionsTotal(qa);
+      if (isCatAllowed(cid, "EXPENSES")) quarterExpensesActualTotal += expensesTotal(qa);
     }
 
     if (isCatAllowed(cid, "REVENUE")) {
@@ -343,6 +370,14 @@ router.get("/", async (req, res) => {
     ytdActual: ytdActualTotal,
     attainmentPct: pct(quarterActualTotal, quarterRevenueTargetTotal),
     ytdAttainmentPct: pct(ytdActualTotal, ytdTargetTotal),
+    // New: a genuine Quarter Actual + Attainment for Collections/Expenses
+    // (previously only their Target totals existed) — feeds the Financials
+    // page's Collections/Expenses sub-tabs, which each need an "Actual vs
+    // Target" card the same way Revenue's has always had one.
+    quarterCollectionsActual: quarterCollectionsActualTotal,
+    collectionsAttainmentPct: pct(quarterCollectionsActualTotal, quarterCollectionsTargetTotal),
+    quarterExpensesActual: quarterExpensesActualTotal,
+    expensesAttainmentPct: pct(quarterExpensesActualTotal, quarterExpensesTargetTotal),
     quarterAdvancesActual: quarterAdvancesActualTotal,
     quarterLoansActual: quarterLoansActualTotal,
     quarterInterestsActual: quarterInterestsActualTotal,
@@ -388,17 +423,26 @@ router.get("/", async (req, res) => {
     let quarterTargetAgg = emptyFigures();
     let quarterActualAgg = emptyFigures();
     let ytdActualAgg = emptyFigures();
+    // Collections/Expenses don't get an Annual/YTD headline (only Revenue
+    // ever has — see the comment below), just a Quarter Target/Actual pair,
+    // one per category, aggregated the same way as Revenue's.
+    let collectionsQuarterTargetAgg = emptyFigures();
+    let collectionsQuarterActualAgg = emptyFigures();
+    let expensesQuarterTargetAgg = emptyFigures();
+    let expensesQuarterActualAgg = emptyFigures();
 
     const companyRows = buCompanies.map((c) => {
       const revenueOk = isCatAllowed(c.id, "REVENUE");
       const collectionsOk = isCatAllowed(c.id, "COLLECTIONS");
       const expensesOk = isCatAllowed(c.id, "EXPENSES");
 
-      // The Business-Unit-level headline figures below (annualTarget/
-      // quarterTarget/quarterActual/ytdActual) have always been revenue-only
-      // (see revenueTotal() calls further down), so gating a Company's
-      // contribution to these aggregates on REVENUE view alone is correct
-      // and sufficient — Collections/Expenses are never read from them.
+      // The Business-Unit-level Annual/YTD headline figures below
+      // (annualTarget/ytdActual) have always been revenue-only (see
+      // revenueTotal() calls further down), so gating a Company's
+      // contribution to those two on REVENUE view alone is correct and
+      // sufficient. Collections/Expenses get their own separately-gated
+      // Quarter Target/Actual aggregates instead (collectionsQuarterTargetAgg
+      // etc.), computed independently below.
       if (revenueOk) annualAgg = addFigures(annualAgg, annualByCompany.get(c.id) || emptyFigures());
 
       let qt = emptyFigures();
@@ -411,6 +455,14 @@ router.get("/", async (req, res) => {
         quarterTargetAgg = addFigures(quarterTargetAgg, qt);
         quarterActualAgg = addFigures(quarterActualAgg, qa);
       }
+      if (collectionsOk) {
+        collectionsQuarterTargetAgg = addFigures(collectionsQuarterTargetAgg, qt);
+        collectionsQuarterActualAgg = addFigures(collectionsQuarterActualAgg, qa);
+      }
+      if (expensesOk) {
+        expensesQuarterTargetAgg = addFigures(expensesQuarterTargetAgg, qt);
+        expensesQuarterActualAgg = addFigures(expensesQuarterActualAgg, qa);
+      }
 
       let ytdActualCompany = emptyFigures();
       for (let q = 1; q <= quarter; q++) {
@@ -420,6 +472,19 @@ router.get("/", async (req, res) => {
       if (revenueOk) ytdActualAgg = addFigures(ytdActualAgg, ytdActualCompany);
 
       const remarks = !isAllQuarters ? remarksByCompanyQuarter.get(`${c.id}:${quarter}`) : undefined;
+      const emptyRemarks: ActualRemarks = {
+        revenueRemarks: "",
+        collectionsInternalEarnedRemarks: "",
+        collectionsInternalUnearnedRemarks: "",
+        collectionsInternalOthersRemarks: "",
+        collectionsExternalEarnedRemarks: "",
+        collectionsExternalUnearnedRemarks: "",
+        collectionsExternalOthersRemarks: "",
+        expensesInterestRemarks: "",
+        expensesDepreciationRemarks: "",
+        expensesOtherNonCashRemarks: "",
+      };
+      const r = remarks || emptyRemarks;
 
       return {
         companyId: c.id,
@@ -428,19 +493,31 @@ router.get("/", async (req, res) => {
           internal: revenueOk ? qa.revenueInternal : 0,
           external: revenueOk ? qa.revenueExternal : 0,
           total: revenueOk ? revenueTotal(qa) : 0,
-          collectionsInternal: collectionsOk ? qa.collectionsInternal : 0,
-          collectionsExternal: collectionsOk ? qa.collectionsExternal : 0,
-          expensesInternal: expensesOk ? qa.expensesInternal : 0,
-          expensesExternal: expensesOk ? qa.expensesExternal : 0,
+          collectionsInternalEarned: collectionsOk ? qa.collectionsInternalEarned : 0,
+          collectionsInternalUnearned: collectionsOk ? qa.collectionsInternalUnearned : 0,
+          collectionsInternalOthers: collectionsOk ? qa.collectionsInternalOthers : 0,
+          collectionsExternalEarned: collectionsOk ? qa.collectionsExternalEarned : 0,
+          collectionsExternalUnearned: collectionsOk ? qa.collectionsExternalUnearned : 0,
+          collectionsExternalOthers: collectionsOk ? qa.collectionsExternalOthers : 0,
+          expensesInterest: expensesOk ? qa.expensesInterest : 0,
+          expensesDepreciation: expensesOk ? qa.expensesDepreciation : 0,
+          expensesOtherNonCash: expensesOk ? qa.expensesOtherNonCash : 0,
         },
         ytdActual: revenueOk ? revenueTotal(ytdActualCompany) : 0,
         // Remarks are logged per single quarter, so they're only meaningful
         // (and only shown) when a specific quarter is selected, not "all" —
-        // and, same as the figures above, each category's remarks are only
-        // included if that category is view-permitted for this Company.
-        revenueRemarks: revenueOk && remarks ? remarks.revenueRemarks : "",
-        collectionsRemarks: collectionsOk && remarks ? remarks.collectionsRemarks : "",
-        expensesRemarks: expensesOk && remarks ? remarks.expensesRemarks : "",
+        // and, same as the figures above, each breakdown's remarks are only
+        // included if its parent category is view-permitted for this Company.
+        revenueRemarks: revenueOk && remarks ? r.revenueRemarks : "",
+        collectionsInternalEarnedRemarks: collectionsOk && remarks ? r.collectionsInternalEarnedRemarks : "",
+        collectionsInternalUnearnedRemarks: collectionsOk && remarks ? r.collectionsInternalUnearnedRemarks : "",
+        collectionsInternalOthersRemarks: collectionsOk && remarks ? r.collectionsInternalOthersRemarks : "",
+        collectionsExternalEarnedRemarks: collectionsOk && remarks ? r.collectionsExternalEarnedRemarks : "",
+        collectionsExternalUnearnedRemarks: collectionsOk && remarks ? r.collectionsExternalUnearnedRemarks : "",
+        collectionsExternalOthersRemarks: collectionsOk && remarks ? r.collectionsExternalOthersRemarks : "",
+        expensesInterestRemarks: expensesOk && remarks ? r.expensesInterestRemarks : "",
+        expensesDepreciationRemarks: expensesOk && remarks ? r.expensesDepreciationRemarks : "",
+        expensesOtherNonCashRemarks: expensesOk && remarks ? r.expensesOtherNonCashRemarks : "",
       };
     });
 
@@ -448,6 +525,10 @@ router.get("/", async (req, res) => {
     const quarterTargetTotalRow = revenueTotal(quarterTargetAgg);
     const quarterActualTotalRow = revenueTotal(quarterActualAgg);
     const ytdActualTotalRow = revenueTotal(ytdActualAgg);
+    const collectionsQuarterTargetRow = collectionsTotal(collectionsQuarterTargetAgg);
+    const collectionsQuarterActualRow = collectionsTotal(collectionsQuarterActualAgg);
+    const expensesQuarterTargetRow = expensesTotal(expensesQuarterTargetAgg);
+    const expensesQuarterActualRow = expensesTotal(expensesQuarterActualAgg);
 
     return {
       businessUnitId: bu.id,
@@ -458,6 +539,12 @@ router.get("/", async (req, res) => {
       quarterAttainmentPct: pct(quarterActualTotalRow, quarterTargetTotalRow),
       ytdActual: ytdActualTotalRow,
       ytdVsAnnualPct: pct(ytdActualTotalRow, annualTotal),
+      collectionsQuarterTarget: collectionsQuarterTargetRow,
+      collectionsQuarterActual: collectionsQuarterActualRow,
+      collectionsAttainmentPct: pct(collectionsQuarterActualRow, collectionsQuarterTargetRow),
+      expensesQuarterTarget: expensesQuarterTargetRow,
+      expensesQuarterActual: expensesQuarterActualRow,
+      expensesAttainmentPct: pct(expensesQuarterActualRow, expensesQuarterTargetRow),
       companies: companyRows,
     };
   });

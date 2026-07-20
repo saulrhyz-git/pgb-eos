@@ -1429,3 +1429,111 @@ same border flip. No behavior changed — same page state, same page size,
 same Prev/Next logic — purely a layout reposition. Worth checking by hand:
 Rocks, Reports, and the Audit Log all show their pager above the table, and
 paging still works (Prev/Next disable at the ends, "Page X of Y" updates).
+
+**Financials: Revenue renamed on the sidebar, Collections/Expenses broken
+into real breakdowns, and the dashboard split into 4 sub-tabs.** A large,
+four-part restructuring:
+
+1. *Label-only rename.* The sidebar nav item is now "Financials" instead of
+   "Revenue" (`client/src/components/Layout.tsx`). The URL is unchanged —
+   still `/revenue` — per the decision to only rename what's displayed, not
+   the route.
+2. *Expenses collapsed to one breakdown set.* Expenses no longer has
+   Internal/External — it's now three values: Interest, Depreciation, and
+   Other Non-Cash Expenses (`expensesInterest`/`expensesDepreciation`/
+   `expensesOtherNonCash`), each with its own Remarks field.
+3. *Collections expanded to six values.* Both Internal and External now each
+   break into Revenue - Earned, Advance Payments - Unearned, and Others
+   (`collectionsInternalEarned`/`collectionsInternalUnearned`/
+   `collectionsInternalOthers`/`collectionsExternalEarned`/
+   `collectionsExternalUnearned`/`collectionsExternalOthers`), each with its
+   own Remarks field — one Remarks field per breakdown, the same granularity
+   Disbursements already used per category.
+4. *Financials dashboard split into 4 sub-tabs.* What used to be one long
+   page (`Dashboard.tsx`, showing Revenue + Collections + Expenses +
+   Disbursements all at once) is now `client/src/pages/financials/
+   FinancialsLayout.tsx` plus four real nested routes — `/revenue` (Revenue,
+   the index route), `/revenue/collections`, `/revenue/expenses`, and
+   `/revenue/disbursements` — each bookmarkable on its own. One shared
+   `FilterBar` and one shared `api.dashboard(...)` fetch live in
+   `FinancialsLayout`, passed down to each leaf tab via React Router's
+   `Outlet` context (`useOutletContext<FinancialsOutletContext>()`) rather
+   than each sub-tab fetching independently, per the decision that the
+   Year/Quarter/Business Unit/Company filter should be shared across all
+   four, not per-tab.
+
+Schema/backend: `QuarterTarget` and `QuarterActual` in `schema.prisma` were
+rewritten to the new 11-figure shape (2 Revenue + 6 Collections + 3
+Expenses), with `QuarterActual` also carrying the matching 10 Remarks
+fields (Revenue keeps its original single `revenueRemarks`). This is a
+**destructive** migration (`server/prisma/migrations/
+20260724010000_restructure_collections_expenses_breakdown/migration.sql`) —
+the old combined Collections/Expenses Internal/External figures cannot be
+principled-ly split into the new breakdown, so existing values in those
+columns are dropped, not migrated. `server/src/utils/aggregate.ts`'s
+`Figures` interface (the single source of truth for financial shape,
+consumed by nearly every route that touches money) was rewritten to match,
+and `collectionsInternalTotal`/`collectionsExternalTotal` helpers were
+added alongside the existing `collectionsTotal`/`expensesTotal`. `targets.ts`
+and `actuals.ts` had their zod schemas and field-permission maps updated to
+the new field names; the Annual→Quarter cascade logic in `targets.ts` needed
+no changes at all, since it iterates generically over a `FIGURE_KEYS` list
+rather than caring what each key represents. `dashboard.ts` gained genuinely
+new BU-level Collections/Expenses rollups (`collectionsQuarterTarget`/
+`collectionsQuarterActual`/`collectionsAttainmentPct` and the Expenses
+equivalents) and matching top-level KPI fields
+(`quarterCollectionsActual`/`collectionsAttainmentPct`/
+`quarterExpensesActual`/`expensesAttainmentPct`) — previously only Revenue
+had a real Quarter Actual + Attainment figure; Collections/Expenses only had
+Target totals. `scorecard.ts`, `comparison.ts`, `reports.ts`, and `seed.ts`
+needed **no changes** — verified by grep that none of them reference the old
+field names directly, since they only ever go through the generic
+`Figures`/aggregate.ts total functions.
+
+Frontend: `client/src/api/types.ts` and `client.ts` were updated to the new
+shape. `TargetConfig.tsx` (Target Setup) keeps its existing "One Total" vs
+"Internal / External" toggle only for Revenue (the only category that still
+fits that shape); Collections and Expenses each got a new, always-expanded
+editor component (`CollectionsFieldsEditor`, `ExpensesFieldsEditor`) with no
+toggle, since Collections now has 3 sub-values per side and Expenses has no
+Internal/External at all. `IntegratorPortal.tsx` (Data Entry) got the same
+treatment — Collections renders as two cards ("Collections — Internal" /
+"Collections — External"), each with 3 breakdown items; Expenses renders as
+one card with 3 breakdown items; each breakdown item is its own numeric
+input + Remarks input pair. The Disbursements section of that same page was
+left untouched. `OperationalGrid.tsx` gained a `category` prop
+("REVENUE"/"COLLECTIONS"/"EXPENSES", defaulting to "REVENUE") controlling
+both which BU-headline columns show (Revenue keeps its full Annual/Quarter/
+YTD headline; Collections/Expenses show only Quarter Target/Actual/
+Attainment, since they have no Annual/YTD rollup) and which per-company
+breakdown fields + Remarks inputs render in the expanded detail row.
+`TargetMatrix.tsx` gained an optional `category` prop to show just one
+category's row per Business Unit (used by each Financials sub-tab) instead
+of all three at once. `KpiCards.tsx` was reworked into a category-aware
+component — Revenue shows Annual + Quarter Target + Quarter Actual (with
+attainment) + Year-to-Date Actual cards; Collections/Expenses show the same
+three non-YTD cards only, since neither has a YTD figure.
+
+Removed: `client/src/pages/Dashboard.tsx` (replaced by the `financials/`
+sub-tab structure above).
+
+Worth checking by hand, given the size and destructive nature of this
+change: the sidebar says "Financials" (not "Revenue") but the URL is still
+`/revenue`; visiting `/revenue`, `/revenue/collections`, `/revenue/expenses`,
+and `/revenue/disbursements` each load a distinct, narrower page rather than
+one long combined page, and each is directly bookmarkable/refreshable;
+changing the Year/Quarter/Business Unit/Company filter on any one sub-tab
+and switching to another sub-tab keeps the same filter selection (confirming
+the shared FilterBar); Target Setup's Collections section shows 2 sub-cards
+(Internal/External) each with 3 fields, and its Expenses section shows 1
+card with 3 fields and no Internal/External split; Data Entry's Collections/
+Expenses sections match the same shape and each breakdown has its own
+Remarks box; the Operational Grid's expanded per-company detail on the
+Collections and Expenses sub-tabs shows the correct 6 and 3 breakdown values
+(respectively) instead of a generic Internal/External pair; a Custom Role
+with only `COLLECTIONS` (not `EXPENSES` or `REVENUE`) granted can still open
+`/revenue/collections` and see real figures there, while the other two
+sub-tabs correctly show zeroed/masked data; and since this migration is
+destructive, confirm on a fresh seed/migrate that Collections and Expenses
+figures all start at 0 rather than carrying over any old Internal/External
+values from before the schema change.

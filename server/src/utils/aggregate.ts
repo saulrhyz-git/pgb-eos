@@ -7,32 +7,52 @@ export function n(value: Prisma.Decimal | number | null | undefined): number {
   return typeof value === "number" ? value : Number(value.toString());
 }
 
+// Revenue stays a plain Internal/External pair. Collections is Internal/
+// External, each broken into three recognition types (Earned/Unearned/
+// Others) — see schema.prisma's QuarterTarget/QuarterActual comment. Expenses
+// has no Internal/External split at all, just three single-value breakdowns
+// (Interest/Depreciation/Other Non-Cash).
 export interface Figures {
   revenueInternal: number;
   revenueExternal: number;
-  collectionsInternal: number;
-  collectionsExternal: number;
-  expensesInternal: number;
-  expensesExternal: number;
+  collectionsInternalEarned: number;
+  collectionsInternalUnearned: number;
+  collectionsInternalOthers: number;
+  collectionsExternalEarned: number;
+  collectionsExternalUnearned: number;
+  collectionsExternalOthers: number;
+  expensesInterest: number;
+  expensesDepreciation: number;
+  expensesOtherNonCash: number;
 }
 
 export const emptyFigures = (): Figures => ({
   revenueInternal: 0,
   revenueExternal: 0,
-  collectionsInternal: 0,
-  collectionsExternal: 0,
-  expensesInternal: 0,
-  expensesExternal: 0,
+  collectionsInternalEarned: 0,
+  collectionsInternalUnearned: 0,
+  collectionsInternalOthers: 0,
+  collectionsExternalEarned: 0,
+  collectionsExternalUnearned: 0,
+  collectionsExternalOthers: 0,
+  expensesInterest: 0,
+  expensesDepreciation: 0,
+  expensesOtherNonCash: 0,
 });
 
 export function toFigures(row: any): Figures {
   return {
     revenueInternal: n(row?.revenueInternal),
     revenueExternal: n(row?.revenueExternal),
-    collectionsInternal: n(row?.collectionsInternal),
-    collectionsExternal: n(row?.collectionsExternal),
-    expensesInternal: n(row?.expensesInternal),
-    expensesExternal: n(row?.expensesExternal),
+    collectionsInternalEarned: n(row?.collectionsInternalEarned),
+    collectionsInternalUnearned: n(row?.collectionsInternalUnearned),
+    collectionsInternalOthers: n(row?.collectionsInternalOthers),
+    collectionsExternalEarned: n(row?.collectionsExternalEarned),
+    collectionsExternalUnearned: n(row?.collectionsExternalUnearned),
+    collectionsExternalOthers: n(row?.collectionsExternalOthers),
+    expensesInterest: n(row?.expensesInterest),
+    expensesDepreciation: n(row?.expensesDepreciation),
+    expensesOtherNonCash: n(row?.expensesOtherNonCash),
   };
 }
 
@@ -40,10 +60,15 @@ export function addFigures(a: Figures, b: Figures): Figures {
   return {
     revenueInternal: a.revenueInternal + b.revenueInternal,
     revenueExternal: a.revenueExternal + b.revenueExternal,
-    collectionsInternal: a.collectionsInternal + b.collectionsInternal,
-    collectionsExternal: a.collectionsExternal + b.collectionsExternal,
-    expensesInternal: a.expensesInternal + b.expensesInternal,
-    expensesExternal: a.expensesExternal + b.expensesExternal,
+    collectionsInternalEarned: a.collectionsInternalEarned + b.collectionsInternalEarned,
+    collectionsInternalUnearned: a.collectionsInternalUnearned + b.collectionsInternalUnearned,
+    collectionsInternalOthers: a.collectionsInternalOthers + b.collectionsInternalOthers,
+    collectionsExternalEarned: a.collectionsExternalEarned + b.collectionsExternalEarned,
+    collectionsExternalUnearned: a.collectionsExternalUnearned + b.collectionsExternalUnearned,
+    collectionsExternalOthers: a.collectionsExternalOthers + b.collectionsExternalOthers,
+    expensesInterest: a.expensesInterest + b.expensesInterest,
+    expensesDepreciation: a.expensesDepreciation + b.expensesDepreciation,
+    expensesOtherNonCash: a.expensesOtherNonCash + b.expensesOtherNonCash,
   };
 }
 
@@ -51,12 +76,20 @@ export function revenueTotal(f: Figures): number {
   return f.revenueInternal + f.revenueExternal;
 }
 
+export function collectionsInternalTotal(f: Figures): number {
+  return f.collectionsInternalEarned + f.collectionsInternalUnearned + f.collectionsInternalOthers;
+}
+
+export function collectionsExternalTotal(f: Figures): number {
+  return f.collectionsExternalEarned + f.collectionsExternalUnearned + f.collectionsExternalOthers;
+}
+
 export function collectionsTotal(f: Figures): number {
-  return f.collectionsInternal + f.collectionsExternal;
+  return collectionsInternalTotal(f) + collectionsExternalTotal(f);
 }
 
 export function expensesTotal(f: Figures): number {
-  return f.expensesInternal + f.expensesExternal;
+  return f.expensesInterest + f.expensesDepreciation + f.expensesOtherNonCash;
 }
 
 export function pct(actual: number, target: number): number {

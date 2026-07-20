@@ -2,21 +2,63 @@ import { PhilippinePeso, Wallet, Receipt, TrendingUp, CalendarRange } from "luci
 import type { Kpis } from "../api/types";
 import { attainmentColor, formatCurrency, formatCurrencyShort, formatPct } from "../utils/format";
 
+type Category = "REVENUE" | "COLLECTIONS" | "EXPENSES";
+
 interface Props {
   kpis: Kpis;
   quarter: number;
+  // Which category's cards to show — each Financials sub-tab renders just
+  // its own category now (see FinancialsLayout.tsx), rather than one big
+  // component showing all three categories at once like before.
+  category?: Category;
 }
 
 // Consistent per-category colors so a card can be matched at a glance across
 // the Annual row and the Quarterly row below it — Revenue is blue,
 // Collections is emerald/green, Expenses is amber. Cards that aren't tied to
-// one category (the Actual cards) stay neutral.
+// one category (Actual/YTD) stay neutral.
 type Tone = "revenue" | "collections" | "expenses" | "neutral";
 const TONES: Record<Tone, { bg: string; border: string; icon: string; value: string }> = {
   revenue: { bg: "bg-blue-50", border: "border-blue-200", icon: "text-blue-600", value: "text-blue-900" },
   collections: { bg: "bg-emerald-50", border: "border-emerald-200", icon: "text-emerald-600", value: "text-emerald-900" },
   expenses: { bg: "bg-amber-50", border: "border-amber-200", icon: "text-amber-600", value: "text-amber-900" },
   neutral: { bg: "bg-white", border: "border-slate-200", icon: "text-slate-500", value: "text-slate-800" },
+};
+
+// Per-category config: which Kpis fields feed the cards, the tone/icon, and
+// the display label. Collections/Expenses have no Annual/YTD counterpart
+// beyond what's listed here (see the Kpis type comment in api/types.ts).
+const CATEGORY_CONFIG: Record<
+  Category,
+  { label: string; tone: Tone; icon: React.ReactNode; annualTarget: keyof Kpis; quarterTarget: keyof Kpis; quarterActual: keyof Kpis; attainmentPct: keyof Kpis }
+> = {
+  REVENUE: {
+    label: "Revenue",
+    tone: "revenue",
+    icon: <PhilippinePeso className="h-4 w-4" />,
+    annualTarget: "annualRevenueTarget",
+    quarterTarget: "quarterTarget",
+    quarterActual: "quarterActual",
+    attainmentPct: "attainmentPct",
+  },
+  COLLECTIONS: {
+    label: "Collections",
+    tone: "collections",
+    icon: <Wallet className="h-4 w-4" />,
+    annualTarget: "annualCollectionsTarget",
+    quarterTarget: "quarterCollectionsTarget",
+    quarterActual: "quarterCollectionsActual",
+    attainmentPct: "collectionsAttainmentPct",
+  },
+  EXPENSES: {
+    label: "Expenses",
+    tone: "expenses",
+    icon: <Receipt className="h-4 w-4" />,
+    annualTarget: "annualExpensesTarget",
+    quarterTarget: "quarterExpensesTarget",
+    quarterActual: "quarterExpensesActual",
+    attainmentPct: "expensesAttainmentPct",
+  },
 };
 
 function Card({
@@ -54,81 +96,57 @@ function Card({
   );
 }
 
-export default function KpiCards({ kpis, quarter }: Props) {
+export default function KpiCards({ kpis, quarter, category = "REVENUE" }: Props) {
   // quarter === 0 means "All Quarters" (full year) was selected in the filter bar.
   const periodLabel = quarter === 0 ? "Full Year" : `Q${quarter}`;
+  const cfg = CATEGORY_CONFIG[category];
+  const annualTarget = kpis[cfg.annualTarget] as number;
+  const quarterTarget = kpis[cfg.quarterTarget] as number;
+  const quarterActual = kpis[cfg.quarterActual] as number;
+  const attainmentPct = kpis[cfg.attainmentPct] as number;
+
   return (
     <div className="flex flex-col gap-4">
-      {/* Annual targets by category — a straight sum of every in-scope Company's
-          Q1-Q4 Quarter Target, unaffected by the Quarter filter above. */}
       <div className="grid grid-cols-1 gap-4 sm:grid-cols-3">
         <Card
-          tone="revenue"
-          icon={<PhilippinePeso className="h-4 w-4" />}
-          label="Annual Revenue Target"
-          value={formatCurrencyShort(kpis.annualRevenueTarget)}
-          fullValue={formatCurrency(kpis.annualRevenueTarget)}
+          tone={cfg.tone}
+          icon={cfg.icon}
+          label={`Annual ${cfg.label} Target`}
+          value={formatCurrencyShort(annualTarget)}
+          fullValue={formatCurrency(annualTarget)}
         />
         <Card
-          tone="collections"
-          icon={<Wallet className="h-4 w-4" />}
-          label="Annual Collections Target"
-          value={formatCurrencyShort(kpis.annualCollectionsTarget)}
-          fullValue={formatCurrency(kpis.annualCollectionsTarget)}
+          tone={cfg.tone}
+          icon={cfg.icon}
+          label={`${periodLabel} ${cfg.label} Target`}
+          value={formatCurrencyShort(quarterTarget)}
+          fullValue={formatCurrency(quarterTarget)}
         />
-        <Card
-          tone="expenses"
-          icon={<Receipt className="h-4 w-4" />}
-          label="Annual Expenses Target"
-          value={formatCurrencyShort(kpis.annualExpensesTarget)}
-          fullValue={formatCurrency(kpis.annualExpensesTarget)}
-        />
-      </div>
-
-      {/* Quarterly targets by category for the selected period — these DO
-          change with the Quarter filter above (unlike the Annual row). */}
-      <div className="grid grid-cols-1 gap-4 sm:grid-cols-3">
-        <Card
-          tone="revenue"
-          icon={<PhilippinePeso className="h-4 w-4" />}
-          label={`${periodLabel} Revenue Target`}
-          value={formatCurrencyShort(kpis.quarterTarget)}
-          fullValue={formatCurrency(kpis.quarterTarget)}
-        />
-        <Card
-          tone="collections"
-          icon={<Wallet className="h-4 w-4" />}
-          label={`${periodLabel} Collections Target`}
-          value={formatCurrencyShort(kpis.quarterCollectionsTarget)}
-          fullValue={formatCurrency(kpis.quarterCollectionsTarget)}
-        />
-        <Card
-          tone="expenses"
-          icon={<Receipt className="h-4 w-4" />}
-          label={`${periodLabel} Expenses Target`}
-          value={formatCurrencyShort(kpis.quarterExpensesTarget)}
-          fullValue={formatCurrency(kpis.quarterExpensesTarget)}
-        />
-      </div>
-
-      <div className="grid grid-cols-1 gap-4 sm:grid-cols-2">
         <Card
           icon={<TrendingUp className="h-4 w-4" />}
           label={`${periodLabel} Actual`}
-          value={formatCurrencyShort(kpis.quarterActual)}
-          fullValue={formatCurrency(kpis.quarterActual)}
-          sub={`${formatPct(kpis.attainmentPct)} attainment`}
-          subColor={attainmentColor(kpis.attainmentPct)}
-        />
-        <Card
-          icon={<CalendarRange className="h-4 w-4" />}
-          label="Year-to-Date Actual"
-          value={formatCurrencyShort(kpis.ytdActual)}
-          fullValue={formatCurrency(kpis.ytdActual)}
-          sub={`${formatPct(kpis.ytdAttainmentPct)} of YTD target`}
-          subColor={attainmentColor(kpis.ytdAttainmentPct)}
+          value={formatCurrencyShort(quarterActual)}
+          fullValue={formatCurrency(quarterActual)}
+          sub={`${formatPct(attainmentPct)} attainment`}
+          subColor={attainmentColor(attainmentPct)}
         />
       </div>
+
+      {/* Revenue is the only category with a Year-to-Date figure — Collections
+          and Expenses only ever have the Quarter Target/Actual/Attainment set
+          above (see the Kpis type comment in api/types.ts). */}
+      {category === "REVENUE" && (
+        <div className="grid grid-cols-1 gap-4 sm:grid-cols-3">
+          <Card
+            icon={<CalendarRange className="h-4 w-4" />}
+            label="Year-to-Date Actual"
+            value={formatCurrencyShort(kpis.ytdActual)}
+            fullValue={formatCurrency(kpis.ytdActual)}
+            sub={`${formatPct(kpis.ytdAttainmentPct)} of YTD target`}
+            subColor={attainmentColor(kpis.ytdAttainmentPct)}
+          />
+        </div>
+      )}
     </div>
   );
 }

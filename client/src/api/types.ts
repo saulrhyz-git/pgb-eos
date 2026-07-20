@@ -118,13 +118,38 @@ export interface Company {
   businessUnitId: string;
 }
 
+// Revenue stays a plain Internal/External pair. Collections is Internal/
+// External, each broken into three recognition types (Earned/Unearned/
+// Others). Expenses has no Internal/External split at all — just three
+// single-value breakdowns (Interest/Depreciation/Other Non-Cash).
 export interface Figures {
   revenueInternal: number;
   revenueExternal: number;
-  collectionsInternal: number;
-  collectionsExternal: number;
-  expensesInternal: number;
-  expensesExternal: number;
+  collectionsInternalEarned: number;
+  collectionsInternalUnearned: number;
+  collectionsInternalOthers: number;
+  collectionsExternalEarned: number;
+  collectionsExternalUnearned: number;
+  collectionsExternalOthers: number;
+  expensesInterest: number;
+  expensesDepreciation: number;
+  expensesOtherNonCash: number;
+}
+
+// One Remarks field per breakdown (not one per parent category) — mirrors
+// the per-category Remarks pattern used for Disbursements. Only present on
+// QuarterActual (Targets have no Remarks).
+export interface ActualRemarks {
+  revenueRemarks: string;
+  collectionsInternalEarnedRemarks: string;
+  collectionsInternalUnearnedRemarks: string;
+  collectionsInternalOthersRemarks: string;
+  collectionsExternalEarnedRemarks: string;
+  collectionsExternalUnearnedRemarks: string;
+  collectionsExternalOthersRemarks: string;
+  expensesInterestRemarks: string;
+  expensesDepreciationRemarks: string;
+  expensesOtherNonCashRemarks: string;
 }
 
 export interface Kpis {
@@ -144,6 +169,12 @@ export interface Kpis {
   ytdActual: number;
   attainmentPct: number;
   ytdAttainmentPct: number;
+  // Collections/Expenses Quarter Actual + Attainment — unlike Revenue, these
+  // have no Annual/YTD counterpart (only a Quarter Target/Actual pair).
+  quarterCollectionsActual: number;
+  collectionsAttainmentPct: number;
+  quarterExpensesActual: number;
+  expensesAttainmentPct: number;
   // Disbursements: recorded (not targeted), so — unlike the pairs above —
   // each of these is just one running actual total for the selected period
   // (respects the Quarter filter, same "All Quarters = sum of Q1-Q4" rule).
@@ -180,20 +211,34 @@ export interface OperationalGridCompanyRow {
     internal: number;
     external: number;
     total: number;
-    collectionsInternal: number;
-    collectionsExternal: number;
-    expensesInternal: number;
-    expensesExternal: number;
+    collectionsInternalEarned: number;
+    collectionsInternalUnearned: number;
+    collectionsInternalOthers: number;
+    collectionsExternalEarned: number;
+    collectionsExternalUnearned: number;
+    collectionsExternalOthers: number;
+    expensesInterest: number;
+    expensesDepreciation: number;
+    expensesOtherNonCash: number;
   };
   ytdActual: number;
   revenueRemarks: string;
-  collectionsRemarks: string;
-  expensesRemarks: string;
+  collectionsInternalEarnedRemarks: string;
+  collectionsInternalUnearnedRemarks: string;
+  collectionsInternalOthersRemarks: string;
+  collectionsExternalEarnedRemarks: string;
+  collectionsExternalUnearnedRemarks: string;
+  collectionsExternalOthersRemarks: string;
+  expensesInterestRemarks: string;
+  expensesDepreciationRemarks: string;
+  expensesOtherNonCashRemarks: string;
 }
 
 // A Business Unit's target (the sum of its Companies' own targets) vs its
 // Companies' combined actuals, with each contributing Company broken out
-// underneath.
+// underneath. annualTarget/ytdActual/ytdVsAnnualPct are Revenue-only (as
+// they've always been); Collections/Expenses each get their own Quarter
+// Target/Actual/Attainment instead (no Annual/YTD counterpart for them).
 export interface OperationalGridRow {
   businessUnitId: string;
   businessUnitName: string;
@@ -203,6 +248,12 @@ export interface OperationalGridRow {
   quarterAttainmentPct: number;
   ytdActual: number;
   ytdVsAnnualPct: number;
+  collectionsQuarterTarget: number;
+  collectionsQuarterActual: number;
+  collectionsAttainmentPct: number;
+  expensesQuarterTarget: number;
+  expensesQuarterActual: number;
+  expensesAttainmentPct: number;
   companies: OperationalGridCompanyRow[];
 }
 
