@@ -1156,6 +1156,25 @@ Business Goal form and the Edit (pencil) button, but no longer sees a delete
 button next to any Business Goal; a Superadmin still sees and can use the
 delete button as before.
 
+**Rocks: click a row for details** (`client/src/pages/Rocks.tsx`) is a pure
+frontend change — no schema/API changes. Clicking anywhere on a Rock's row
+(other than its Status dropdown, Progress input, or Edit/Delete buttons,
+which still work exactly as before) opens a read-only Details pop-up showing
+the full Rock: title, Company/Quarter, Status badge, Progress bar, Owner,
+Business Goal, the full (non-truncated) Target(s)/Remarks text, and
+created/last-updated timestamps and by whom. An Edit button inside the
+pop-up closes it and opens the existing Add/Edit Rock modal pre-filled for
+that Rock, same as clicking its pencil icon directly. Same dismiss
+affordances as the Add/Edit pop-up: its X button, its Close button, or
+clicking the dimmed backdrop. Worth checking by hand: clicking a row's
+Company/Quarter/Rock/Business Goal/Owner cells opens the Details pop-up;
+clicking the Status dropdown, editing Progress, or clicking Edit/Delete on
+that same row does NOT open the Details pop-up (those controls still work
+immediately, in place); the Details pop-up shows the full Target(s)/Remarks
+text even when the table's own preview was truncated by `line-clamp-2`; the
+Edit button inside it correctly opens the pop-up form pre-filled for that
+same Rock.
+
 Worth checking by hand: a BU Integrator with no Custom Role granting
 `REPORTS` sees the "Reports access required" card when visiting `/reports`,
 and a Custom Role with `REPORTS` view checked unlocks the page for them; a

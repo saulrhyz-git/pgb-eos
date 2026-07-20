@@ -178,6 +178,10 @@ export default function Rocks() {
   // handleRockSubmit) — auto-dismisses on its own after a few seconds.
   const [savedMessage, setSavedMessage] = useState("");
 
+  // Read-only Rock Details pop-up — opened by clicking anywhere on a row
+  // that isn't one of its interactive controls (Status/Progress/Actions).
+  const [detailRock, setDetailRock] = useState<Rock | null>(null);
+
   const [newGoalForm, setNewGoalForm] = useState(emptyGoalForm);
   const [goalError, setGoalError] = useState("");
   const [editingGoalId, setEditingGoalId] = useState<string | null>(null);
@@ -892,7 +896,12 @@ export default function Rocks() {
             </thead>
             <tbody className="divide-y divide-slate-100">
               {pagedRocks.map((r) => (
-                <tr key={r.id}>
+                <tr
+                  key={r.id}
+                  onClick={() => setDetailRock(r)}
+                  className="cursor-pointer hover:bg-slate-50"
+                  title="Click for Rock details"
+                >
                   <td className="px-4 py-3 font-medium text-slate-800">{r.company.name}</td>
                   <td className="px-4 py-3 text-slate-600">Q{r.quarter}</td>
                   <td className="px-4 py-3 text-slate-700">
@@ -904,7 +913,11 @@ export default function Rocks() {
                   </td>
                   <td className="px-4 py-3 text-slate-600">{r.businessGoal?.name || "—"}</td>
                   <td className="px-4 py-3 text-slate-600">{r.ownerName || "—"}</td>
-                  <td className="px-4 py-3">
+                  {/* The next three cells hold their own click targets (Status
+                      select, Progress input, Edit/Delete buttons) — each stops
+                      the click from bubbling up to the row so quickly changing
+                      a Rock inline doesn't also pop open the Details modal. */}
+                  <td className="px-4 py-3" onClick={(e) => e.stopPropagation()}>
                     <select
                       className={`rounded-full border-0 px-2 py-1 text-xs font-medium ${STATUS_BADGE[r.status]}`}
                       value={r.status}
@@ -917,7 +930,7 @@ export default function Rocks() {
                       ))}
                     </select>
                   </td>
-                  <td className="px-4 py-3">
+                  <td className="px-4 py-3" onClick={(e) => e.stopPropagation()}>
                     <div className="flex items-center gap-2">
                       <input
                         type="number"
@@ -936,7 +949,7 @@ export default function Rocks() {
                       </span>
                     </div>
                   </td>
-                  <td className="px-4 py-3">
+                  <td className="px-4 py-3" onClick={(e) => e.stopPropagation()}>
                     <div className="flex justify-end gap-2">
                       <button onClick={() => startEditRock(r)} className="rounded-md p-1.5 text-slate-500 hover:bg-slate-100" title="Edit">
                         <Pencil className="h-4 w-4" />
@@ -971,6 +984,108 @@ export default function Rocks() {
           <Pagination page={page} pageSize={ROCKS_PAGE_SIZE} total={sortedRocks.length} onPageChange={setPage} />
         )}
       </div>
+
+      {/* Read-only Rock Details pop-up — opened by clicking a row (see the
+          table above). Same dismiss affordances as the Add/Edit pop-up:
+          backdrop click, X, or the Close button. */}
+      {detailRock && (
+        <div
+          className="fixed inset-0 z-50 flex items-start justify-center overflow-y-auto bg-slate-900/50 p-4 sm:items-center"
+          onClick={() => setDetailRock(null)}
+        >
+          <div
+            onClick={(e) => e.stopPropagation()}
+            className="flex w-full max-w-lg flex-col gap-4 rounded-lg border border-slate-200 bg-white p-4 shadow-xl sm:p-6"
+          >
+            <div className="flex items-start justify-between gap-3">
+              <div>
+                <h3 className="text-base font-semibold text-slate-800">{detailRock.title}</h3>
+                <p className="text-xs text-slate-500">
+                  {detailRock.company.name} &middot; Q{detailRock.quarter}
+                </p>
+              </div>
+              <button
+                onClick={() => setDetailRock(null)}
+                className="rounded-md p-1 text-slate-400 hover:bg-slate-100 hover:text-slate-600"
+                title="Close"
+              >
+                <X className="h-4 w-4" />
+              </button>
+            </div>
+
+            <div className="flex flex-wrap items-center gap-3">
+              <span className={`rounded-full px-2.5 py-1 text-xs font-semibold ${STATUS_BADGE[detailRock.status]}`}>
+                {STATUS_LABELS[detailRock.status]}
+              </span>
+              <div className="flex items-center gap-2">
+                <div className="h-1.5 w-24 overflow-hidden rounded-full bg-slate-100">
+                  <div
+                    className="h-full rounded-full bg-brand-500"
+                    style={{ width: `${Math.min(100, detailRock.progressPct)}%` }}
+                  />
+                </div>
+                <span className={`text-xs font-semibold ${attainmentColor(detailRock.progressPct)}`}>
+                  {formatProgressPct(detailRock.progressPct)}
+                </span>
+              </div>
+            </div>
+
+            <div className="grid grid-cols-2 gap-3 text-sm">
+              <div>
+                <div className="text-xs font-medium uppercase tracking-wide text-slate-400">Owner</div>
+                <div className="text-slate-700">{detailRock.ownerName || "—"}</div>
+              </div>
+              <div>
+                <div className="text-xs font-medium uppercase tracking-wide text-slate-400">Business Goal</div>
+                <div className="text-slate-700">{detailRock.businessGoal?.name || "—"}</div>
+              </div>
+            </div>
+
+            {detailRock.description && (
+              <div>
+                <div className="text-xs font-medium uppercase tracking-wide text-slate-400">Target(s)</div>
+                <div className="whitespace-pre-wrap text-sm text-slate-700">{detailRock.description}</div>
+              </div>
+            )}
+
+            {detailRock.remarks && (
+              <div>
+                <div className="text-xs font-medium uppercase tracking-wide text-slate-400">Remarks</div>
+                <div className="whitespace-pre-wrap text-sm italic text-slate-700">{detailRock.remarks}</div>
+              </div>
+            )}
+
+            <div className="flex flex-col gap-1 border-t border-slate-100 pt-3 text-xs text-slate-400">
+              <div>
+                Created {new Date(detailRock.createdAt).toLocaleString()}
+                {detailRock.createdBy && <> by {detailRock.createdBy.name}</>}
+              </div>
+              <div>
+                Last updated {new Date(detailRock.updatedAt).toLocaleString()}
+                {detailRock.updatedBy && <> by {detailRock.updatedBy.name}</>}
+              </div>
+            </div>
+
+            <div className="flex justify-end gap-2">
+              <button
+                onClick={() => {
+                  setDetailRock(null);
+                  startEditRock(detailRock);
+                }}
+                className="flex items-center gap-2 rounded-md bg-brand-500 px-4 py-2 text-sm font-medium text-white hover:bg-brand-600"
+              >
+                <Pencil className="h-4 w-4" /> Edit
+              </button>
+              <button
+                onClick={() => setDetailRock(null)}
+                className="rounded-md border border-slate-300 px-4 py-2 text-sm font-medium text-slate-600 hover:bg-slate-50"
+              >
+                Close
+              </button>
+            </div>
+          </div>
+        </div>
+      )}
     </div>
   );
 }
