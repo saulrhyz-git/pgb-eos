@@ -178,6 +178,55 @@ router.get("/quarter", async (req, res) => {
   res.json(targets);
 });
 
+// Shared by the single PUT /quarter route below and the bulk-upload route
+// further down: upserts one Company/Year/Quarter's Figures and cascades the
+// delta across that Company's *subsequent* quarters of the same Year (never
+// prior ones), keeping the Company's Q1-Q4 sum exactly what it was right
+// before this edit. Does not check permissions/locks itself — callers are
+// responsible for that first (see PUT /quarter and POST /quarter/bulk).
+async function upsertQuarterTarget(companyId: string, yearId: string, quarter: number, figures: Figures) {
+  return prisma.$transaction(async (tx) => {
+    const existing = await tx.quarterTarget.findUnique({
+      where: { companyId_yearId_quarter: { companyId, yearId, quarter } },
+    });
+    const oldFigures = toFigures(existing);
+
+    const updated = await tx.quarterTarget.upsert({
+      where: { companyId_yearId_quarter: { companyId, yearId, quarter } },
+      update: figures,
+      create: { companyId, yearId, quarter, ...figures },
+    });
+
+    const subsequentQuarters: number[] = [];
+    for (let q = quarter + 1; q <= 4; q++) subsequentQuarters.push(q);
+
+    if (subsequentQuarters.length) {
+      const subsequentRows = await tx.quarterTarget.findMany({
+        where: { companyId, yearId, quarter: { in: subsequentQuarters } },
+      });
+      const rowByQuarter = new Map(subsequentRows.map((r) => [r.quarter, r]));
+
+      for (const key of FIGURE_KEYS) {
+        const delta = round2(Number(figures[key]) - oldFigures[key]);
+        if (delta === 0) continue;
+        const currentValues = subsequentQuarters.map((q) => Number(rowByQuarter.get(q)?.[key] ?? 0));
+        const newValues = distributeAdjustment(currentValues, -delta);
+        for (let i = 0; i < subsequentQuarters.length; i++) {
+          if (newValues[i] === currentValues[i]) continue;
+          const q = subsequentQuarters[i];
+          await tx.quarterTarget.upsert({
+            where: { companyId_yearId_quarter: { companyId, yearId, quarter: q } },
+            update: { [key]: newValues[i] },
+            create: { companyId, yearId, quarter: q, [key]: newValues[i] } as any,
+          });
+        }
+      }
+    }
+
+    return updated;
+  });
+}
+
 router.put("/quarter", async (req, res) => {
   const parsed = z
     .object({ companyId: z.string().uuid(), yearId: z.string().uuid(), quarter: z.number().int().min(1).max(4) })
@@ -203,49 +252,7 @@ router.put("/quarter", async (req, res) => {
     return res.status(403).json({ error: "This quarter has been manually locked by an admin and can no longer be edited" });
   }
 
-  const target = await prisma.$transaction(async (tx) => {
-    const existing = await tx.quarterTarget.findUnique({
-      where: { companyId_yearId_quarter: { companyId, yearId, quarter } },
-    });
-    const oldFigures = toFigures(existing);
-
-    const updated = await tx.quarterTarget.upsert({
-      where: { companyId_yearId_quarter: { companyId, yearId, quarter } },
-      update: figures,
-      create: { companyId, yearId, quarter, ...figures },
-    });
-
-    // Cascade: keep the Company's Q1-Q4 sum for this Year exactly what it
-    // was right before this edit by redistributing the delta across the
-    // *subsequent* quarters only (Q4 has none to cascade into).
-    const subsequentQuarters: number[] = [];
-    for (let q = quarter + 1; q <= 4; q++) subsequentQuarters.push(q);
-
-    if (subsequentQuarters.length) {
-      const subsequentRows = await tx.quarterTarget.findMany({
-        where: { companyId, yearId, quarter: { in: subsequentQuarters } },
-      });
-      const rowByQuarter = new Map(subsequentRows.map((r) => [r.quarter, r]));
-
-      for (const key of FIGURE_KEYS) {
-        const delta = round2(Number((figures as Figures)[key]) - oldFigures[key]);
-        if (delta === 0) continue;
-        const currentValues = subsequentQuarters.map((q) => Number(rowByQuarter.get(q)?.[key] ?? 0));
-        const newValues = distributeAdjustment(currentValues, -delta);
-        for (let i = 0; i < subsequentQuarters.length; i++) {
-          if (newValues[i] === currentValues[i]) continue;
-          const q = subsequentQuarters[i];
-          await tx.quarterTarget.upsert({
-            where: { companyId_yearId_quarter: { companyId, yearId, quarter: q } },
-            update: { [key]: newValues[i] },
-            create: { companyId, yearId, quarter: q, [key]: newValues[i] } as any,
-          });
-        }
-      }
-    }
-
-    return updated;
-  });
+  const target = await upsertQuarterTarget(companyId, yearId, quarter, figures as Figures);
 
   await logAudit({
     user: req.user,
@@ -257,6 +264,143 @@ router.put("/quarter", async (req, res) => {
   });
 
   res.json(target);
+});
+
+// ---------- Bulk Upload (CSV/Excel) ----------
+// The frontend parses the uploaded file client-side (any of .csv/.xlsx/.xls)
+// and posts the resulting rows as plain JSON — no file ever reaches the
+// server, so no multipart/file-storage handling is needed here. Each row
+// identifies its Company by name (optionally disambiguated by Business Unit
+// name, since Company names are only unique *within* a Business Unit — see
+// the @@unique([businessUnitId, name]) in schema.prisma) rather than by
+// companyId, since that's what's practical to type into a spreadsheet.
+// Rows are processed sequentially (not in one big transaction) so a bad row
+// doesn't abort the rows around it — every row gets its own permission/lock
+// check and its own success-or-error outcome in the response, same
+// philosophy as the rest of the app's "best effort, report what failed"
+// bulk operations (e.g. Rocks rollover).
+const bulkRowSchema = z
+  .object({
+    // Echoed straight back in the response's `row` field when present — lets
+    // the frontend report errors against the original spreadsheet line
+    // number even if it filtered out some rows (e.g. blank lines) before
+    // submitting, so numbering in the preview/results table stays consistent
+    // with what the user sees in their file. Falls back to the row's
+    // position within the submitted array if omitted.
+    sourceRow: z.number().int().min(1).optional(),
+    businessUnitName: z.string().trim().optional(),
+    companyName: z.string().trim().min(1, "Company is required"),
+    quarter: z.number().int().min(1).max(4),
+  })
+  .merge(figuresSchema.partial());
+
+const bulkUploadSchema = z.object({
+  yearId: z.string().uuid(),
+  rows: z.array(bulkRowSchema).min(1, "At least one row is required").max(1000, "Too many rows in one upload (max 1000)"),
+});
+
+interface BulkRowResult {
+  row: number; // 1-based, matching the spreadsheet's data rows (header excluded)
+  companyName: string;
+  businessUnitName?: string;
+  quarter: number;
+  status: "ok" | "error";
+  error?: string;
+}
+
+router.post("/quarter/bulk", async (req, res) => {
+  const parsed = bulkUploadSchema.safeParse(req.body);
+  if (!parsed.success) {
+    return res.status(400).json({ error: parsed.error.issues[0]?.message || "Invalid bulk upload payload", details: parsed.error.issues });
+  }
+  const { yearId, rows } = parsed.data;
+
+  const yearRow = await prisma.year.findUnique({ where: { id: yearId }, select: { year: true } });
+  if (!yearRow) return res.status(404).json({ error: "Year not found" });
+
+  const manuallyLockedQuarters = await getManuallyLockedQuarters(yearId);
+  const permRows = await loadUserPermissions(req.user!);
+
+  // Pre-load every Company (with its Business Unit name) once, rather than
+  // querying per row — bulk uploads are exactly the case where an N+1 query
+  // pattern would hurt.
+  const allCompanies = await prisma.company.findMany({
+    include: { businessUnit: { select: { id: true, name: true } } },
+  });
+
+  const results: BulkRowResult[] = [];
+  let successCount = 0;
+
+  for (let i = 0; i < rows.length; i++) {
+    const row = rows[i];
+    const rowNum = row.sourceRow ?? i + 1;
+    const base: Omit<BulkRowResult, "status" | "error"> = {
+      row: rowNum,
+      companyName: row.companyName,
+      businessUnitName: row.businessUnitName,
+      quarter: row.quarter,
+    };
+
+    try {
+      // Match Company by name (case-insensitive), narrowed by Business Unit
+      // name if the row provided one — required to disambiguate when the
+      // same Company name exists in more than one Business Unit.
+      const nameLower = row.companyName.trim().toLowerCase();
+      let candidates = allCompanies.filter((c) => c.name.trim().toLowerCase() === nameLower);
+      if (row.businessUnitName) {
+        const buLower = row.businessUnitName.trim().toLowerCase();
+        candidates = candidates.filter((c) => c.businessUnit.name.trim().toLowerCase() === buLower);
+      }
+
+      if (candidates.length === 0) {
+        results.push({ ...base, status: "error", error: "Company not found" });
+        continue;
+      }
+      if (candidates.length > 1) {
+        results.push({
+          ...base,
+          status: "error",
+          error: `Company name is ambiguous — matches ${candidates.length} Companies across different Business Units. Add a Business Unit column to disambiguate.`,
+        });
+        continue;
+      }
+
+      const company = candidates[0];
+
+      if (manuallyLockedQuarters.has(row.quarter)) {
+        results.push({ ...base, status: "error", error: `Q${row.quarter} ${yearRow.year} has been manually locked and can no longer be edited` });
+        continue;
+      }
+
+      try {
+        assertBusinessUnitAccess(req.user!, company.businessUnitId);
+        if (hasAnyGrant(permRows, ["TARGETS"])) {
+          assertPermission(permRows, "edit", "TARGETS", { businessUnitId: company.businessUnitId, companyId: company.id });
+        }
+      } catch (err: any) {
+        results.push({ ...base, status: "error", error: err.message || "Not permitted to edit this Company's targets" });
+        continue;
+      }
+
+      const figures = toFigures(row);
+      await upsertQuarterTarget(company.id, yearId, row.quarter, figures);
+      results.push({ ...base, status: "ok" });
+      successCount++;
+    } catch (err: any) {
+      results.push({ ...base, status: "error", error: err.message || "Failed to save this row" });
+    }
+  }
+
+  await logAudit({
+    user: req.user,
+    action: "TARGET_QUARTER_BULK_UPDATE",
+    entityType: "QuarterTarget",
+    entityId: yearId,
+    summary: `Bulk-uploaded ${successCount}/${rows.length} quarter target row(s) for ${yearRow.year}`,
+    metadata: { yearId, total: rows.length, successCount, errorCount: rows.length - successCount },
+  });
+
+  res.json({ successCount, errorCount: rows.length - successCount, results });
 });
 
 router.put("/annual", async (req, res) => {

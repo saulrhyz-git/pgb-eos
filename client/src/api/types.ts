@@ -136,6 +136,25 @@ export interface Figures {
   expensesOtherNonCash: number;
 }
 
+// Result of a bulk CSV/Excel target upload (POST /targets/quarter/bulk) —
+// processed one row at a time server-side, so a bad row doesn't block the
+// rows around it. `row` is 1-based and matches the spreadsheet's data rows
+// (header excluded).
+export interface BulkTargetRowResult {
+  row: number;
+  companyName: string;
+  businessUnitName?: string;
+  quarter: number;
+  status: "ok" | "error";
+  error?: string;
+}
+
+export interface BulkTargetUploadResult {
+  successCount: number;
+  errorCount: number;
+  results: BulkTargetRowResult[];
+}
+
 // One Remarks field per breakdown (not one per parent category) — mirrors
 // the per-category Remarks pattern used for Disbursements. Only present on
 // QuarterActual (Targets have no Remarks).

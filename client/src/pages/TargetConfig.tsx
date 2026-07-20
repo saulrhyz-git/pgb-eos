@@ -1,7 +1,8 @@
 import { Dispatch, FormEvent, SetStateAction, useEffect, useState } from "react";
-import { AlertTriangle, CheckCircle2, Lock, LockOpen, Plus, Save } from "lucide-react";
+import { AlertTriangle, CheckCircle2, Lock, LockOpen, Plus, Save, Upload } from "lucide-react";
 import { api } from "../api/client";
 import { useAuth } from "../contexts/AuthContext";
+import BulkTargetUpload from "../components/BulkTargetUpload";
 import type { BusinessUnit, Company, TargetLockEntry, Year } from "../api/types";
 
 type FigureKey =
@@ -452,6 +453,11 @@ export default function TargetConfig() {
   const [lockActionError, setLockActionError] = useState("");
   const [lockActionBusy, setLockActionBusy] = useState<number | null>(null);
 
+  // CSV/Excel bulk upload — sets Quarter Targets for many Companies (and
+  // Quarters) in one file. See client/src/components/BulkTargetUpload.tsx
+  // and server's POST /targets/quarter/bulk.
+  const [showBulkUpload, setShowBulkUpload] = useState(false);
+
   const selectedYear = years.find((y) => y.id === yearId);
 
   function manualLockInfo(q: number): TargetLockEntry | undefined {
@@ -888,20 +894,30 @@ export default function TargetConfig() {
           </div>
         )}
 
-        <div className="flex rounded-md border border-slate-200 dark:border-slate-700 p-0.5 text-sm sm:w-fit">
+        <div className="flex flex-wrap items-center justify-between gap-3">
+          <div className="flex rounded-md border border-slate-200 dark:border-slate-700 p-0.5 text-sm sm:w-fit">
+            <button
+              type="button"
+              onClick={() => setMode("quarter")}
+              className={`flex-1 rounded px-3 py-1.5 font-medium sm:flex-none ${mode === "quarter" ? "bg-brand-500 text-white" : "text-slate-500 dark:text-slate-400"}`}
+            >
+              Set by Quarter
+            </button>
+            <button
+              type="button"
+              onClick={() => setMode("annual")}
+              className={`flex-1 rounded px-3 py-1.5 font-medium sm:flex-none ${mode === "annual" ? "bg-brand-500 text-white" : "text-slate-500 dark:text-slate-400"}`}
+            >
+              Set Annual Target
+            </button>
+          </div>
           <button
             type="button"
-            onClick={() => setMode("quarter")}
-            className={`flex-1 rounded px-3 py-1.5 font-medium sm:flex-none ${mode === "quarter" ? "bg-brand-500 text-white" : "text-slate-500 dark:text-slate-400"}`}
+            disabled={!yearId}
+            onClick={() => setShowBulkUpload(true)}
+            className="flex items-center gap-2 rounded-md border border-slate-300 dark:border-slate-600 px-3 py-1.5 text-sm font-medium text-slate-600 dark:text-slate-300 hover:bg-slate-50 dark:hover:bg-slate-800 disabled:opacity-50"
           >
-            Set by Quarter
-          </button>
-          <button
-            type="button"
-            onClick={() => setMode("annual")}
-            className={`flex-1 rounded px-3 py-1.5 font-medium sm:flex-none ${mode === "annual" ? "bg-brand-500 text-white" : "text-slate-500 dark:text-slate-400"}`}
-          >
-            Set Annual Target
+            <Upload className="h-4 w-4" /> Bulk Upload (CSV/Excel)
           </button>
         </div>
 
@@ -1030,6 +1046,19 @@ export default function TargetConfig() {
           </form>
         )}
       </div>
+
+      {showBulkUpload && yearId && (
+        <BulkTargetUpload
+          yearId={yearId}
+          yearLabel={selectedYear ? String(selectedYear.year) : ""}
+          onClose={() => setShowBulkUpload(false)}
+          onUploaded={() => {
+            refreshQuarterForm();
+            if (mode === "annual") refreshAnnualForm();
+            refreshManualLocks();
+          }}
+        />
+      )}
     </div>
   );
 }

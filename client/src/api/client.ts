@@ -4,6 +4,7 @@ import type {
   AuditLogMeta,
   AuditLogPage,
   AuthUser,
+  BulkTargetUploadResult,
   BusinessGoal,
   BusinessUnit,
   Company,
@@ -130,6 +131,21 @@ export const api = {
   putAnnualTarget: (payload: { companyId: string; yearId: string } & Figures) =>
     request<{ updated: any[]; lockedQuarters: number[] }>("/targets/annual", {
       method: "PUT",
+      body: JSON.stringify(payload),
+    }),
+
+  // Bulk CSV/Excel upload — the file itself is parsed client-side (see
+  // BulkTargetUpload.tsx), this just posts the resulting rows. Each row
+  // identifies its Company by name (optionally + Business Unit name to
+  // disambiguate) rather than companyId, since that's what's practical to
+  // put in a spreadsheet. Processed one row at a time server-side — a bad
+  // row doesn't block the others, see the per-row `results` in the response.
+  bulkUploadQuarterTargets: (payload: {
+    yearId: string;
+    rows: Array<{ sourceRow?: number; businessUnitName?: string; companyName: string; quarter: number } & Partial<Figures>>;
+  }) =>
+    request<BulkTargetUploadResult>("/targets/quarter/bulk", {
+      method: "POST",
       body: JSON.stringify(payload),
     }),
 

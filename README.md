@@ -1687,3 +1687,49 @@ back to Split shows the normalized 266.67/266.67/266.66 rather than the
 original 500/200/100; the same behavior works independently for Collections
 External and for Expenses; and it works the same way in both the "Set by
 Quarter" and "Set Annual Target" forms.
+
+**Target Setup: bulk upload Quarter Targets from a CSV/Excel file.** A
+"Bulk Upload (CSV/Excel)" button next to the Set by Quarter / Set Annual
+Target toggle in `client/src/pages/TargetConfig.tsx` opens a new
+`client/src/components/BulkTargetUpload.tsx` modal. It parses a `.csv`/
+`.xlsx`/`.xls` file entirely in the browser (via the new `xlsx` (SheetJS)
+dependency added to `client/package.json` — run `npm install` in `client/`
+to pick it up) into rows, so no file ever reaches the server; only the
+parsed JSON rows are posted. A "Download Template" button generates a
+starter `.xlsx` with the expected columns (Business Unit, Company, Quarter,
+plus all 11 figure columns) and two example rows. Column headers are
+matched flexibly — "Revenue - Internal", "Revenue Internal", and
+`revenueInternal` all resolve to the same field, since matching strips
+everything but letters/digits before comparing — so reasonable header
+variations aren't rejected. One file can mix any Companies and any
+Quarters (even all 4 quarters for several Companies), since each row
+carries its own Quarter; blank figure cells default to 0.
+
+On the server, `server/src/routes/targets.ts` gained `POST
+/targets/quarter/bulk`: the existing cascade-upsert logic from `PUT
+/quarter` (redistribute the delta across a Company's subsequent quarters so
+its Q1-Q4 sum doesn't drift) was extracted into a shared
+`upsertQuarterTarget()` function used by both routes. Each row identifies
+its Company by name — optionally narrowed by a Business Unit name — rather
+than by id, since names are what's practical to type into a spreadsheet
+(Company names are only unique *within* a Business Unit, so an ambiguous
+match without a Business Unit column is reported as an error rather than
+guessed at). Rows are processed one at a time, not as a single all-or-
+nothing transaction, so one bad row (unknown Company, ambiguous name, a
+manually-locked quarter, no Custom-Role permission on that Company) doesn't
+block the rows around it — the response carries a per-row
+`{row, status, error?}` result, which the modal's preview table displays
+against each spreadsheet line number (an optional `sourceRow` passthrough
+field keeps that numbering correct even though the frontend filters out
+client-detected bad rows — missing Company/invalid Quarter — before
+submitting). A single summary `TARGET_QUARTER_BULK_UPDATE` Audit Log entry
+is written per upload (not one per row). Worth checking by hand: uploading
+the downloaded template (after filling in a real Company name) sets that
+Company's Q1/Q2 targets and shows "Saved" per row; a row with an unknown
+Company name or an out-of-range Quarter shows its specific error without
+blocking the other rows; a Company name that exists in two different
+Business Units is rejected as ambiguous unless the Business Unit column is
+filled in; uploading against a manually-locked quarter reports that row as
+locked rather than silently skipping it; and a BU Integrator (or Custom-
+Role-scoped user) uploading a file that includes a Company outside their
+access gets a permission error on just that row.
