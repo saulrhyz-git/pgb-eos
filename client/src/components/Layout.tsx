@@ -10,6 +10,7 @@ import {
   Gauge,
   UserCircle,
   ScrollText,
+  FileSpreadsheet,
   Menu,
   X,
 } from "lucide-react";
@@ -43,6 +44,13 @@ export default function Layout() {
       </NavLink>
       <NavLink to="/targets" className={linkClass} onClick={() => setMenuOpen(false)}>
         <Settings className="h-4 w-4" /> Target Setup
+      </NavLink>
+      {/* Shown unconditionally, same as Scorecard/Rocks — the backend is the
+          real gate (Superadmin/Group Integrator by default, or a Custom Role
+          granting REPORTS view), and anyone without access just sees the
+          "access required" card on the page itself. */}
+      <NavLink to="/reports" className={linkClass} onClick={() => setMenuOpen(false)}>
+        <FileSpreadsheet className="h-4 w-4" /> Reports
       </NavLink>
       {/* Superadmins already reach the Audit Log via the Admin tab bar
           below — this link is only for non-superadmins who've been

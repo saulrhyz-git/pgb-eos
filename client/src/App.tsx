@@ -7,6 +7,7 @@ import Dashboard from "./pages/Dashboard";
 import Profile from "./pages/Profile";
 import Scorecard from "./pages/Scorecard";
 import Rocks from "./pages/Rocks";
+import Reports from "./pages/Reports";
 import IntegratorPortal from "./pages/IntegratorPortal";
 import TargetConfig from "./pages/TargetConfig";
 import AdminUsers from "./pages/admin/AdminUsers";
@@ -64,6 +65,7 @@ export default function App() {
         <Route path="profile" element={<Profile />} />
         <Route path="revenue" element={<Dashboard />} />
         <Route path="rocks" element={<Rocks />} />
+        <Route path="reports" element={<Reports />} />
         <Route path="data-entry" element={<IntegratorPortal />} />
         <Route path="targets" element={<TargetConfig />} />
         {/* This top-level /audit-log route exists only so a non-superadmin

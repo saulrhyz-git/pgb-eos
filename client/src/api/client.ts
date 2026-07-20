@@ -12,6 +12,7 @@ import type {
   Rock,
   RockStatus,
   Role,
+  ReportResult,
   RolePermission,
   ScorecardResponse,
   SmtpSettings,
@@ -338,4 +339,39 @@ export const api = {
     return request<AuditLogPage>(`/audit-log${query ? `?${query}` : ""}`);
   },
   auditLogMeta: () => request<AuditLogMeta>("/audit-log/meta"),
+
+  // ---------- Reports engine ----------
+  // Default access is Superadmin + Group Integrator (same as the Executive
+  // Scorecard); a BU Integrator (or blank-role user) needs a Custom Role that
+  // grants REPORTS view to see this at all (403 otherwise). Every report type
+  // below returns the same generic { title, scope, columns, rows } shape —
+  // see ReportResult in ./types and server/src/routes/reports.ts.
+  reportFinancial: (params: { yearId: string; quarter?: number; businessUnitId?: string; companyId?: string }) => {
+    // quarter omitted or 0 means "All Quarters" (full year), same convention as the Revenue dashboard.
+    const qs = new URLSearchParams({ yearId: params.yearId, quarter: !params.quarter ? "all" : String(params.quarter) });
+    if (params.businessUnitId) qs.set("businessUnitId", params.businessUnitId);
+    if (params.companyId) qs.set("companyId", params.companyId);
+    return request<ReportResult>(`/reports/financial?${qs.toString()}`);
+  },
+  reportRocks: (params: {
+    yearId: string;
+    quarter?: number;
+    businessUnitId?: string;
+    companyId?: string;
+    businessGoalId?: string;
+    status?: RockStatus;
+  }) => {
+    const qs = new URLSearchParams({ yearId: params.yearId });
+    if (params.quarter) qs.set("quarter", String(params.quarter));
+    if (params.businessUnitId) qs.set("businessUnitId", params.businessUnitId);
+    if (params.companyId) qs.set("companyId", params.companyId);
+    if (params.businessGoalId) qs.set("businessGoalId", params.businessGoalId);
+    if (params.status) qs.set("status", params.status);
+    return request<ReportResult>(`/reports/rocks?${qs.toString()}`);
+  },
+  reportExecutiveSummary: (params: { yearId: string; quarter?: number; businessUnitId?: string }) => {
+    const qs = new URLSearchParams({ yearId: params.yearId, quarter: !params.quarter ? "all" : String(params.quarter) });
+    if (params.businessUnitId) qs.set("businessUnitId", params.businessUnitId);
+    return request<ReportResult>(`/reports/executive-summary?${qs.toString()}`);
+  },
 };

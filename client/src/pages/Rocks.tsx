@@ -1,4 +1,4 @@
-import { FormEvent, useEffect, useState } from "react";
+import { FormEvent, useEffect, useMemo, useState } from "react";
 import {
   AlertTriangle,
   CheckCircle2,
@@ -14,8 +14,39 @@ import {
 } from "lucide-react";
 import { api } from "../api/client";
 import { useAuth } from "../contexts/AuthContext";
+import Pagination from "../components/Pagination";
+import SortableTh from "../components/SortableTh";
 import { attainmentColor, formatProgressPct } from "../utils/format";
 import type { BusinessGoal, BusinessUnit, Company, Rock, RockStatus, Year } from "../api/types";
+
+const ROCKS_PAGE_SIZE = 10;
+
+type RockSortKey = "companyName" | "quarter" | "title" | "businessGoalName" | "ownerName" | "status" | "progressPct";
+
+// Workflow order (not alphabetical) so sorting by Status reads as a
+// progression rather than shuffling the four labels alphabetically.
+const ROCK_STATUS_ORDER: RockStatus[] = ["PENDING", "ON_TRACK", "AT_RISK", "TARGET_MET"];
+
+function compareRocks(a: Rock, b: Rock, key: RockSortKey): number {
+  switch (key) {
+    case "companyName":
+      return a.company.name.localeCompare(b.company.name);
+    case "quarter":
+      return a.quarter - b.quarter;
+    case "title":
+      return a.title.localeCompare(b.title);
+    case "businessGoalName":
+      return (a.businessGoal?.name || "").localeCompare(b.businessGoal?.name || "");
+    case "ownerName":
+      return (a.ownerName || "").localeCompare(b.ownerName || "");
+    case "status":
+      return ROCK_STATUS_ORDER.indexOf(a.status) - ROCK_STATUS_ORDER.indexOf(b.status);
+    case "progressPct":
+      return a.progressPct - b.progressPct;
+    default:
+      return 0;
+  }
+}
 
 const STATUS_LABELS: Record<RockStatus, string> = {
   PENDING: "Pending",
@@ -119,6 +150,20 @@ export default function Rocks() {
   const [error, setError] = useState("");
   const [rollingOver, setRollingOver] = useState(false);
 
+  // Table sort + pagination — purely client-side over whatever `rocks` the
+  // filters above already narrowed down to. Sorting a column or changing a
+  // filter both reset back to page 1 so the user never lands on a now-empty
+  // page; quickly editing a Rock's Status/Progress inline (quickUpdate)
+  // deliberately does NOT reset the page, so an in-place edit doesn't yank
+  // the table back to the start.
+  const [sort, setSort] = useState<{ key: RockSortKey; dir: "asc" | "desc" }>({ key: "quarter", dir: "asc" });
+  const [page, setPage] = useState(1);
+
+  function handleSort(key: RockSortKey) {
+    setSort((prev) => (prev.key === key ? { key, dir: prev.dir === "asc" ? "desc" : "asc" } : { key, dir: "asc" }));
+    setPage(1);
+  }
+
   const [showRockForm, setShowRockForm] = useState(false);
   const [rockForm, setRockForm] = useState(emptyRockForm);
   const [formBusinessUnitId, setFormBusinessUnitId] = useState("");
@@ -178,6 +223,7 @@ export default function Rocks() {
     if (!yearId) return;
     setLoading(true);
     setError("");
+    setPage(1);
     api
       .rocks({
         yearId,
@@ -400,6 +446,18 @@ export default function Rocks() {
   const avgProgress = total ? Math.round(rocks.reduce((sum, r) => sum + r.progressPct, 0) / total) : 0;
 
   const formGoals = goalsForBu(formBusinessUnitId);
+
+  // KPI cards above always reflect the full filtered set (`rocks`); only the
+  // table itself is sorted/paginated.
+  const sortedRocks = useMemo(() => {
+    const copy = [...rocks];
+    copy.sort((a, b) => {
+      const cmp = compareRocks(a, b, sort.key);
+      return sort.dir === "asc" ? cmp : -cmp;
+    });
+    return copy;
+  }, [rocks, sort]);
+  const pagedRocks = sortedRocks.slice((page - 1) * ROCKS_PAGE_SIZE, page * ROCKS_PAGE_SIZE);
 
   return (
     <div className="flex flex-col gap-6">
@@ -811,18 +869,24 @@ export default function Rocks() {
           <table className="w-full min-w-[1020px] text-sm">
             <thead className="bg-slate-50 text-left text-xs font-semibold uppercase text-slate-500">
               <tr>
-                <th className="px-4 py-3">Company</th>
-                <th className="px-4 py-3">Quarter</th>
-                <th className="px-4 py-3">Rock</th>
-                <th className="px-4 py-3">Business Goal</th>
-                <th className="px-4 py-3">Owner</th>
-                <th className="px-4 py-3">Status</th>
-                <th className="px-4 py-3">Progress</th>
+                <SortableTh label="Company" sortKey="companyName" activeKey={sort.key} dir={sort.dir} onClick={handleSort} />
+                <SortableTh label="Quarter" sortKey="quarter" activeKey={sort.key} dir={sort.dir} onClick={handleSort} />
+                <SortableTh label="Rock" sortKey="title" activeKey={sort.key} dir={sort.dir} onClick={handleSort} />
+                <SortableTh
+                  label="Business Goal"
+                  sortKey="businessGoalName"
+                  activeKey={sort.key}
+                  dir={sort.dir}
+                  onClick={handleSort}
+                />
+                <SortableTh label="Owner" sortKey="ownerName" activeKey={sort.key} dir={sort.dir} onClick={handleSort} />
+                <SortableTh label="Status" sortKey="status" activeKey={sort.key} dir={sort.dir} onClick={handleSort} />
+                <SortableTh label="Progress" sortKey="progressPct" activeKey={sort.key} dir={sort.dir} onClick={handleSort} />
                 <th className="px-4 py-3 text-right">Actions</th>
               </tr>
             </thead>
             <tbody className="divide-y divide-slate-100">
-              {rocks.map((r) => (
+              {pagedRocks.map((r) => (
                 <tr key={r.id}>
                   <td className="px-4 py-3 font-medium text-slate-800">{r.company.name}</td>
                   <td className="px-4 py-3 text-slate-600">Q{r.quarter}</td>
@@ -883,7 +947,7 @@ export default function Rocks() {
                   </td>
                 </tr>
               ))}
-              {rocks.length === 0 && !loading && (
+              {sortedRocks.length === 0 && !loading && (
                 <tr>
                   <td colSpan={8} className="px-4 py-6 text-center text-slate-500">
                     No Rocks for this scope yet.
@@ -897,6 +961,9 @@ export default function Rocks() {
           <div className="flex items-center justify-center gap-2 py-4 text-sm text-slate-500">
             <Loader2 className="h-4 w-4 animate-spin" /> Loading...
           </div>
+        )}
+        {!loading && (
+          <Pagination page={page} pageSize={ROCKS_PAGE_SIZE} total={sortedRocks.length} onPageChange={setPage} />
         )}
       </div>
     </div>

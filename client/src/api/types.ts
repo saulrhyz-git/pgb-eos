@@ -9,7 +9,7 @@ export type Role = "SUPERADMIN" | "GROUP_INTEGRATOR" | "BU_INTEGRATOR";
 // see permissions.ts on the backend for why it's excluded from
 // visibility-filtering logic despite still being requested through the same
 // per-BU/Company matrix UI.
-export type Resource = "TARGETS" | "REVENUE" | "COLLECTIONS" | "EXPENSES" | "ROCKS" | "SCORECARD" | "AUDIT_LOG";
+export type Resource = "TARGETS" | "REVENUE" | "COLLECTIONS" | "EXPENSES" | "ROCKS" | "SCORECARD" | "AUDIT_LOG" | "REPORTS";
 
 export interface AuthUser {
   id: string;
@@ -196,6 +196,25 @@ export interface DashboardResponse {
   chart: ChartPoint[];
   targetMatrix: TargetMatrixRow[];
   operationalGrid: OperationalGridRow[];
+}
+
+// Generic shape shared by every report type the Reports engine can produce —
+// see server/src/routes/reports.ts. Because every report (Financial
+// Performance, Rocks, Executive Summary, and any future one) resolves to the
+// same { columns, rows } contract, the whole Reports page can render and
+// export ANY of them with one generic table + CSV/print renderer instead of
+// bespoke UI per report.
+export interface ReportColumn {
+  key: string;
+  label: string;
+  type: "text" | "number";
+}
+
+export interface ReportResult {
+  title: string;
+  scope: Record<string, string | number | null>;
+  columns: ReportColumn[];
+  rows: Record<string, string | number>[];
 }
 
 export type RockStatus = "PENDING" | "ON_TRACK" | "AT_RISK" | "TARGET_MET";

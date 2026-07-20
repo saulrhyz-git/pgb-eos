@@ -1076,3 +1076,84 @@ pop-up immediately and shows the success toast, which disappears on its own
 after a few seconds without needing to be dismissed manually; submitting an
 invalid Rock (e.g. missing Title) keeps the pop-up open and shows the
 existing inline validation error instead of closing.
+
+**Rocks: pagination + sortable column headers** (`client/src/pages/Rocks.tsx`,
+new shared `client/src/components/Pagination.tsx` and
+`client/src/components/SortableTh.tsx`) is a pure frontend change — no
+schema/API changes. The Rocks table now shows 10 rocks per page instead of
+the full filtered list at once, with a "Showing X-Y of Z" caption and
+Prev/Next controls underneath. Every column header (Company, Quarter, Rock,
+Business Goal, Owner, Status, Progress) is now clickable to sort by that
+column — click again to reverse direction — with an arrow icon showing the
+active column and direction. Sorting or changing a filter resets back to
+page 1 so the table never lands on a now-empty page; quickly editing a
+Rock's Status/Progress inline does not reset the page, so an in-place edit
+doesn't yank the table back to the start. `Pagination` and `SortableTh` are
+built as standalone, reusable components (not Rocks-specific) so the new
+Reports engine below reuses both instead of re-implementing pager/sort-header
+UI. Worth checking by hand: a filtered Rocks list with more than 10 results
+shows a pager, and Prev/Next move through pages correctly, clamping at both
+ends; clicking a column header sorts ascending, clicking it again reverses
+to descending, and the arrow/highlight reflects the active column; changing
+any filter (Business Unit, Company, Business Goal, Year, Quarter) resets
+back to page 1; editing a Rock's status or progress inline via the quick
+controls does not jump the table back to page 1.
+
+**Reports engine** (new `server/prisma/migrations/
+20260721040000_add_reports_permission_resource/migration.sql` adding
+`REPORTS` to the `PermissionResource` enum, `server/src/routes/reports.ts`,
+updates to `server/src/utils/permissions.ts` and
+`server/src/routes/customRoles.ts`'s resource list, and a new
+`client/src/pages/Reports.tsx` wired into a `/reports` route and nav link)
+adds a filterable, exportable "Reports" tab covering three report types:
+Financial Performance (Target vs Actual per Company), Rocks (the full
+filtered Rock list), and Executive Summary (a per-Business-Unit rollup of
+both). Needs a fresh `npm run prisma:migrate` for the new `REPORTS`
+permission value.
+- **Access.** Follows the same pattern as the Executive Scorecard (not the
+  stricter Audit Log pattern): Superadmin and Group Integrator can always
+  open Reports; a BU Integrator (or blank-role user) needs a Custom Role
+  that explicitly grants `REPORTS` view (a new row in Admin → Roles, right
+  alongside Executive Scorecard and Audit Log). Once inside, the actual rows
+  returned are still masked per the user's existing
+  Revenue/Collections/Expenses/Rocks grants exactly like everywhere else —
+  Reports is a different *shape* on the same data, never a way to see more
+  of it than a Custom Role otherwise allows.
+- **Design.** Every report type resolves to the same generic shape —
+  `{ title, scope, columns, rows }` — so the frontend renders and exports
+  any of them with one generic sortable + paginated (10/page, reusing the
+  Rocks page's new `Pagination`/`SortableTh` components) preview table
+  instead of bespoke UI per report. Filters: Year (required), Quarter
+  (All/1-4), Business Unit, Company (Financial/Rocks only), and Business
+  Goal + Status (Rocks only) — Executive Summary has no Company drill-down,
+  matching the Scorecard it mirrors.
+- **Export — important caveat.** This sandbox has no access to the npm
+  registry, so true binary `.xlsx`/`.pdf` generation (which would need
+  packages like `exceljs` or `pdfkit`) isn't available here. "Export to
+  Excel" downloads a `.csv` file built client-side from the report's columns
+  and rows (via a `Blob` + anchor-tag download) — this opens natively in
+  Excel or Google Sheets, but is a CSV, not a true `.xlsx` workbook (no
+  multiple sheets, cell formatting, or formulas). "Export to PDF" opens a
+  new tab with a print-formatted HTML table and immediately calls the
+  browser's native print dialog (`window.print()`) — choosing "Save as PDF"
+  there produces the PDF; there's no server-side PDF file generated
+  directly. Both buttons are labeled for what they actually do and both are
+  disabled when a report has no rows. If true binary exports are needed
+  later, that requires installing `exceljs`/`pdfkit` (or similar) via npm,
+  which this sandbox currently cannot do.
+
+Worth checking by hand: a BU Integrator with no Custom Role granting
+`REPORTS` sees the "Reports access required" card when visiting `/reports`,
+and a Custom Role with `REPORTS` view checked unlocks the page for them; a
+Custom Role that also narrows, say, `COLLECTIONS` to one Company shows that
+same narrowing in the Financial Performance report's Collections columns
+(zeroed out for companies outside that grant); switching between the three
+report tabs re-fetches and re-renders correctly, resetting to page 1 and
+clearing the Company/Business Goal/Status filters when switching to
+Executive Summary; clicking a column header sorts the preview table and
+"Export to Excel" downloads a `.csv` that opens cleanly in Excel with the
+same columns/row order currently sorted on screen; "Export to PDF" opens a
+new tab showing a clean printable table with the report's title and active
+filters listed at the top, and the browser's print dialog appears
+automatically; a report with zero rows in scope shows "No data in this
+scope" in the table and both export buttons are disabled.

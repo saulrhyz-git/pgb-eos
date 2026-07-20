@@ -3,7 +3,7 @@ import { ChevronDown, ChevronRight, Pencil, Plus, Trash2, X } from "lucide-react
 import { api } from "../../api/client";
 import type { BusinessUnit, CustomRole, Resource, RolePermission } from "../../api/types";
 
-const RESOURCES: Resource[] = ["TARGETS", "REVENUE", "COLLECTIONS", "EXPENSES", "ROCKS", "SCORECARD", "AUDIT_LOG"];
+const RESOURCES: Resource[] = ["TARGETS", "REVENUE", "COLLECTIONS", "EXPENSES", "ROCKS", "SCORECARD", "AUDIT_LOG", "REPORTS"];
 const RESOURCE_LABELS: Record<Resource, string> = {
   TARGETS: "Targets",
   REVENUE: "Revenue",
@@ -12,6 +12,7 @@ const RESOURCE_LABELS: Record<Resource, string> = {
   ROCKS: "Rocks",
   SCORECARD: "Executive Scorecard",
   AUDIT_LOG: "Audit Log",
+  REPORTS: "Reports",
 };
 
 type Grants = Record<Resource, { canView: boolean; canEdit: boolean; canDelete: boolean }>;
@@ -212,12 +213,15 @@ export default function AdminRoles() {
         <div>
           <h3 className="text-base font-semibold text-slate-800">Custom Roles</h3>
           <p className="text-sm text-slate-500">
-            Named permission profiles you can assign to any user — pick which Business Units/Companies they can touch, and
-            whether they can View, Edit, or Delete each of Targets, Revenue, Collections, Expenses, Rocks, the Executive
-            Scorecard, and the Audit Log there. Only the View column matters for the Executive Scorecard and the Audit
-            Log — both are read-only pages, so Edit/Delete checkboxes for them are ignored. The Audit Log itself isn't
-            really scoped to any one Business Unit/Company (it's a single global log), so granting it View on any one
-            row here is enough to open the page at all — it's just attached to a scope here to reuse the same picker.
+            Named permission profiles you can assign to any user (any number at once) — pick which Business
+            Units/Companies they can touch, and whether they can View, Edit, or Delete each of Targets, Revenue,
+            Collections, Expenses, Rocks, the Executive Scorecard, the Audit Log, and Reports there. Only the View
+            column matters for the Executive Scorecard, the Audit Log, and Reports — all three are read-only pages, so
+            Edit/Delete checkboxes for them are ignored. The Audit Log and Reports aren't really scoped to any one
+            Business Unit/Company the way the others are (the Audit Log is a single global log; Reports is its own
+            page-level gate, with the underlying figures still masked by whatever Revenue/Collections/Expenses/Rocks
+            grants apply), so granting either View on any one row here is enough to open that page at all — they're
+            just attached to a scope here to reuse the same picker.
           </p>
         </div>
         <button

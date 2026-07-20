@@ -38,6 +38,7 @@ enum PermissionResource {
   ROCKS
   SCORECARD
   AUDIT_LOG
+  REPORTS
 }
 
 model User {

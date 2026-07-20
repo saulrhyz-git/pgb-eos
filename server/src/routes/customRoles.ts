@@ -18,7 +18,7 @@ router.use(requireAuth);
 router.use(blockPendingPasswordChange);
 router.use(requireRole("SUPERADMIN"));
 
-const resourceEnum = z.enum(["TARGETS", "REVENUE", "COLLECTIONS", "EXPENSES", "ROCKS", "SCORECARD", "AUDIT_LOG"]);
+const resourceEnum = z.enum(["TARGETS", "REVENUE", "COLLECTIONS", "EXPENSES", "ROCKS", "SCORECARD", "AUDIT_LOG", "REPORTS"]);
 
 // Each entry grants access to exactly one scope: either a whole Business Unit
 // (companyId omitted) or one specific Company within it (both ids present,
