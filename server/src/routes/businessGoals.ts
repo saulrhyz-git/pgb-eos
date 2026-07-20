@@ -144,7 +144,11 @@ router.put("/:id", requireRole("GROUP_INTEGRATOR", "SUPERADMIN"), async (req, re
   }
 });
 
-router.delete("/:id", requireRole("GROUP_INTEGRATOR", "SUPERADMIN"), async (req, res) => {
+// Deleting a Business Goal is Superadmin-only (unlike create/update, which
+// Group Integrators can also do) — it's a destructive, taxonomy-wide action
+// that untags every Rock using it across every Business Unit, not just
+// whichever ones a Group Integrator happens to manage.
+router.delete("/:id", requireRole("SUPERADMIN"), async (req, res) => {
   try {
     // Rocks tagged with this goal keep existing (businessGoalId is set to
     // null via the schema's onDelete: SetNull), they just lose the tag.

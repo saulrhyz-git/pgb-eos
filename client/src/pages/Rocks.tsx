@@ -132,6 +132,9 @@ function BuChecklist({
 export default function Rocks() {
   const { user } = useAuth();
   const canManageStructure = user?.role === "GROUP_INTEGRATOR" || user?.role === "SUPERADMIN";
+  // Deleting a Business Goal is Superadmin-only (unlike creating/editing one,
+  // which a Group Integrator can also do) — see server/src/routes/businessGoals.ts.
+  const canDeleteGoal = user?.role === "SUPERADMIN";
   const canSeeAllBUs = user?.role === "GROUP_INTEGRATOR" || user?.role === "SUPERADMIN";
 
   const [years, setYears] = useState<Year[]>([]);
@@ -671,13 +674,15 @@ export default function Rocks() {
                     <button onClick={() => startEditGoal(g)} className="rounded-md p-1 text-slate-500 hover:text-brand-600" title="Edit">
                       <Pencil className="h-3.5 w-3.5" />
                     </button>
-                    <button
-                      onClick={() => handleDeleteGoal(g)}
-                      className="rounded-md p-1 text-slate-500 hover:text-red-600"
-                      title="Delete goal"
-                    >
-                      <X className="h-3.5 w-3.5" />
-                    </button>
+                    {canDeleteGoal && (
+                      <button
+                        onClick={() => handleDeleteGoal(g)}
+                        className="rounded-md p-1 text-slate-500 hover:text-red-600"
+                        title="Delete goal"
+                      >
+                        <X className="h-3.5 w-3.5" />
+                      </button>
+                    )}
                   </div>
                 </div>
               )

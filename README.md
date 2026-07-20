@@ -1142,6 +1142,20 @@ permission value.
   later, that requires installing `exceljs`/`pdfkit` (or similar) via npm,
   which this sandbox currently cannot do.
 
+**Business Goals: delete is Superadmin-only** (`server/src/routes/
+businessGoals.ts`'s `DELETE /:id`, `client/src/pages/Rocks.tsx`) narrows who
+can delete a Business Goal. Creating and editing a Business Goal is still a
+Group Integrator + Superadmin action, same as before, but deleting one — a
+destructive, taxonomy-wide action that untags every Rock using it across
+every Business Unit — now requires the `SUPERADMIN` role specifically; a
+Group Integrator (and every other base role) no longer sees the delete (X)
+button in the "Manage Business Goals" list, and the backend rejects a
+delete attempt from anyone else with a 403 even if attempted directly.
+Worth checking by hand: a Group Integrator still sees and can use the Add
+Business Goal form and the Edit (pencil) button, but no longer sees a delete
+button next to any Business Goal; a Superadmin still sees and can use the
+delete button as before.
+
 Worth checking by hand: a BU Integrator with no Custom Role granting
 `REPORTS` sees the "Reports access required" card when visiting `/reports`,
 and a Custom Role with `REPORTS` view checked unlocks the page for them; a
