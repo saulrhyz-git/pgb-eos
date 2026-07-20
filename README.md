@@ -1006,3 +1006,39 @@ column, and re-opening the edit form shows both checkboxes still ticked;
 removing one of the two roles (unticking it and saving) leaves the other
 role's grants intact; a role still can't be deleted while any user has it
 checked, even if that user also has other roles assigned.
+
+**Currency formatting: 2-decimal full amounts + abbreviated KPI cards**
+(`client/src/utils/format.ts`'s `formatCurrency()` and new
+`formatCurrencyShort()`, `client/src/components/KpiCards.tsx`, and
+`client/src/pages/Scorecard.tsx`'s `HeadlineCard`/`CategoryCard`/
+`SummaryStat`) is a pure frontend formatting change — no schema/migration
+needed. Two related tweaks:
+1. `formatCurrency()` now always shows exactly 2 decimal places (e.g.
+   `₱1,234.50`, `₱1,234.00`) instead of rounding to whole pesos — this is the
+   "complete", non-abbreviated form used everywhere except the KPI-style
+   cards below (Operational Grid, Target Matrix, Data Entry, Target Setup,
+   the Scorecard's per-Business-Unit tables, etc. all pick this up
+   automatically since they already called the same helper). Entry fields
+   for Targets/Actuals already accepted 2 decimal places (`step="0.01"`), so
+   this only changes how the figures are displayed.
+2. The large headline figures on the Revenue dashboard's `KpiCards.tsx` and
+   the Executive Scorecard's summary cards now render abbreviated via the new
+   `formatCurrencyShort()` — ₱6,512,700,000.00 shows as "₱6.512B",
+   ₱1,100,000,000.00 as "₱1.1B", ₱600,000,000.00 as "₱600M" (K/M/B thresholds
+   at 1,000/1,000,000/1,000,000,000; truncated — not rounded — to at most 3
+   decimal places with trailing zeros trimmed, so a card never implies more
+   precision than it has). Every abbreviated card carries the full,
+   non-abbreviated `formatCurrency()` value as its native `title` tooltip, so
+   hovering over any shorthand figure shows the exact peso amount. Values
+   under ₱1,000 aren't abbreviated at all — they render with `formatCurrency()`
+   as before.
+
+Worth checking by hand: any Target/Actual entry with cents (e.g. 1234.50)
+now displays with the cents intact throughout the Operational Grid, Target
+Matrix, and Data Entry pages instead of getting rounded off; a Business Unit
+or Company with a billions-scale Annual Target shows the shorthand form on
+its KPI card (Revenue dashboard) and Scorecard summary card, and hovering
+over that figure with the mouse shows a native tooltip with the exact peso
+amount to the cent; a Business Unit with only a few thousand pesos in
+targets/actuals still shows its full amount on the card (no abbreviation
+under ₱1,000).

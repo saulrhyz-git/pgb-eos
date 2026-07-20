@@ -1,6 +1,6 @@
 import { PhilippinePeso, Wallet, Receipt, TrendingUp, CalendarRange } from "lucide-react";
 import type { Kpis } from "../api/types";
-import { attainmentColor, formatCurrency, formatPct } from "../utils/format";
+import { attainmentColor, formatCurrency, formatCurrencyShort, formatPct } from "../utils/format";
 
 interface Props {
   kpis: Kpis;
@@ -23,6 +23,7 @@ function Card({
   icon,
   label,
   value,
+  fullValue,
   sub,
   subColor,
   tone = "neutral",
@@ -30,6 +31,10 @@ function Card({
   icon: React.ReactNode;
   label: string;
   value: string;
+  // Full, non-abbreviated value shown as a tooltip on hover — lets the card
+  // itself stay shorthand (e.g. "₱6.512B") while the exact figure is still
+  // one hover away.
+  fullValue?: string;
   sub?: string;
   subColor?: string;
   tone?: Tone;
@@ -41,7 +46,9 @@ function Card({
         {icon}
         <span className="text-xs font-medium uppercase tracking-wide">{label}</span>
       </div>
-      <div className={`mt-2 text-2xl font-semibold ${t.value}`}>{value}</div>
+      <div className={`mt-2 text-2xl font-semibold ${t.value}`} title={fullValue}>
+        {value}
+      </div>
       {sub && <div className={`mt-1 text-sm font-medium ${subColor || "text-slate-500"}`}>{sub}</div>}
     </div>
   );
@@ -59,19 +66,22 @@ export default function KpiCards({ kpis, quarter }: Props) {
           tone="revenue"
           icon={<PhilippinePeso className="h-4 w-4" />}
           label="Annual Revenue Target"
-          value={formatCurrency(kpis.annualRevenueTarget)}
+          value={formatCurrencyShort(kpis.annualRevenueTarget)}
+          fullValue={formatCurrency(kpis.annualRevenueTarget)}
         />
         <Card
           tone="collections"
           icon={<Wallet className="h-4 w-4" />}
           label="Annual Collections Target"
-          value={formatCurrency(kpis.annualCollectionsTarget)}
+          value={formatCurrencyShort(kpis.annualCollectionsTarget)}
+          fullValue={formatCurrency(kpis.annualCollectionsTarget)}
         />
         <Card
           tone="expenses"
           icon={<Receipt className="h-4 w-4" />}
           label="Annual Expenses Target"
-          value={formatCurrency(kpis.annualExpensesTarget)}
+          value={formatCurrencyShort(kpis.annualExpensesTarget)}
+          fullValue={formatCurrency(kpis.annualExpensesTarget)}
         />
       </div>
 
@@ -82,19 +92,22 @@ export default function KpiCards({ kpis, quarter }: Props) {
           tone="revenue"
           icon={<PhilippinePeso className="h-4 w-4" />}
           label={`${periodLabel} Revenue Target`}
-          value={formatCurrency(kpis.quarterTarget)}
+          value={formatCurrencyShort(kpis.quarterTarget)}
+          fullValue={formatCurrency(kpis.quarterTarget)}
         />
         <Card
           tone="collections"
           icon={<Wallet className="h-4 w-4" />}
           label={`${periodLabel} Collections Target`}
-          value={formatCurrency(kpis.quarterCollectionsTarget)}
+          value={formatCurrencyShort(kpis.quarterCollectionsTarget)}
+          fullValue={formatCurrency(kpis.quarterCollectionsTarget)}
         />
         <Card
           tone="expenses"
           icon={<Receipt className="h-4 w-4" />}
           label={`${periodLabel} Expenses Target`}
-          value={formatCurrency(kpis.quarterExpensesTarget)}
+          value={formatCurrencyShort(kpis.quarterExpensesTarget)}
+          fullValue={formatCurrency(kpis.quarterExpensesTarget)}
         />
       </div>
 
@@ -102,14 +115,16 @@ export default function KpiCards({ kpis, quarter }: Props) {
         <Card
           icon={<TrendingUp className="h-4 w-4" />}
           label={`${periodLabel} Actual`}
-          value={formatCurrency(kpis.quarterActual)}
+          value={formatCurrencyShort(kpis.quarterActual)}
+          fullValue={formatCurrency(kpis.quarterActual)}
           sub={`${formatPct(kpis.attainmentPct)} attainment`}
           subColor={attainmentColor(kpis.attainmentPct)}
         />
         <Card
           icon={<CalendarRange className="h-4 w-4" />}
           label="Year-to-Date Actual"
-          value={formatCurrency(kpis.ytdActual)}
+          value={formatCurrencyShort(kpis.ytdActual)}
+          fullValue={formatCurrency(kpis.ytdActual)}
           sub={`${formatPct(kpis.ytdAttainmentPct)} of YTD target`}
           subColor={attainmentColor(kpis.ytdAttainmentPct)}
         />

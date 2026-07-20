@@ -23,7 +23,7 @@ import {
 } from "recharts";
 import { api } from "../api/client";
 import { useAuth } from "../contexts/AuthContext";
-import { attainmentColor, formatCurrency, formatPct, formatProgressPct } from "../utils/format";
+import { attainmentColor, formatCurrency, formatCurrencyShort, formatPct, formatProgressPct } from "../utils/format";
 import type { BusinessUnit, ScorecardResponse, Year } from "../api/types";
 
 // Same Orange/Blue/Red/Green convention as the Rocks page.
@@ -50,11 +50,14 @@ function HeadlineCard({
   icon,
   label,
   value,
+  fullValue,
   pct,
 }: {
   icon: React.ReactNode;
   label: string;
   value: string;
+  // Full, non-abbreviated value shown as a tooltip on hover.
+  fullValue?: string;
   pct: number;
 }) {
   const badge = attainmentBadge(pct);
@@ -67,7 +70,9 @@ function HeadlineCard({
         </div>
         <span className={`rounded-full px-2.5 py-1 text-xs font-semibold ${badge.className}`}>{badge.label}</span>
       </div>
-      <div className="text-3xl font-bold text-slate-800 sm:text-4xl">{value}</div>
+      <div className="text-3xl font-bold text-slate-800 sm:text-4xl" title={fullValue}>
+        {value}
+      </div>
       <div className="flex items-center gap-2">
         <div className="h-2 flex-1 overflow-hidden rounded-full bg-slate-100">
           <div
@@ -88,7 +93,20 @@ const TONES: Record<Tone, { bg: string; border: string; icon: string; value: str
   expenses: { bg: "bg-amber-50", border: "border-amber-200", icon: "text-amber-600", value: "text-amber-900" },
 };
 
-function CategoryCard({ tone, icon, label, value }: { tone: Tone; icon: React.ReactNode; label: string; value: string }) {
+function CategoryCard({
+  tone,
+  icon,
+  label,
+  value,
+  fullValue,
+}: {
+  tone: Tone;
+  icon: React.ReactNode;
+  label: string;
+  value: string;
+  // Full, non-abbreviated value shown as a tooltip on hover.
+  fullValue?: string;
+}) {
   const t = TONES[tone];
   return (
     <div className={`rounded-lg border ${t.border} ${t.bg} p-4 shadow-sm`}>
@@ -96,19 +114,34 @@ function CategoryCard({ tone, icon, label, value }: { tone: Tone; icon: React.Re
         {icon}
         <span className="text-xs font-medium uppercase tracking-wide">{label}</span>
       </div>
-      <div className={`mt-2 text-xl font-semibold ${t.value}`}>{value}</div>
+      <div className={`mt-2 text-xl font-semibold ${t.value}`} title={fullValue}>
+        {value}
+      </div>
     </div>
   );
 }
 
-function SummaryStat({ icon, label, value }: { icon: React.ReactNode; label: string; value: string }) {
+function SummaryStat({
+  icon,
+  label,
+  value,
+  fullValue,
+}: {
+  icon: React.ReactNode;
+  label: string;
+  value: string;
+  // Full, non-abbreviated value shown as a tooltip on hover.
+  fullValue?: string;
+}) {
   return (
     <div className="rounded-lg border border-slate-200 bg-white p-4 shadow-sm">
       <div className="flex items-center gap-2 text-slate-500">
         {icon}
         <span className="text-xs font-medium uppercase tracking-wide">{label}</span>
       </div>
-      <div className="mt-2 text-2xl font-semibold text-slate-800">{value}</div>
+      <div className="mt-2 text-2xl font-semibold text-slate-800" title={fullValue}>
+        {value}
+      </div>
     </div>
   );
 }
@@ -307,7 +340,8 @@ export default function Scorecard() {
             <HeadlineCard
               icon={<PhilippinePeso className="h-4 w-4" />}
               label={`${periodLabel} Revenue Attainment`}
-              value={formatCurrency(data.revenue.kpis.quarterActual)}
+              value={formatCurrencyShort(data.revenue.kpis.quarterActual)}
+              fullValue={formatCurrency(data.revenue.kpis.quarterActual)}
               pct={data.revenue.kpis.attainmentPct}
             />
             <HeadlineCard
@@ -327,19 +361,22 @@ export default function Scorecard() {
                 tone="revenue"
                 icon={<PhilippinePeso className="h-4 w-4" />}
                 label="Annual Revenue Target"
-                value={formatCurrency(data.revenue.kpis.annualRevenueTarget)}
+                value={formatCurrencyShort(data.revenue.kpis.annualRevenueTarget)}
+                fullValue={formatCurrency(data.revenue.kpis.annualRevenueTarget)}
               />
               <CategoryCard
                 tone="collections"
                 icon={<PhilippinePeso className="h-4 w-4" />}
                 label="Annual Collections Target"
-                value={formatCurrency(data.revenue.kpis.annualCollectionsTarget)}
+                value={formatCurrencyShort(data.revenue.kpis.annualCollectionsTarget)}
+                fullValue={formatCurrency(data.revenue.kpis.annualCollectionsTarget)}
               />
               <CategoryCard
                 tone="expenses"
                 icon={<PhilippinePeso className="h-4 w-4" />}
                 label="Annual Expenses Target"
-                value={formatCurrency(data.revenue.kpis.annualExpensesTarget)}
+                value={formatCurrencyShort(data.revenue.kpis.annualExpensesTarget)}
+                fullValue={formatCurrency(data.revenue.kpis.annualExpensesTarget)}
               />
             </div>
 
@@ -347,12 +384,14 @@ export default function Scorecard() {
               <SummaryStat
                 icon={<TrendingUp className="h-4 w-4" />}
                 label={`${periodLabel} Actual vs Target`}
-                value={`${formatCurrency(data.revenue.kpis.quarterActual)} / ${formatCurrency(data.revenue.kpis.quarterTarget)}`}
+                value={`${formatCurrencyShort(data.revenue.kpis.quarterActual)} / ${formatCurrencyShort(data.revenue.kpis.quarterTarget)}`}
+                fullValue={`${formatCurrency(data.revenue.kpis.quarterActual)} / ${formatCurrency(data.revenue.kpis.quarterTarget)}`}
               />
               <SummaryStat
                 icon={<CalendarRange className="h-4 w-4" />}
                 label="Year-to-Date Actual"
-                value={formatCurrency(data.revenue.kpis.ytdActual)}
+                value={formatCurrencyShort(data.revenue.kpis.ytdActual)}
+                fullValue={formatCurrency(data.revenue.kpis.ytdActual)}
               />
             </div>
 
