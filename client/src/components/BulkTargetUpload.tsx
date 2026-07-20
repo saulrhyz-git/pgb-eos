@@ -1,5 +1,6 @@
-import { useRef, useState } from "react";
+import { useEffect, useRef, useState } from "react";
 import * as XLSX from "xlsx";
+import * as ExcelJS from "exceljs";
 import { AlertTriangle, CheckCircle2, Download, Upload, X } from "lucide-react";
 import { api } from "../api/client";
 import type { Figures } from "../api/types";
@@ -10,6 +11,16 @@ import type { Figures } from "../api/types";
 // POST /targets/quarter/bulk (see server/src/routes/targets.ts). One file
 // can cover any mix of Companies and Quarters (even all 4 quarters for
 // several Companies at once), since each row carries its own Quarter.
+//
+// The downloadable template is built with "exceljs" instead of "xlsx":
+// SheetJS's free Community Edition can only *read* Excel data validation
+// (dropdown lists), it silently drops them on write, so it can't produce a
+// template with real in-cell dropdowns. ExcelJS can write them, so the
+// Business Unit/Company/Quarter columns get real dropdown lists sourced
+// from whatever Business Units/Companies currently exist — no more losing
+// an upload to a misspelled or mis-spaced name. Parsing an uploaded file
+// still uses "xlsx" (SheetJS), which reads plain cell values just fine
+// regardless of which library wrote them.
 
 const FIGURE_FIELDS: { key: keyof Figures; label: string }[] = [
   { key: "revenueInternal", label: "Revenue - Internal" },
@@ -103,15 +114,79 @@ function parseWorkbook(data: ArrayBuffer): { rows: ParsedRow[]; unmatchedHeaders
   return { rows, unmatchedHeaders };
 }
 
-function downloadTemplate() {
+// How many data rows the Business Unit/Company/Quarter dropdown validation
+// is applied to — generous enough for any realistic bulk upload without
+// applying it to the whole 1M-row sheet (which would bloat the file and
+// slow Excel down for no benefit).
+const TEMPLATE_DROPDOWN_ROWS = 500;
+
+async function downloadTemplate(businessUnitNames: string[], companyNames: string[]) {
+  const wb = new ExcelJS.Workbook();
+  const sheet = wb.addWorksheet("Targets");
+  const listSheet = wb.addWorksheet("Lists");
+  listSheet.state = "hidden"; // reference data only, not meant to be edited directly
+
   const header = ["Business Unit", "Company", "Quarter", ...FIGURE_FIELDS.map((f) => f.label)];
-  const example = ["Retail", "Acme Corp", 1, ...FIGURE_FIELDS.map(() => 0)];
-  const example2 = ["Retail", "Acme Corp", 2, ...FIGURE_FIELDS.map(() => 0)];
-  const ws = XLSX.utils.aoa_to_sheet([header, example, example2]);
-  ws["!cols"] = header.map((h) => ({ wch: Math.max(12, h.length + 2) }));
-  const wb = XLSX.utils.book_new();
-  XLSX.utils.book_append_sheet(wb, ws, "Targets");
-  XLSX.writeFile(wb, "target_upload_template.xlsx");
+  sheet.columns = header.map((h) => ({ header: h, width: Math.max(14, h.length + 2) }));
+
+  // A couple of real example rows (using the first actual Business Unit/
+  // Company if any exist yet) so the template isn't just a bare header.
+  const exampleBU = businessUnitNames[0] ?? "";
+  const exampleCompany = companyNames[0] ?? "";
+  if (exampleCompany) {
+    sheet.addRow([exampleBU, exampleCompany, 1, ...FIGURE_FIELDS.map(() => 0)]);
+    sheet.addRow([exampleBU, exampleCompany, 2, ...FIGURE_FIELDS.map(() => 0)]);
+  }
+
+  // Lists sheet backs the dropdowns — column A is every current Business
+  // Unit name, column B every current Company name (flat, not filtered per
+  // Business Unit — Company names only need to be unique *within* a
+  // Business Unit, so the same Company name could legitimately appear under
+  // two different Business Units; the upload's Business Unit column is what
+  // disambiguates that case server-side, same as typing it by hand).
+  listSheet.getColumn(1).values = ["Business Unit", ...businessUnitNames];
+  listSheet.getColumn(2).values = ["Company", ...companyNames];
+
+  const dvErrorOptions = { showErrorMessage: true, errorStyle: "warning" as const };
+  for (let r = 2; r <= TEMPLATE_DROPDOWN_ROWS + 1; r++) {
+    if (businessUnitNames.length) {
+      sheet.getCell(r, 1).dataValidation = {
+        type: "list",
+        allowBlank: true,
+        formulae: [`Lists!$A$2:$A$${businessUnitNames.length + 1}`],
+        ...dvErrorOptions,
+        errorTitle: "Unrecognized Business Unit",
+        error: "Pick a Business Unit from the dropdown, or leave this blank if the Company name alone is unambiguous.",
+      };
+    }
+    if (companyNames.length) {
+      sheet.getCell(r, 2).dataValidation = {
+        type: "list",
+        allowBlank: true,
+        formulae: [`Lists!$B$2:$B$${companyNames.length + 1}`],
+        ...dvErrorOptions,
+        errorTitle: "Unrecognized Company",
+        error: "Pick a Company from the dropdown.",
+      };
+    }
+    sheet.getCell(r, 3).dataValidation = {
+      type: "list",
+      allowBlank: true,
+      formulae: ['"1,2,3,4"'],
+      ...dvErrorOptions,
+      errorTitle: "Invalid Quarter",
+      error: "Quarter must be 1, 2, 3, or 4.",
+    };
+  }
+
+  const buffer = await wb.xlsx.writeBuffer();
+  const blob = new Blob([buffer], { type: "application/vnd.openxmlformats-officedocument.spreadsheetml.sheet" });
+  const url = URL.createObjectURL(blob);
+  const a = document.createElement("a");
+  a.href = url;
+  a.download = "target_upload_template.xlsx";
+  a.click();
+  URL.revokeObjectURL(url);
 }
 
 interface Props {
@@ -129,6 +204,35 @@ export default function BulkTargetUpload({ yearId, yearLabel, onClose, onUploade
   const [parseError, setParseError] = useState("");
   const [submitting, setSubmitting] = useState(false);
   const [summary, setSummary] = useState<{ successCount: number; errorCount: number } | null>(null);
+
+  // Every currently-accessible Business Unit/Company name — loaded once on
+  // open, used only to populate the template's dropdown lists (not to
+  // validate the parsed upload itself, since the server is the real source
+  // of truth there). `null` while loading; the Download Template button
+  // stays disabled until this resolves so it never ships a stale/empty list.
+  const [names, setNames] = useState<{ businessUnits: string[]; companies: string[] } | null>(null);
+  const [templateBusy, setTemplateBusy] = useState(false);
+
+  useEffect(() => {
+    Promise.all([api.businessUnits(), api.companies()])
+      .then(([bus, companies]) => {
+        setNames({
+          businessUnits: bus.map((b) => b.name),
+          companies: companies.map((c) => c.name),
+        });
+      })
+      .catch(() => setNames({ businessUnits: [], companies: [] }));
+  }, []);
+
+  async function handleDownloadTemplate() {
+    if (!names) return;
+    setTemplateBusy(true);
+    try {
+      await downloadTemplate(names.businessUnits, names.companies);
+    } finally {
+      setTemplateBusy(false);
+    }
+  }
 
   const validRows = rows.filter((r) => !r.clientError);
   const invalidRows = rows.filter((r) => r.clientError);
@@ -200,7 +304,9 @@ export default function BulkTargetUpload({ yearId, yearLabel, onClose, onUploade
             <p className="mt-1 text-xs text-slate-500 dark:text-slate-400">
               Upload a CSV or Excel file to set Quarter Targets for many Companies (and Quarters) at once. Each row
               needs a Company and a Quarter (1-4); include a Business Unit column too if a Company name is used in
-              more than one Business Unit. Blank figure cells are treated as 0.
+              more than one Business Unit. Blank figure cells are treated as 0. The downloaded template's Business
+              Unit, Company, and Quarter columns come with dropdown lists of current values, so typos and spacing
+              mistakes shouldn't slip through — just click a cell's arrow to pick instead of typing.
             </p>
           </div>
           <button onClick={onClose} className="rounded-md p-1 text-slate-400 hover:bg-slate-100 dark:hover:bg-slate-800 dark:text-slate-500">
@@ -211,10 +317,11 @@ export default function BulkTargetUpload({ yearId, yearLabel, onClose, onUploade
         <div className="flex flex-wrap items-center gap-3">
           <button
             type="button"
-            onClick={downloadTemplate}
-            className="flex items-center gap-2 rounded-md border border-slate-300 dark:border-slate-600 px-3 py-2 text-sm font-medium text-slate-600 dark:text-slate-300 hover:bg-slate-50 dark:hover:bg-slate-800"
+            disabled={!names || templateBusy}
+            onClick={handleDownloadTemplate}
+            className="flex items-center gap-2 rounded-md border border-slate-300 dark:border-slate-600 px-3 py-2 text-sm font-medium text-slate-600 dark:text-slate-300 hover:bg-slate-50 dark:hover:bg-slate-800 disabled:opacity-50"
           >
-            <Download className="h-4 w-4" /> Download Template
+            <Download className="h-4 w-4" /> {templateBusy ? "Preparing..." : "Download Template"}
           </button>
           <button
             type="button"

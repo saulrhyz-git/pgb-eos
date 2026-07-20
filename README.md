@@ -1733,3 +1733,52 @@ filled in; uploading against a manually-locked quarter reports that row as
 locked rather than silently skipping it; and a BU Integrator (or Custom-
 Role-scoped user) uploading a file that includes a Company outside their
 access gets a permission error on just that row.
+
+**Bulk Target Upload template: real Excel dropdowns for Business Unit/
+Company/Quarter, not just plain columns.** Follow-up to the bulk upload
+feature above — the downloaded template's first three columns now carry
+actual in-cell Excel dropdown lists (click the little arrow on a cell to
+pick a value) sourced from whatever Business Units/Companies exist right
+now, plus a fixed 1-4 list for Quarter, instead of being plain unconstrained
+cells. This is aimed squarely at the failure mode the previous version still
+allowed: a misspelled or oddly-spaced Company/Business Unit name in a
+hand-typed cell that the server would've rejected as "Company not found."
+
+This needed a different library for the template file specifically:
+SheetJS's free Community Edition (the `xlsx` package already used
+everywhere else in this feature) can only *read* Excel data validation, it
+silently drops it when writing, so it's structurally incapable of
+producing a template with working dropdowns. `client/src/components/
+BulkTargetUpload.tsx` now uses `exceljs` (new dependency) just for
+`downloadTemplate()` — everything else (parsing an uploaded file) is
+unchanged and still goes through `xlsx`/SheetJS, since reading plain cell
+values doesn't care which library wrote them. On open, the modal fetches
+the full current `api.businessUnits()`/`api.companies()` lists once and
+keeps the Download Template button disabled until that resolves, so the
+dropdowns are never built from a stale or empty list. The lists themselves
+live on a hidden "Lists" sheet in the generated workbook (column A =
+Business Unit names, column B = Company names — flat, not filtered per
+Business Unit, since the same Company name can legitimately exist under two
+different Business Units and the upload's own Business Unit column is what
+disambiguates that, same as before); the visible "Targets" sheet's first
+500 data rows get list-type data validation pointing at those two columns
+plus an inline `"1,2,3,4"` list for Quarter. The validation's error style is
+"warning" rather than "stop," so a value that doesn't match the dropdown
+(e.g. a Business Unit added *after* the template was downloaded) still
+warns but doesn't hard-block typing it — the server is still the real
+source of truth on upload either way.
+
+ExcelJS's browser build references Node's `Buffer`/`process` globals
+internally (it silently doesn't work in a plain Vite bundle without them),
+so `client/vite.config.ts` gained the `vite-plugin-node-polyfills` plugin
+(new devDependency), scoped to just `buffer`/`process`/`util`/`stream` —
+nothing else in the app needs it. **Run `npm install` in `client/`** to
+pick up both new dependencies (`exceljs` and `vite-plugin-node-polyfills`)
+before starting the dev server. Worth checking by hand: Download Template
+produces an `.xlsx` where clicking a cell in the Business Unit or Company
+column (any of the first ~500 rows) shows a dropdown arrow listing every
+current Business Unit/Company by name; picking Quarter shows just 1/2/3/4;
+typing a value that isn't on the list still works but shows Excel's warning
+triangle rather than being blocked outright; and the template still opens
+and uploads correctly end to end (parsing is unaffected by which library
+generated the file).
