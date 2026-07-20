@@ -24,7 +24,9 @@ export interface AuthUser {
   description: string;
   businessUnitIds: string[];
   mustChangePassword: boolean;
-  customRoleId?: string | null;
+  // Any number of Custom Roles assigned (see UserCustomRole in
+  // schema.prisma) — effective access is the union of all of them.
+  customRoleIds: string[];
 }
 
 export interface AdminUser {
@@ -37,7 +39,7 @@ export interface AdminUser {
   mustChangePassword: boolean;
   createdAt: string;
   businessUnits: { id: string; name: string }[];
-  customRole: { id: string; name: string } | null;
+  customRoles: { id: string; name: string }[];
 }
 
 // One row of a Custom Role's permission matrix: for one Business Unit (or,

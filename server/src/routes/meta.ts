@@ -2,7 +2,7 @@ import { Router } from "express";
 import { z } from "zod";
 import { prisma } from "../lib/prisma";
 import { blockPendingPasswordChange, loadUserPermissions, requireAuth, requireRole, scopedBusinessUnitFilter } from "../middleware/auth";
-import { canAny } from "../utils/permissions";
+import { ALL_RESOURCES, canAny, hasAnyGrant } from "../utils/permissions";
 import { currentCalendarQuarter } from "../utils/quarterDates";
 import { logAudit } from "../utils/auditLog";
 
@@ -64,7 +64,12 @@ router.get("/business-units", async (req, res) => {
   });
 
   const permRows = await loadUserPermissions(user);
-  if (permRows.length) {
+  // Only narrow if the role addresses at least one of the "real" (non-audit)
+  // resources — a role that only ever grants AUDIT_LOG view has permRows but
+  // would otherwise fail every canAny(ALL_RESOURCES) check below, wiping out
+  // this dropdown entirely for a user whose base role should still see
+  // everything. See hasAnyGrant() in utils/permissions.ts.
+  if (hasAnyGrant(permRows, ALL_RESOURCES)) {
     // A Custom Role narrows which Business Units/Companies even show up in
     // dropdowns app-wide, using "any view, on anything" so a role scoped to
     // just ROCKS (say) can still find the right Company on the Rocks page
@@ -122,7 +127,7 @@ router.get("/companies", async (req, res) => {
   let companies = await prisma.company.findMany({ where, orderBy: { name: "asc" } });
 
   const permRows = await loadUserPermissions(user);
-  if (permRows.length) {
+  if (hasAnyGrant(permRows, ALL_RESOURCES)) {
     companies = companies.filter((c) => canAny(permRows, "view", { businessUnitId: c.businessUnitId, companyId: c.id }));
   }
 

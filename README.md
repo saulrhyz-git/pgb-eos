@@ -206,12 +206,18 @@ real data — the app starts completely empty.
   Companies, both independently selectable), and each pick gets its own
   7-resource x View/Edit/Delete grid on the right;
   saving flattens the selections into `RolePermission` rows (only rows with
-  at least one box checked are kept). A role is assigned to a user via a
-  "Custom Role" dropdown on Admin → Users (hidden for Superadmins, who always
-  have full access regardless); it has no effect until assigned, and a role
+  at least one box checked are kept). Roles are assigned to a user via a
+  "Custom Roles" checkbox list on Admin → Users (hidden for Superadmins, who
+  always have full access regardless) — a Superadmin can tick any number of
+  roles for the same user (see `UserCustomRole` in `schema.prisma`, the join
+  table backing this), not just one; a user's effective Custom-Role access is
+  the union of every role assigned to them (`loadUserPermissions()` in
+  `middleware/auth.ts` merges each assigned role's `RolePermission` rows into
+  one flat list before any `can()`/`hasAnyGrant()` check runs). Assigning a
+  role has no effect until it's assigned to at least one user, and a role
   can't be deleted while any user still has it. Enforcement: a user with no
   Custom Role assigned sees zero change in behavior (today's Business-Unit
-  scoping applies exactly as before). A user WITH one has their access
+  scoping applies exactly as before). A user WITH one or more has their access
   narrowed further everywhere that resource shows up — and for a blank-role
   user (see above), the Custom Role isn't just a narrowing layer but the
   entire basis for their access, since they have no base-role scoping to
@@ -234,7 +240,16 @@ real data — the app starts completely empty.
   figures alongside zeroed headline numbers). Permissions are looked up fresh
   from the database on every request (not baked into the login token), so
   editing a role's matrix takes effect immediately for anyone assigned to it,
-  without needing to log out and back in.
+  without needing to log out and back in. Crucially, this narrowing is scoped
+  per resource, not all-or-nothing: whether a Custom Role affects, say,
+  financial visibility depends on whether that role has ANY row at all for
+  Revenue/Collections/Expenses (see `hasAnyGrant()` in `permissions.ts`) — a
+  role built to grant only Executive Scorecard view has rows, but none for
+  Targets/Revenue/Collections/Expenses/Rocks, so none of that other access is
+  touched; the user's base role (e.g. BU Integrator) keeps seeing everything
+  it normally would there. A Custom Role only narrows a resource it actually
+  addresses — it's additive on top of the base role, never a wholesale
+  replacement of it.
 - **Executive Scorecard** (`server/src/routes/scorecard.ts`,
   `client/src/pages/Scorecard.tsx`): a third, filterable/interactive view
   aimed at a C-Level/BOD audience — a condensed, Business-Unit-level-only
@@ -936,3 +951,58 @@ locked; reloading the page without changing anything else re-flags it "At
 Risk" again, since the Rock is still incomplete past the 60-day mark;
 setting it to "Target Met" instead makes it stick, since Target Met Rocks
 are excluded from the check.
+
+**Custom Roles: additive-only narrowing + multiple roles per user**
+(`server/src/utils/permissions.ts`'s new `hasAnyGrant()` helper and its use
+across `dashboard.ts`/`actuals.ts`/`targets.ts`/`rocks.ts`/`scorecard.ts`/
+`meta.ts`; the new `UserCustomRole` join table in `schema.prisma` replacing
+`User.customRoleId`; `AuthUser.customRoleIds: string[]` in
+`middleware/auth.ts`; `routes/auth.ts`, `routes/admin.ts`; and
+`client/src/pages/admin/AdminUsers.tsx`'s Custom Roles checkbox list) fixes
+two related problems with Custom Roles and needs a fresh
+`npm run prisma:migrate` (the new migration also backfills every existing
+single `customRoleId` assignment into the join table before dropping the old
+column, so no one loses their currently-assigned role). Two independent
+changes:
+1. **Bug fix — narrowing is now per-resource, not all-or-nothing.** Every
+   enforcement point used to gate narrowing on "does this user have *any*
+   Custom Role rows at all" (`permRows.length`), which meant a role that only
+   ever grants, say, `SCORECARD` view would still trip the financial-data
+   narrowing everywhere else in the app — a BU Integrator given a
+   Scorecard-only role lost all their normal Revenue/Collections/Expenses
+   visibility, even though the role never mentioned those resources. Fixed by
+   gating each narrowing block on `hasAnyGrant(rows, <the specific
+   resource(s) that block cares about>)` instead — narrowing for a resource
+   only ever engages if the assigned role(s) actually have at least one row
+   for that resource; a role that never touches a resource leaves the base
+   role's normal access to it completely untouched. This preserves the
+   original, intentional narrowing behavior (a role that DOES grant, say,
+   Collections-view-only for one Company still narrows exactly as before) —
+   it only stops narrowing from firing for resources the role never
+   addresses at all. `meta.ts`'s dropdown-visibility filtering is gated on
+   `hasAnyGrant(rows, ALL_RESOURCES)` specifically (excluding `AUDIT_LOG`,
+   matching its existing "any view, on anything" intent) so a role that only
+   grants Audit Log view doesn't wipe out Business Unit/Company dropdowns
+   app-wide either.
+2. **Feature — a Superadmin can now assign any number of Custom Roles to the
+   same user**, not just one. A user's effective Custom-Role access is the
+   union of every assigned role's permission matrix
+   (`loadRolePermissionsForRoles()` in `permissions.ts`, called from
+   `loadUserPermissions()`). Admin → Users' single "Custom Role" dropdown is
+   now a "Custom Roles" checkbox list (matching the existing Business Unit
+   assignment checklist style) — ticking, say, both a "Scorecard viewer" role
+   and a "Rocks editor" role gives that user both sets of grants at once.
+
+This is unverified end-to-end. Worth checking by hand: assigning a BU
+Integrator a Custom Role with only Executive Scorecard view checked (no
+Targets/Revenue/Collections/Expenses/Rocks rows at all) leaves every one of
+their existing Revenue dashboard figures, Target Setup access, and Rocks
+access completely unchanged, while also unlocking the Scorecard page for
+them; a role that DOES include, say, a Collections-only view row for one
+Company still narrows that user down to just that Company/category as
+before; on Admin → Users, ticking two different Custom Roles for the same
+user and saving shows both role names (comma-separated) in the Custom Roles
+column, and re-opening the edit form shows both checkboxes still ticked;
+removing one of the two roles (unticking it and saving) leaves the other
+role's grants intact; a role still can't be deleted while any user has it
+checked, even if that user also has other roles assigned.

@@ -47,9 +47,9 @@ model User {
   passwordHash       String
   name               String
   // Optional — a user can be created with no base Role at all ("blank"),
-  // relying entirely on an assigned CustomRole for access (see customRoleId
-  // below). A blank-role user with no CustomRole assigned has no access to
-  // anything (see hasGlobalBusinessUnitAccess in middleware/auth.ts).
+  // relying entirely on their assigned CustomRole(s) for access (see
+  // customRoles below). A blank-role user with no CustomRole assigned has no
+  // access to anything (see hasGlobalBusinessUnitAccess in middleware/auth.ts).
   role               Role?
   // Superadmin-authored free-text note about this user (e.g. their title or
   // team) — shown in the app header in place of their role. Not editable by
@@ -67,14 +67,18 @@ model User {
   failedLoginAttempts Int       @default(0)
   lockedUntil         DateTime?
 
-  // Optional, additional layer on top of `role`. When set (typically for a
-  // GROUP_INTEGRATOR or BU_INTEGRATOR), the user's effective View/Edit/Delete
-  // access to Targets/Revenue/Collections/Expenses/Rocks per Business Unit or
-  // Company is governed by this Custom Role's permission matrix instead of
-  // the coarser "everything in my assigned Business Unit(s)" default.
-  // Superadmins ignore this entirely (always full access).
-  customRoleId String?
-  customRole   CustomRole? @relation(fields: [customRoleId], references: [id], onDelete: SetNull)
+  // Optional, additional layer on top of `role`. When any are assigned
+  // (typically for a GROUP_INTEGRATOR or BU_INTEGRATOR), the user's effective
+  // View/Edit/Delete access to Targets/Revenue/Collections/Expenses/Rocks per
+  // Business Unit or Company is governed by the UNION of every assigned
+  // Custom Role's permission matrix, layered ADDITIVELY on top of (never in
+  // place of) the coarser "everything in my assigned Business Unit(s)"
+  // default — a Custom Role only narrows a resource it actually addresses;
+  // one that never mentions a given resource leaves the base role's normal
+  // access to it untouched (see hasAnyGrant() in utils/permissions.ts).
+  // Superadmins ignore this entirely (always full access). A user may have
+  // any number of Custom Roles (see UserCustomRole below), not just one.
+  customRoles UserCustomRole[]
 
   businessUnits UserBusinessUnit[]
   actualEdits   QuarterActual[]    @relation("ActualEditedBy")
@@ -83,6 +87,22 @@ model User {
   targetLocks   TargetLock[]
 
   @@index([role])
+}
+
+// Join table for the User <-> CustomRole many-to-many: a Superadmin can
+// assign any number of Custom Roles to the same user (e.g. one narrowing
+// Collections visibility, another separately granting Rocks view), and their
+// effective permissions are the union of every assigned role's matrix. See
+// loadUserPermissions() in middleware/auth.ts for how these are merged.
+model UserCustomRole {
+  userId       String
+  customRoleId String
+  createdAt    DateTime @default(now())
+
+  user       User       @relation(fields: [userId], references: [id], onDelete: Cascade)
+  customRole CustomRole @relation(fields: [customRoleId], references: [id], onDelete: Cascade)
+
+  @@id([userId, customRoleId])
   @@index([customRoleId])
 }
 
@@ -99,7 +119,7 @@ model CustomRole {
   updatedAt   DateTime @updatedAt
 
   permissions RolePermission[]
-  users       User[]
+  users       UserCustomRole[]
 }
 
 // One row = "for this Business Unit (or, if companyId is set, this specific

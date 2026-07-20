@@ -5,12 +5,14 @@ import { blockPendingPasswordChange, requireAuth, requireRole } from "../middlew
 import { logAudit } from "../utils/auditLog";
 
 // Superadmin-only CRUD over Custom Roles: named permission profiles that can
-// be assigned to any User (see admin.ts's user create/update) as an
+// be assigned to any User — any number at once, see admin.ts's user
+// create/update and the UserCustomRole join table in schema.prisma — as an
 // additional, more granular layer on top of their base Role. Each role owns a
 // matrix of RolePermission rows — one per (Business Unit or Company) x
 // resource, each with independent View/Edit/Delete flags — enforced across
 // targets.ts, actuals.ts, rocks.ts, and dashboard.ts wherever a request's user
-// has a customRoleId set.
+// has one or more Custom Roles assigned (their effective access is the union
+// of all of them).
 const router = Router();
 router.use(requireAuth);
 router.use(blockPendingPasswordChange);

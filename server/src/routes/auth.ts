@@ -40,7 +40,7 @@ function toAuthUser(user: {
   role: AuthUser["role"];
   description: string;
   mustChangePassword: boolean;
-  customRoleId: string | null;
+  customRoles: { customRoleId: string }[];
   businessUnits: { businessUnitId: string }[];
 }): AuthUser {
   return {
@@ -52,7 +52,7 @@ function toAuthUser(user: {
     description: user.description,
     businessUnitIds: user.businessUnits.map((b) => b.businessUnitId),
     mustChangePassword: user.mustChangePassword,
-    customRoleId: user.customRoleId,
+    customRoleIds: user.customRoles.map((r) => r.customRoleId),
   };
 }
 
@@ -64,7 +64,10 @@ router.post("/login", async (req, res) => {
   const normalized = identifier.trim().toLowerCase();
   const user = await prisma.user.findFirst({
     where: { OR: [{ email: normalized }, { username: normalized }] },
-    include: { businessUnits: { select: { businessUnitId: true } } },
+    include: {
+      businessUnits: { select: { businessUnitId: true } },
+      customRoles: { select: { customRoleId: true } },
+    },
   });
   if (!user) return res.status(401).json({ error: "Invalid credentials" });
 
@@ -138,7 +141,7 @@ const updateProfileSchema = z.object({
 
 // Self-service profile update — any authenticated user can change their own
 // name/email/username. Deliberately does NOT include `role`, `description`,
-// `businessUnitIds`, or `customRoleId`: those stay superadmin-only via
+// `businessUnitIds`, or `customRoleIds`: those stay superadmin-only via
 // routes/admin.ts. Returns a fresh token since name/email/username all
 // travel in it.
 router.put("/profile", requireAuth, async (req, res) => {
@@ -157,7 +160,10 @@ router.put("/profile", requireAuth, async (req, res) => {
     const updated = await prisma.user.update({
       where: { id: req.user!.id },
       data,
-      include: { businessUnits: { select: { businessUnitId: true } } },
+      include: {
+        businessUnits: { select: { businessUnitId: true } },
+        customRoles: { select: { customRoleId: true } },
+      },
     });
     const authUser = toAuthUser(updated);
     const token = signToken(authUser);
@@ -187,7 +193,10 @@ router.post("/change-password", requireAuth, async (req, res) => {
 
   const user = await prisma.user.findUnique({
     where: { id: req.user!.id },
-    include: { businessUnits: { select: { businessUnitId: true } } },
+    include: {
+      businessUnits: { select: { businessUnitId: true } },
+      customRoles: { select: { customRoleId: true } },
+    },
   });
   if (!user) return res.status(404).json({ error: "User not found" });
 
@@ -198,7 +207,10 @@ router.post("/change-password", requireAuth, async (req, res) => {
   const updated = await prisma.user.update({
     where: { id: user.id },
     data: { passwordHash, mustChangePassword: false },
-    include: { businessUnits: { select: { businessUnitId: true } } },
+    include: {
+      businessUnits: { select: { businessUnitId: true } },
+      customRoles: { select: { customRoleId: true } },
+    },
   });
 
   const authUser = toAuthUser(updated);

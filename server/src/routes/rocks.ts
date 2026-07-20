@@ -10,7 +10,7 @@ import {
   resolveCompanyBusinessUnit,
   scopedBusinessUnitFilter,
 } from "../middleware/auth";
-import { assertPermission, can } from "../utils/permissions";
+import { assertPermission, can, hasAnyGrant } from "../utils/permissions";
 import { logAudit } from "../utils/auditLog";
 import { escalateStaleRocks } from "../utils/rockAutoStatus";
 
@@ -67,7 +67,7 @@ router.get("/", async (req, res) => {
     if (companyId) {
       const buId = await resolveCompanyBusinessUnit(companyId);
       assertBusinessUnitAccess(user, buId);
-      if (permRows.length) assertPermission(permRows, "view", "ROCKS", { businessUnitId: buId, companyId });
+      if (hasAnyGrant(permRows, ["ROCKS"])) assertPermission(permRows, "view", "ROCKS", { businessUnitId: buId, companyId });
     }
   } catch (err: any) {
     return res.status(err.status || 500).json({ error: err.message });
@@ -86,7 +86,7 @@ router.get("/", async (req, res) => {
       return res.status(err.status || 500).json({ error: err.message });
     }
 
-    if (permRows.length) {
+    if (hasAnyGrant(permRows, ["ROCKS"])) {
       const companyWhere: any = {};
       if (buFilter) companyWhere.businessUnitId = buFilter;
       const candidates = await prisma.company.findMany({ where: companyWhere, select: { id: true, businessUnitId: true } });
@@ -151,7 +151,7 @@ router.post("/", async (req, res) => {
     const businessUnitId = await resolveCompanyBusinessUnit(parsed.data.companyId);
     assertBusinessUnitAccess(req.user!, businessUnitId);
     const permRows = await loadUserPermissions(req.user!);
-    if (permRows.length) assertPermission(permRows, "edit", "ROCKS", { businessUnitId, companyId: parsed.data.companyId });
+    if (hasAnyGrant(permRows, ["ROCKS"])) assertPermission(permRows, "edit", "ROCKS", { businessUnitId, companyId: parsed.data.companyId });
     if (parsed.data.businessGoalId) await assertBusinessGoalUsable(parsed.data.businessGoalId, businessUnitId);
   } catch (err: any) {
     return res.status(err.status || 500).json({ error: err.message });
@@ -200,7 +200,7 @@ router.post("/rollover", requireRole("GROUP_INTEGRATOR", "SUPERADMIN"), async (r
     if (companyId) {
       const buId = await resolveCompanyBusinessUnit(companyId);
       assertBusinessUnitAccess(user, buId);
-      if (permRows.length) assertPermission(permRows, "edit", "ROCKS", { businessUnitId: buId, companyId });
+      if (hasAnyGrant(permRows, ["ROCKS"])) assertPermission(permRows, "edit", "ROCKS", { businessUnitId: buId, companyId });
     }
   } catch (err: any) {
     return res.status(err.status || 500).json({ error: err.message });
@@ -235,7 +235,7 @@ router.post("/rollover", requireRole("GROUP_INTEGRATOR", "SUPERADMIN"), async (r
       return res.status(err.status || 500).json({ error: err.message });
     }
 
-    if (permRows.length) {
+    if (hasAnyGrant(permRows, ["ROCKS"])) {
       // Only roll over Rocks belonging to Companies this Custom Role grants
       // ROCKS edit on — a broad rollover silently skips the rest rather than
       // failing outright.
@@ -316,7 +316,7 @@ router.put("/:id", async (req, res) => {
     const businessUnitId = await resolveCompanyBusinessUnit(existing.companyId);
     assertBusinessUnitAccess(req.user!, businessUnitId);
     const permRows = await loadUserPermissions(req.user!);
-    if (permRows.length) assertPermission(permRows, "edit", "ROCKS", { businessUnitId, companyId: existing.companyId });
+    if (hasAnyGrant(permRows, ["ROCKS"])) assertPermission(permRows, "edit", "ROCKS", { businessUnitId, companyId: existing.companyId });
     if (parsed.data.businessGoalId) await assertBusinessGoalUsable(parsed.data.businessGoalId, businessUnitId);
   } catch (err: any) {
     return res.status(err.status || 500).json({ error: err.message });
@@ -346,7 +346,7 @@ router.delete("/:id", async (req, res) => {
     const businessUnitId = await resolveCompanyBusinessUnit(existing.companyId);
     assertBusinessUnitAccess(req.user!, businessUnitId);
     const permRows = await loadUserPermissions(req.user!);
-    if (permRows.length) assertPermission(permRows, "delete", "ROCKS", { businessUnitId, companyId: existing.companyId });
+    if (hasAnyGrant(permRows, ["ROCKS"])) assertPermission(permRows, "delete", "ROCKS", { businessUnitId, companyId: existing.companyId });
   } catch (err: any) {
     return res.status(err.status || 500).json({ error: err.message });
   }

@@ -1,7 +1,7 @@
 import { Router } from "express";
 import { prisma } from "../lib/prisma";
 import { blockPendingPasswordChange, loadUserPermissions, requireAuth, scopedBusinessUnitFilter } from "../middleware/auth";
-import { can, canAnyOf, FINANCIAL_RESOURCES } from "../utils/permissions";
+import { can, canAnyOf, FINANCIAL_RESOURCES, hasAnyGrant } from "../utils/permissions";
 import { addFigures, collectionsTotal, emptyFigures, expensesTotal, Figures, pct, revenueTotal, toFigures } from "../utils/aggregate";
 import { escalateStaleRocks } from "../utils/rockAutoStatus";
 
@@ -74,13 +74,20 @@ router.get("/", async (req, res) => {
   // for financial data, applied twice here — once for the Revenue section
   // (FINANCIAL_RESOURCES) and once for the Rocks section (ROCKS) below,
   // since a role could grant one without the other (e.g. a board member who
-  // should see Rocks status but not raw financials).
+  // should see Rocks status but not raw financials). Each section only
+  // engages narrowing if the Custom Role actually addresses that section's
+  // resource(s) at all — a role that never mentions REVENUE/COLLECTIONS/
+  // EXPENSES (e.g. a Rocks-only grant) must never touch financial visibility,
+  // and vice versa. See hasAnyGrant() in utils/permissions.ts.
   let revenueCompanies = companies;
   let revenueBusinessUnits = businessUnits;
   let rockCompanies = companies;
   let rockBusinessUnits = businessUnits;
 
-  if (permRows.length) {
+  const financialRoleActive = hasAnyGrant(permRows, FINANCIAL_RESOURCES);
+  const rocksRoleActive = hasAnyGrant(permRows, ["ROCKS"]);
+
+  if (financialRoleActive) {
     revenueCompanies = companies.filter((c) =>
       canAnyOf(permRows, "view", FINANCIAL_RESOURCES, { businessUnitId: c.businessUnitId, companyId: c.id })
     );
@@ -89,7 +96,9 @@ router.get("/", async (req, res) => {
       if (canAnyOf(permRows, "view", FINANCIAL_RESOURCES, { businessUnitId: bu.id })) permittedRevenueBuIds.add(bu.id);
     }
     revenueBusinessUnits = businessUnits.filter((bu) => permittedRevenueBuIds.has(bu.id));
+  }
 
+  if (rocksRoleActive) {
     rockCompanies = companies.filter((c) => can(permRows, "view", "ROCKS", { businessUnitId: c.businessUnitId, companyId: c.id }));
     const permittedRockBuIds = new Set(rockCompanies.map((c) => c.businessUnitId));
     for (const bu of businessUnits) {
@@ -99,7 +108,7 @@ router.get("/", async (req, res) => {
   }
 
   function isCatAllowed(companyId: string, businessUnitId: string, resource: "REVENUE" | "COLLECTIONS" | "EXPENSES"): boolean {
-    if (!permRows.length) return true;
+    if (!financialRoleActive) return true;
     return can(permRows, "view", resource, { businessUnitId, companyId });
   }
 

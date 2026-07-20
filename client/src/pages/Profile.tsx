@@ -84,7 +84,9 @@ export default function Profile() {
         <div className="flex flex-col gap-1">
           <div className="text-sm font-semibold text-slate-800">
             {user?.role ? ROLE_LABELS[user.role] : "No base role"}
-            {user?.customRoleId ? " · Custom Role assigned" : ""}
+            {user?.customRoleIds?.length
+              ? ` · ${user.customRoleIds.length} Custom Role${user.customRoleIds.length === 1 ? "" : "s"} assigned`
+              : ""}
           </div>
           <div className="text-sm text-slate-600">
             {user?.description ? user.description : <span className="text-slate-400">No description set by your administrator.</span>}

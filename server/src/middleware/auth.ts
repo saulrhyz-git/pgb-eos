@@ -1,7 +1,7 @@
 import { NextFunction, Request, Response } from "express";
 import jwt from "jsonwebtoken";
 import { prisma } from "../lib/prisma";
-import { loadRolePermissions } from "../utils/permissions";
+import { loadRolePermissionsForRoles } from "../utils/permissions";
 
 export interface AuthUser {
   id: string;
@@ -9,8 +9,8 @@ export interface AuthUser {
   username?: string | null;
   name: string;
   // null = "blank" role — no base-role-derived access at all. Such a user
-  // relies entirely on their assigned Custom Role (customRoleId below); with
-  // no Custom Role assigned either, they have no access to anything.
+  // relies entirely on their assigned Custom Role(s) (customRoleIds below);
+  // with no Custom Role assigned either, they have no access to anything.
   role: "SUPERADMIN" | "GROUP_INTEGRATOR" | "BU_INTEGRATOR" | null;
   // Superadmin-authored free-text note (title, team, etc.), shown in the
   // app header in place of the role label. Not editable by the user
@@ -18,14 +18,17 @@ export interface AuthUser {
   description: string;
   businessUnitIds: string[];
   mustChangePassword: boolean;
-  // Optional, additional layer on top of `role` (see CustomRole/RolePermission
-  // in schema.prisma). Only the id travels in the token — permissions
+  // Any number of additional layers on top of `role` (see CustomRole/
+  // RolePermission in schema.prisma, and UserCustomRole for the join table
+  // backing this array). Only the ids travel in the token — permissions
   // themselves are looked up fresh from the DB per request (see
-  // utils/permissions.ts) so edits to a role take effect immediately rather
+  // utils/permissions.ts) so editing a role takes effect immediately rather
   // than waiting for the affected user to log in again. Superadmins ignore
-  // this entirely; users with no customRoleId keep today's coarser
-  // "everything in my assigned Business Unit(s)" behavior unchanged.
-  customRoleId?: string | null;
+  // this entirely; users with no Custom Roles keep today's coarser
+  // "everything in my assigned Business Unit(s)" behavior unchanged. A
+  // user's effective Custom-Role access is the union of every role listed
+  // here.
+  customRoleIds: string[];
 }
 
 declare global {
@@ -90,18 +93,19 @@ export function blockPendingPasswordChange(req: Request, res: Response, next: Ne
  *
  * A "blank" role (role === null) has no coarse Business-Unit-assignment
  * concept of its own — such a user's access is meant to be defined entirely
- * by their Custom Role's own per-Business-Unit/Company grants. So: if they
- * have a Custom Role assigned, the coarse BU gate is bypassed entirely (this
- * function returns true) and the Custom Role's own `can()`/`assertPermission()`
- * checks downstream are what actually restrict them. If they have no Custom
- * Role at all, they have no basis for access whatsoever, so this returns
- * false and — since a blank-role user's businessUnitIds is always empty —
- * every coarse check below denies them by default.
+ * by their Custom Role(s)' own per-Business-Unit/Company grants. So: if they
+ * have at least one Custom Role assigned, the coarse BU gate is bypassed
+ * entirely (this function returns true) and the Custom Role's own
+ * `can()`/`assertPermission()` checks downstream are what actually restrict
+ * them. If they have no Custom Role at all, they have no basis for access
+ * whatsoever, so this returns false and — since a blank-role user's
+ * businessUnitIds is always empty — every coarse check below denies them by
+ * default.
  */
 function hasGlobalBusinessUnitAccess(user: AuthUser): boolean {
   if (user.role === "SUPERADMIN") return true;
   if (user.role === "GROUP_INTEGRATOR") return user.businessUnitIds.length === 0;
-  if (user.role === null) return Boolean(user.customRoleId);
+  if (user.role === null) return user.customRoleIds.length > 0;
   return false; // BU_INTEGRATOR
 }
 
@@ -151,13 +155,14 @@ export async function resolveCompanyBusinessUnit(companyId: string): Promise<str
 }
 
 /**
- * Loads the requesting user's Custom Role permission rows, if any (empty
- * array if they have no customRoleId — routes should treat an empty array as
- * "not using the Custom Role system, fall back to existing BU scoping").
- * Superadmins never have their access narrowed by a Custom Role even if one
- * is somehow assigned, so this returns [] for them unconditionally.
+ * Loads the union of every RolePermission row across all of the requesting
+ * user's assigned Custom Roles (empty array if they have none — routes
+ * should treat an empty array as "not using the Custom Role system, fall
+ * back to existing BU scoping"). Superadmins never have their access
+ * narrowed by a Custom Role even if one is somehow assigned, so this returns
+ * [] for them unconditionally.
  */
 export async function loadUserPermissions(user: AuthUser) {
-  if (user.role === "SUPERADMIN" || !user.customRoleId) return [];
-  return loadRolePermissions(user.customRoleId);
+  if (user.role === "SUPERADMIN" || user.customRoleIds.length === 0) return [];
+  return loadRolePermissionsForRoles(user.customRoleIds);
 }

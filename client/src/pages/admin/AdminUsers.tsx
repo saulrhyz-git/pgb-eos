@@ -24,7 +24,7 @@ const emptyForm = {
   description: "",
   password: "",
   businessUnitIds: [] as string[],
-  customRoleId: "" as string,
+  customRoleIds: [] as string[],
 };
 
 export default function AdminUsers() {
@@ -61,7 +61,7 @@ export default function AdminUsers() {
       description: u.description || "",
       password: "",
       businessUnitIds: u.businessUnits.map((b) => b.id),
-      customRoleId: u.customRole?.id || "",
+      customRoleIds: u.customRoles.map((r) => r.id),
     });
     setError("");
     setShowForm(true);
@@ -73,6 +73,15 @@ export default function AdminUsers() {
       businessUnitIds: f.businessUnitIds.includes(id)
         ? f.businessUnitIds.filter((x) => x !== id)
         : [...f.businessUnitIds, id],
+    }));
+  }
+
+  function toggleCustomRole(id: string) {
+    setForm((f) => ({
+      ...f,
+      customRoleIds: f.customRoleIds.includes(id)
+        ? f.customRoleIds.filter((x) => x !== id)
+        : [...f.customRoleIds, id],
     }));
   }
 
@@ -94,7 +103,7 @@ export default function AdminUsers() {
           role,
           description: form.description,
           businessUnitIds: form.businessUnitIds,
-          customRoleId: form.customRoleId || null,
+          customRoleIds: form.customRoleIds,
         };
         if (form.password) payload.password = form.password;
         await api.adminUpdateUser(form.id, payload);
@@ -107,7 +116,7 @@ export default function AdminUsers() {
           description: form.description,
           password: form.password,
           businessUnitIds: form.businessUnitIds,
-          customRoleId: form.customRoleId || null,
+          customRoleIds: form.customRoleIds,
         });
       }
       setShowForm(false);
@@ -261,24 +270,40 @@ export default function AdminUsers() {
           )}
 
           {form.role !== "SUPERADMIN" && (
-            <div className="flex flex-col gap-1">
-              <label className="text-xs font-medium text-slate-500">Custom Role (optional)</label>
-              <select
-                className="rounded-md border border-slate-300 px-3 py-2 text-sm sm:w-1/2"
-                value={form.customRoleId}
-                onChange={(e) => setForm((f) => ({ ...f, customRoleId: e.target.value }))}
-              >
-                <option value="">None — use the default Business Unit access above</option>
-                {customRoles.map((r) => (
-                  <option key={r.id} value={r.id}>
-                    {r.name}
-                  </option>
-                ))}
-              </select>
+            <div className="flex flex-col gap-2">
+              <label className="text-xs font-medium text-slate-500">Custom Roles (optional, any number)</label>
+              {customRoles.length === 0 ? (
+                <span className="text-xs text-slate-500">
+                  No Custom Roles have been created yet — manage them under the Roles tab.
+                </span>
+              ) : (
+                <div className="flex flex-wrap gap-2">
+                  {customRoles.map((r) => (
+                    <label
+                      key={r.id}
+                      className={`flex cursor-pointer items-center gap-1.5 rounded-md border px-3 py-1.5 text-xs font-medium ${
+                        form.customRoleIds.includes(r.id)
+                          ? "border-brand-500 bg-brand-50 text-brand-700"
+                          : "border-slate-200 text-slate-600"
+                      }`}
+                    >
+                      <input
+                        type="checkbox"
+                        className="hidden"
+                        checked={form.customRoleIds.includes(r.id)}
+                        onChange={() => toggleCustomRole(r.id)}
+                      />
+                      {r.name}
+                    </label>
+                  ))}
+                </div>
+              )}
               <span className="text-xs text-slate-500">
-                An additional, more granular layer on top of the role above — narrows this user's View/Edit/Delete access to
-                exactly the Business Units/Companies and resources (Targets/Revenue/Collections/Expenses/Rocks) the Custom Role
-                grants. Manage roles under the Roles tab.
+                Additional, more granular layer(s) on top of the role above — each assigned Custom Role adds its own
+                View/Edit/Delete grants for its Business Units/Companies and resources
+                (Targets/Revenue/Collections/Expenses/Rocks/Scorecard/Audit Log) on top of the default access above; a role
+                never removes access to a resource it doesn't mention. Selecting more than one merges all of their grants
+                together. Manage roles under the Roles tab.
               </span>
             </div>
           )}
@@ -313,7 +338,7 @@ export default function AdminUsers() {
               <th className="px-4 py-3">Description</th>
               <th className="px-4 py-3">Email / Username</th>
               <th className="px-4 py-3">Role</th>
-              <th className="px-4 py-3">Custom Role</th>
+              <th className="px-4 py-3">Custom Roles</th>
               <th className="px-4 py-3">Business Units</th>
               <th className="px-4 py-3">Status</th>
               <th className="px-4 py-3 text-right">Actions</th>
@@ -339,7 +364,9 @@ export default function AdminUsers() {
                     </span>
                   )}
                 </td>
-                <td className="px-4 py-3 text-slate-600">{u.customRole?.name || "—"}</td>
+                <td className="px-4 py-3 text-slate-600">
+                  {u.customRoles.length ? u.customRoles.map((r) => r.name).join(", ") : "—"}
+                </td>
                 <td className="px-4 py-3 text-slate-600">
                   {u.businessUnits.length
                     ? u.businessUnits.map((b) => b.name).join(", ")

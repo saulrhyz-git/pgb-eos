@@ -9,7 +9,7 @@ import {
   scopedBusinessUnitFilter,
 } from "../middleware/auth";
 import { addFigures, collectionsTotal, emptyFigures, expensesTotal, Figures, pct, revenueTotal, toFigures } from "../utils/aggregate";
-import { can, canAnyOf, FINANCIAL_RESOURCES, Resource } from "../utils/permissions";
+import { can, canAnyOf, FINANCIAL_RESOURCES, hasAnyGrant, Resource } from "../utils/permissions";
 
 const router = Router();
 router.use(requireAuth);
@@ -79,11 +79,18 @@ router.get("/", async (req, res) => {
   }
 
   const permRows = await loadUserPermissions(user);
+  // Only engage Custom-Role narrowing for financial data if the role actually
+  // addresses at least one of REVENUE/COLLECTIONS/EXPENSES somewhere — a role
+  // that never mentions these (e.g. a SCORECARD-only grant) must leave the
+  // user's base-role financial visibility completely untouched, rather than
+  // collapsing it to nothing just because `permRows` is non-empty for some
+  // unrelated resource. See hasAnyGrant() in utils/permissions.ts.
+  const financialRoleActive = hasAnyGrant(permRows, FINANCIAL_RESOURCES);
 
   let businessUnits = await prisma.businessUnit.findMany({ where: buWhere, orderBy: { name: "asc" } });
   let companies = await prisma.company.findMany({ where: companyWhere, orderBy: { name: "asc" } });
 
-  if (permRows.length) {
+  if (financialRoleActive) {
     // A Custom Role can grant view either at the whole-Business-Unit level or
     // at just one specific Company within it — a Business Unit stays visible
     // if EITHER is true for at least one of its Companies (or for itself
@@ -169,12 +176,14 @@ router.get("/", async (req, res) => {
   }
 
   // Per-Company, per-category view check used to mask figures below. Users
-  // with no Custom Role (permRows.length === 0) always pass — identical to
-  // today's behavior. `companies`/`businessUnits` were already narrowed above
-  // to ones with at least SOME financial view, so this only ever hides one
-  // specific category's numbers, never an entire row.
+  // whose Custom Role (if any) never addresses REVENUE/COLLECTIONS/EXPENSES
+  // at all always pass — identical to having no Custom Role, and identical to
+  // today's behavior for the common case. `companies`/`businessUnits` were
+  // already narrowed above to ones with at least SOME financial view (only
+  // when financialRoleActive), so this only ever hides one specific
+  // category's numbers, never an entire row.
   function isCatAllowed(companyId: string, resource: Resource): boolean {
-    if (!permRows.length) return true;
+    if (!financialRoleActive) return true;
     return can(permRows, "view", resource, { businessUnitId: businessUnitIdByCompany.get(companyId), companyId });
   }
 

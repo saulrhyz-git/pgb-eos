@@ -47,6 +47,28 @@ export async function loadRolePermissions(customRoleId: string): Promise<Permiss
   }));
 }
 
+/**
+ * Same as loadRolePermissions, but for a User with any number of assigned
+ * Custom Roles at once (see UserCustomRole in schema.prisma) — one query
+ * returning the union of every assigned role's RolePermission rows. Every
+ * `can()`/`canAnyOf()`/`hasAnyGrant()` check downstream already treats its
+ * `rows` argument as "whatever this user is granted, from wherever", so
+ * merging rows from multiple roles into one flat array here is all that's
+ * needed for a user's effective access to be the union of all their roles.
+ */
+export async function loadRolePermissionsForRoles(customRoleIds: string[]): Promise<PermissionRow[]> {
+  if (customRoleIds.length === 0) return [];
+  const rows = await prisma.rolePermission.findMany({ where: { customRoleId: { in: customRoleIds } } });
+  return rows.map((r) => ({
+    businessUnitId: r.businessUnitId,
+    companyId: r.companyId,
+    resource: r.resource as Resource,
+    canView: r.canView,
+    canEdit: r.canEdit,
+    canDelete: r.canDelete,
+  }));
+}
+
 const actionKey: Record<Action, keyof PermissionRow> = {
   view: "canView",
   edit: "canEdit",
@@ -95,6 +117,29 @@ export function canAnyOf(
 /** Does this permission set allow `action` on ANY resource for this Business Unit/Company (used for coarse visibility)? */
 export function canAny(rows: PermissionRow[], action: Action, ctx: { businessUnitId?: string; companyId?: string }): boolean {
   return canAnyOf(rows, action, ALL_RESOURCES, ctx);
+}
+
+/**
+ * Does this Custom Role even *address* any of `resources` — anywhere, for any
+ * Business Unit/Company — at all? A RolePermission row only ever exists if an
+ * admin explicitly checked at least one View/Edit/Delete box for it (see
+ * AdminRoles.tsx), so this answers "did the person who built this role
+ * configure anything for these resources", as opposed to `rows.length > 0`,
+ * which is true the instant the role touches ANY resource whatsoever (even
+ * ones with nothing to do with the check at hand).
+ *
+ * This is the fix for Custom Roles narrowing resources they were never meant
+ * to touch: a role built to grant only SCORECARD view has rows, so
+ * `rows.length > 0`, but `hasAnyGrant(rows, FINANCIAL_RESOURCES)` is false —
+ * meaning financial narrowing should never engage for that user at all, and
+ * their base role's normal Revenue/Collections/Expenses access is left fully
+ * intact. Every call site that used to gate narrowing on raw `rows.length`
+ * should gate on `hasAnyGrant(rows, <the specific resource(s) that route
+ * narrows on>)` instead — that's what makes a Custom Role strictly additive
+ * on top of the base role rather than a wholesale replacement of it.
+ */
+export function hasAnyGrant(rows: PermissionRow[], resources: Resource[]): boolean {
+  return rows.some((r) => resources.includes(r.resource));
 }
 
 export class PermissionError extends Error {

@@ -10,7 +10,7 @@ import {
   resolveCompanyBusinessUnit,
   scopedBusinessUnitFilter,
 } from "../middleware/auth";
-import { assertPermission, can } from "../utils/permissions";
+import { assertPermission, can, hasAnyGrant } from "../utils/permissions";
 import { logAudit } from "../utils/auditLog";
 
 const router = Router();
@@ -121,7 +121,7 @@ router.get("/quarter", async (req, res) => {
     if (companyId) {
       const buId = await resolveCompanyBusinessUnit(companyId);
       assertBusinessUnitAccess(user, buId);
-      if (permRows.length) assertPermission(permRows, "view", "TARGETS", { businessUnitId: buId, companyId });
+      if (hasAnyGrant(permRows, ["TARGETS"])) assertPermission(permRows, "view", "TARGETS", { businessUnitId: buId, companyId });
     }
   } catch (err: any) {
     return res.status(err.status || 500).json({ error: err.message });
@@ -140,7 +140,7 @@ router.get("/quarter", async (req, res) => {
       return res.status(err.status || 500).json({ error: err.message });
     }
 
-    if (permRows.length) {
+    if (hasAnyGrant(permRows, ["TARGETS"])) {
       // A Custom Role narrows visibility further, down to only the
       // Companies it grants TARGETS view on (Company-level rows take
       // precedence over a Business-Unit-level grant for the same resource).
@@ -175,7 +175,7 @@ router.put("/quarter", async (req, res) => {
     const businessUnitId = await resolveCompanyBusinessUnit(parsed.data.companyId);
     assertBusinessUnitAccess(req.user!, businessUnitId);
     const permRows = await loadUserPermissions(req.user!);
-    if (permRows.length) assertPermission(permRows, "edit", "TARGETS", { businessUnitId, companyId: parsed.data.companyId });
+    if (hasAnyGrant(permRows, ["TARGETS"])) assertPermission(permRows, "edit", "TARGETS", { businessUnitId, companyId: parsed.data.companyId });
   } catch (err: any) {
     return res.status(err.status || 500).json({ error: err.message });
   }
@@ -256,7 +256,7 @@ router.put("/annual", async (req, res) => {
     const businessUnitId = await resolveCompanyBusinessUnit(parsed.data.companyId);
     assertBusinessUnitAccess(req.user!, businessUnitId);
     const permRows = await loadUserPermissions(req.user!);
-    if (permRows.length) assertPermission(permRows, "edit", "TARGETS", { businessUnitId, companyId: parsed.data.companyId });
+    if (hasAnyGrant(permRows, ["TARGETS"])) assertPermission(permRows, "edit", "TARGETS", { businessUnitId, companyId: parsed.data.companyId });
   } catch (err: any) {
     return res.status(err.status || 500).json({ error: err.message });
   }

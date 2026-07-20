@@ -181,7 +181,8 @@ export const api = {
     description?: string;
     password: string;
     businessUnitIds?: string[];
-    customRoleId?: string | null;
+    // Any number of Custom Roles to assign — their grants are merged.
+    customRoleIds?: string[];
   }) => request<AdminUser>("/admin/users", { method: "POST", body: JSON.stringify(payload) }),
   adminUpdateUser: (
     id: string,
@@ -193,7 +194,7 @@ export const api = {
       description: string;
       businessUnitIds: string[];
       password: string;
-      customRoleId: string | null;
+      customRoleIds: string[];
     }>
   ) => request<AdminUser>(`/admin/users/${id}`, { method: "PUT", body: JSON.stringify(payload) }),
   adminDeleteUser: (id: string) => request<void>(`/admin/users/${id}`, { method: "DELETE" }),
