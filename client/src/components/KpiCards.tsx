@@ -105,48 +105,69 @@ export default function KpiCards({ kpis, quarter, category = "REVENUE" }: Props)
   const quarterActual = kpis[cfg.quarterActual] as number;
   const attainmentPct = kpis[cfg.attainmentPct] as number;
 
-  return (
-    <div className="flex flex-col gap-4">
-      <div className="grid grid-cols-1 gap-4 sm:grid-cols-3">
-        <Card
-          tone={cfg.tone}
-          icon={cfg.icon}
-          label={`Annual ${cfg.label} Target`}
-          value={formatCurrencyShort(annualTarget)}
-          fullValue={formatCurrency(annualTarget)}
-        />
-        <Card
-          tone={cfg.tone}
-          icon={cfg.icon}
-          label={`${periodLabel} ${cfg.label} Target`}
-          value={formatCurrencyShort(quarterTarget)}
-          fullValue={formatCurrency(quarterTarget)}
-        />
-        <Card
-          icon={<TrendingUp className="h-4 w-4" />}
-          label={`${periodLabel} Actual`}
-          value={formatCurrencyShort(quarterActual)}
-          fullValue={formatCurrency(quarterActual)}
-          sub={`${formatPct(attainmentPct)} attainment`}
-          subColor={attainmentColor(attainmentPct)}
-        />
-      </div>
+  const annualCard = (
+    <Card
+      key="annual"
+      tone={cfg.tone}
+      icon={cfg.icon}
+      label={`Annual ${cfg.label} Target`}
+      value={formatCurrencyShort(annualTarget)}
+      fullValue={formatCurrency(annualTarget)}
+    />
+  );
+  const quarterTargetCard = (
+    <Card
+      key="quarterTarget"
+      tone={cfg.tone}
+      icon={cfg.icon}
+      label={`${periodLabel} ${cfg.label} Target`}
+      value={formatCurrencyShort(quarterTarget)}
+      fullValue={formatCurrency(quarterTarget)}
+    />
+  );
+  const quarterActualCard = (
+    <Card
+      key="quarterActual"
+      icon={<TrendingUp className="h-4 w-4" />}
+      label={`${periodLabel} Actual`}
+      value={formatCurrencyShort(quarterActual)}
+      fullValue={formatCurrency(quarterActual)}
+      sub={`${formatPct(attainmentPct)} attainment`}
+      subColor={attainmentColor(attainmentPct)}
+    />
+  );
 
-      {/* Revenue is the only category with a Year-to-Date figure — Collections
-          and Expenses only ever have the Quarter Target/Actual/Attainment set
-          above (see the Kpis type comment in api/types.ts). */}
-      {category === "REVENUE" && (
-        <div className="grid grid-cols-1 gap-4 sm:grid-cols-3">
-          <Card
-            icon={<CalendarRange className="h-4 w-4" />}
-            label="Year-to-Date Actual"
-            value={formatCurrencyShort(kpis.ytdActual)}
-            fullValue={formatCurrency(kpis.ytdActual)}
-            sub={`${formatPct(kpis.ytdAttainmentPct)} of YTD target`}
-            subColor={attainmentColor(kpis.ytdAttainmentPct)}
-          />
-        </div>
-      )}
+  // Revenue is the only category with a 2x2 layout: Annual Target next to
+  // Year-to-Date Actual on top, Quarter Target next to Quarter Actual below.
+  // Collections/Expenses have no Year-to-Date figure (see the Kpis type
+  // comment in api/types.ts), so they keep the original single row of 3.
+  if (category === "REVENUE") {
+    const ytdCard = (
+      <Card
+        key="ytd"
+        icon={<CalendarRange className="h-4 w-4" />}
+        label="Year-to-Date Actual"
+        value={formatCurrencyShort(kpis.ytdActual)}
+        fullValue={formatCurrency(kpis.ytdActual)}
+        sub={`${formatPct(kpis.ytdAttainmentPct)} of YTD target`}
+        subColor={attainmentColor(kpis.ytdAttainmentPct)}
+      />
+    );
+    return (
+      <div className="grid grid-cols-1 gap-4 sm:grid-cols-2">
+        {annualCard}
+        {ytdCard}
+        {quarterTargetCard}
+        {quarterActualCard}
+      </div>
+    );
+  }
+
+  return (
+    <div className="grid grid-cols-1 gap-4 sm:grid-cols-3">
+      {annualCard}
+      {quarterTargetCard}
+      {quarterActualCard}
     </div>
   );
 }
