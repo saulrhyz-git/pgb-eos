@@ -1057,3 +1057,22 @@ correctly there; a user without Scorecard access (a BU Integrator with no
 Custom Role granting `SCORECARD` view) sees the existing "access required"
 card immediately after logging in rather than a blank/broken page, and can
 still reach the Revenue dashboard via its nav link.
+
+**Add/Edit Rock as a closable pop-up** (`client/src/pages/Rocks.tsx`) is a
+pure frontend change — no schema/API changes. The Add/Edit Rock form, which
+previously rendered inline as its own section further down the page, is now
+a modal pop-up: a dimmed full-screen overlay with the form centered on top,
+closable via its X button, its Cancel button, or clicking the dimmed
+backdrop outside the form (the form itself stops that click from bubbling to
+the backdrop, so clicking inside it never closes it accidentally). On a
+successful save the pop-up auto-closes and a brief "Rock added/updated
+successfully" toast appears bottom-right for 3 seconds before dismissing
+itself. Worth checking by hand: clicking "Add Rock" (or the pencil icon to
+edit an existing one) opens the form as a centered overlay instead of
+pushing page content down; the page behind it is visibly dimmed and doesn't
+scroll independently of the pop-up; clicking outside the form, its X, or
+Cancel all close it without saving; submitting a valid Rock closes the
+pop-up immediately and shows the success toast, which disappears on its own
+after a few seconds without needing to be dismissed manually; submitting an
+invalid Rock (e.g. missing Title) keeps the pop-up open and shows the
+existing inline validation error instead of closing.

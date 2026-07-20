@@ -126,6 +126,10 @@ export default function Rocks() {
   const [savingRock, setSavingRock] = useState(false);
   const [rockError, setRockError] = useState("");
 
+  // Brief success toast shown after a Rock is saved from the pop-up (see
+  // handleRockSubmit) — auto-dismisses on its own after a few seconds.
+  const [savedMessage, setSavedMessage] = useState("");
+
   const [newGoalForm, setNewGoalForm] = useState(emptyGoalForm);
   const [goalError, setGoalError] = useState("");
   const [editingGoalId, setEditingGoalId] = useState<string | null>(null);
@@ -189,6 +193,12 @@ export default function Rocks() {
 
   useEffect(loadRocks, [yearId, quarter, businessUnitId, companyId, businessGoalId]);
 
+  useEffect(() => {
+    if (!savedMessage) return;
+    const timer = setTimeout(() => setSavedMessage(""), 3000);
+    return () => clearTimeout(timer);
+  }, [savedMessage]);
+
   // Business goals usable for a given Business Unit: global (no BU tags) or explicitly assigned to it.
   function goalsForBu(buId: string) {
     return businessGoals.filter((g) => g.businessUnits.length === 0 || g.businessUnits.some((b) => b.id === buId));
@@ -242,12 +252,16 @@ export default function Rocks() {
         status: rockForm.status,
         progressPct: rockForm.progressPct,
       };
+      const wasEdit = Boolean(rockForm.id);
       if (rockForm.id) {
         await api.updateRock(rockForm.id, shared);
       } else {
         await api.createRock({ companyId: rockForm.companyId, yearId, ...shared });
       }
+      // Auto-close the pop-up and surface a brief toast confirming the save
+      // — see the savedMessage state/effect above for the auto-dismiss.
       setShowRockForm(false);
+      setSavedMessage(wasEdit ? "Rock updated successfully" : "Rock added successfully");
       loadRocks();
     } catch (err: any) {
       setRockError(err.message || "Failed to save rock");
@@ -389,6 +403,16 @@ export default function Rocks() {
 
   return (
     <div className="flex flex-col gap-6">
+      {/* Success toast after saving a Rock from the pop-up — fixed position,
+          so where it sits in the tree doesn't matter; auto-dismisses via the
+          savedMessage effect above. */}
+      {savedMessage && (
+        <div className="fixed bottom-4 right-4 z-[60] flex items-center gap-2 rounded-md border border-emerald-200 bg-emerald-50 px-4 py-3 text-sm font-medium text-emerald-700 shadow-lg">
+          <CheckCircle2 className="h-4 w-4" />
+          {savedMessage}
+        </div>
+      )}
+
       <div>
         <h2 className="mb-1 text-lg font-semibold text-slate-800">Rocks</h2>
         <p className="text-sm text-slate-500">
@@ -606,13 +630,21 @@ export default function Rocks() {
       )}
 
       {showRockForm && (
-        <form onSubmit={handleRockSubmit} className="flex flex-col gap-4 rounded-lg border border-slate-200 bg-white p-4 shadow-sm sm:p-6">
-          <div className="flex items-center justify-between">
-            <div className="text-sm font-semibold text-slate-700">{rockForm.id ? "Edit Rock" : "New Rock"}</div>
-            <button type="button" onClick={() => setShowRockForm(false)} className="text-slate-500 hover:text-slate-600">
-              <X className="h-4 w-4" />
-            </button>
-          </div>
+        <div
+          className="fixed inset-0 z-50 flex items-start justify-center overflow-y-auto bg-slate-900/50 p-4 sm:items-center"
+          onClick={() => setShowRockForm(false)}
+        >
+          <form
+            onSubmit={handleRockSubmit}
+            onClick={(e) => e.stopPropagation()}
+            className="flex w-full max-w-3xl flex-col gap-4 rounded-lg border border-slate-200 bg-white p-4 shadow-xl sm:p-6"
+          >
+            <div className="flex items-center justify-between">
+              <div className="text-sm font-semibold text-slate-700">{rockForm.id ? "Edit Rock" : "New Rock"}</div>
+              <button type="button" onClick={() => setShowRockForm(false)} className="text-slate-500 hover:text-slate-600">
+                <X className="h-4 w-4" />
+              </button>
+            </div>
 
           <div className="grid grid-cols-1 gap-4 sm:grid-cols-2 lg:grid-cols-4">
             <div className="flex flex-col gap-1">
@@ -770,7 +802,8 @@ export default function Rocks() {
               Cancel
             </button>
           </div>
-        </form>
+          </form>
+        </div>
       )}
 
       <div className="overflow-hidden rounded-lg border border-slate-200 bg-white shadow-sm">
