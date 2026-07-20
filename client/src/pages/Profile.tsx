@@ -75,61 +75,61 @@ export default function Profile() {
   return (
     <div className="mx-auto flex max-w-2xl flex-col gap-8">
       <div>
-        <h2 className="mb-1 text-lg font-semibold text-slate-800">My Profile</h2>
-        <p className="text-sm text-slate-500">Update your account details or change your password.</p>
+        <h2 className="mb-1 text-lg font-semibold text-slate-800 dark:text-slate-100">My Profile</h2>
+        <p className="text-sm text-slate-500 dark:text-slate-400">Update your account details or change your password.</p>
       </div>
 
-      <div className="flex items-start gap-4 rounded-lg border border-slate-200 bg-white p-4 shadow-sm sm:p-6">
-        <UserCircle className="h-10 w-10 shrink-0 text-brand-500" />
+      <div className="flex items-start gap-4 rounded-lg border border-slate-200 dark:border-slate-700 bg-white dark:bg-slate-900 p-4 shadow-sm sm:p-6">
+        <UserCircle className="h-10 w-10 shrink-0 text-brand-500 dark:text-brand-400" />
         <div className="flex flex-col gap-1">
-          <div className="text-sm font-semibold text-slate-800">
+          <div className="text-sm font-semibold text-slate-800 dark:text-slate-100">
             {user?.role ? ROLE_LABELS[user.role] : "No base role"}
             {user?.customRoleIds?.length
               ? ` · ${user.customRoleIds.length} Custom Role${user.customRoleIds.length === 1 ? "" : "s"} assigned`
               : ""}
           </div>
-          <div className="text-sm text-slate-600">
-            {user?.description ? user.description : <span className="text-slate-400">No description set by your administrator.</span>}
+          <div className="text-sm text-slate-600 dark:text-slate-300">
+            {user?.description ? user.description : <span className="text-slate-400 dark:text-slate-500">No description set by your administrator.</span>}
           </div>
-          <div className="text-xs text-slate-400">
+          <div className="text-xs text-slate-400 dark:text-slate-500">
             Your role and description are managed by a Superadmin under Admin → Users.
           </div>
         </div>
       </div>
 
-      <form onSubmit={handleSaveProfile} className="flex flex-col gap-4 rounded-lg border border-slate-200 bg-white p-4 shadow-sm sm:p-6">
-        <div className="text-sm font-semibold text-slate-700">Account details</div>
+      <form onSubmit={handleSaveProfile} className="flex flex-col gap-4 rounded-lg border border-slate-200 dark:border-slate-700 bg-white dark:bg-slate-900 p-4 shadow-sm sm:p-6">
+        <div className="text-sm font-semibold text-slate-700 dark:text-slate-200">Account details</div>
         <div className="grid grid-cols-1 gap-4 sm:grid-cols-2">
           <div className="flex flex-col gap-1">
-            <label className="text-xs font-medium text-slate-500">Name</label>
+            <label className="text-xs font-medium text-slate-500 dark:text-slate-400">Name</label>
             <input
-              className="rounded-md border border-slate-300 px-3 py-2 text-sm"
+              className="rounded-md border border-slate-300 dark:border-slate-600 dark:bg-slate-800 dark:text-slate-100 px-3 py-2 text-sm"
               value={name}
               onChange={(e) => setName(e.target.value)}
               required
             />
           </div>
           <div className="flex flex-col gap-1">
-            <label className="text-xs font-medium text-slate-500">Email</label>
+            <label className="text-xs font-medium text-slate-500 dark:text-slate-400">Email</label>
             <input
               type="email"
-              className="rounded-md border border-slate-300 px-3 py-2 text-sm"
+              className="rounded-md border border-slate-300 dark:border-slate-600 dark:bg-slate-800 dark:text-slate-100 px-3 py-2 text-sm"
               value={email}
               onChange={(e) => setEmail(e.target.value)}
               required
             />
           </div>
           <div className="flex flex-col gap-1 sm:col-span-2">
-            <label className="text-xs font-medium text-slate-500">Username (optional)</label>
+            <label className="text-xs font-medium text-slate-500 dark:text-slate-400">Username (optional)</label>
             <input
-              className="rounded-md border border-slate-300 px-3 py-2 text-sm"
+              className="rounded-md border border-slate-300 dark:border-slate-600 dark:bg-slate-800 dark:text-slate-100 px-3 py-2 text-sm"
               value={username}
               onChange={(e) => setUsername(e.target.value)}
             />
           </div>
         </div>
 
-        {profileError && <div className="rounded-md bg-red-50 px-3 py-2 text-sm text-red-600">{profileError}</div>}
+        {profileError && <div className="rounded-md bg-red-50 dark:bg-red-950/40 px-3 py-2 text-sm text-red-600 dark:text-red-400">{profileError}</div>}
 
         <button
           type="submit"
@@ -141,24 +141,24 @@ export default function Profile() {
         </button>
       </form>
 
-      <form onSubmit={handleChangePassword} className="flex flex-col gap-4 rounded-lg border border-slate-200 bg-white p-4 shadow-sm sm:p-6">
-        <div className="text-sm font-semibold text-slate-700">Change password</div>
+      <form onSubmit={handleChangePassword} className="flex flex-col gap-4 rounded-lg border border-slate-200 dark:border-slate-700 bg-white dark:bg-slate-900 p-4 shadow-sm sm:p-6">
+        <div className="text-sm font-semibold text-slate-700 dark:text-slate-200">Change password</div>
         <div className="grid grid-cols-1 gap-4 sm:grid-cols-3">
           <div className="flex flex-col gap-1">
-            <label className="text-xs font-medium text-slate-500">Current password</label>
+            <label className="text-xs font-medium text-slate-500 dark:text-slate-400">Current password</label>
             <input
               type="password"
-              className="rounded-md border border-slate-300 px-3 py-2 text-sm"
+              className="rounded-md border border-slate-300 dark:border-slate-600 dark:bg-slate-800 dark:text-slate-100 px-3 py-2 text-sm"
               value={currentPassword}
               onChange={(e) => setCurrentPassword(e.target.value)}
               required
             />
           </div>
           <div className="flex flex-col gap-1">
-            <label className="text-xs font-medium text-slate-500">New password</label>
+            <label className="text-xs font-medium text-slate-500 dark:text-slate-400">New password</label>
             <input
               type="password"
-              className="rounded-md border border-slate-300 px-3 py-2 text-sm"
+              className="rounded-md border border-slate-300 dark:border-slate-600 dark:bg-slate-800 dark:text-slate-100 px-3 py-2 text-sm"
               value={newPassword}
               onChange={(e) => setNewPassword(e.target.value)}
               minLength={8}
@@ -166,10 +166,10 @@ export default function Profile() {
             />
           </div>
           <div className="flex flex-col gap-1">
-            <label className="text-xs font-medium text-slate-500">Confirm new password</label>
+            <label className="text-xs font-medium text-slate-500 dark:text-slate-400">Confirm new password</label>
             <input
               type="password"
-              className="rounded-md border border-slate-300 px-3 py-2 text-sm"
+              className="rounded-md border border-slate-300 dark:border-slate-600 dark:bg-slate-800 dark:text-slate-100 px-3 py-2 text-sm"
               value={confirmPassword}
               onChange={(e) => setConfirmPassword(e.target.value)}
               minLength={8}
@@ -177,9 +177,9 @@ export default function Profile() {
             />
           </div>
         </div>
-        <span className="text-xs text-slate-500">At least 8 characters, with letters and numbers.</span>
+        <span className="text-xs text-slate-500 dark:text-slate-400">At least 8 characters, with letters and numbers.</span>
 
-        {passwordError && <div className="rounded-md bg-red-50 px-3 py-2 text-sm text-red-600">{passwordError}</div>}
+        {passwordError && <div className="rounded-md bg-red-50 dark:bg-red-950/40 px-3 py-2 text-sm text-red-600 dark:text-red-400">{passwordError}</div>}
 
         <button
           type="submit"

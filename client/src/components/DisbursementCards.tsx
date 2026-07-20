@@ -14,9 +14,9 @@ interface Props {
 // blue/emerald/amber above it.
 type Tone = "advances" | "loans" | "interests";
 const TONES: Record<Tone, { bg: string; border: string; icon: string; value: string }> = {
-  advances: { bg: "bg-purple-50", border: "border-purple-200", icon: "text-purple-600", value: "text-purple-900" },
-  loans: { bg: "bg-cyan-50", border: "border-cyan-200", icon: "text-cyan-600", value: "text-cyan-900" },
-  interests: { bg: "bg-rose-50", border: "border-rose-200", icon: "text-rose-600", value: "text-rose-900" },
+  advances: { bg: "bg-purple-50 dark:bg-purple-950/40", border: "border-purple-200 dark:border-purple-800", icon: "text-purple-600 dark:text-purple-400", value: "text-purple-900 dark:text-purple-100" },
+  loans: { bg: "bg-cyan-50 dark:bg-cyan-950/40", border: "border-cyan-200 dark:border-cyan-800", icon: "text-cyan-600 dark:text-cyan-400", value: "text-cyan-900 dark:text-cyan-100" },
+  interests: { bg: "bg-rose-50 dark:bg-rose-950/40", border: "border-rose-200 dark:border-rose-800", icon: "text-rose-600 dark:text-rose-400", value: "text-rose-900 dark:text-rose-100" },
 };
 
 function Card({

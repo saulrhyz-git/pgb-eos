@@ -271,10 +271,10 @@ export default function Reports() {
 
   if (forbidden) {
     return (
-      <div className="flex flex-col items-center gap-3 rounded-lg border border-slate-200 bg-white p-12 text-center shadow-sm">
-        <ShieldAlert className="h-10 w-10 text-slate-300" />
-        <h2 className="text-lg font-semibold text-slate-700">Reports access required</h2>
-        <p className="max-w-md text-sm text-slate-500">
+      <div className="flex flex-col items-center gap-3 rounded-lg border border-slate-200 dark:border-slate-700 bg-white dark:bg-slate-900 p-12 text-center shadow-sm">
+        <ShieldAlert className="h-10 w-10 text-slate-300 dark:text-slate-600" />
+        <h2 className="text-lg font-semibold text-slate-700 dark:text-slate-200">Reports access required</h2>
+        <p className="max-w-md text-sm text-slate-500 dark:text-slate-400">
           You don't currently have access to the Reports engine. Ask a Superadmin to grant your account (or a Custom Role
           assigned to you) view access to Reports.
         </p>
@@ -285,19 +285,19 @@ export default function Reports() {
   return (
     <div className="flex flex-col gap-6">
       <div>
-        <h2 className="mb-1 text-xl font-bold text-slate-800">Reports</h2>
-        <p className="text-sm text-slate-500">Filter and export a flat, spreadsheet-ready view of Targets/Actuals and Rocks data.</p>
+        <h2 className="mb-1 text-xl font-bold text-slate-800 dark:text-slate-100">Reports</h2>
+        <p className="text-sm text-slate-500 dark:text-slate-400">Filter and export a flat, spreadsheet-ready view of Targets/Actuals and Rocks data.</p>
       </div>
 
       {/* Report type tabs */}
-      <div className="flex flex-wrap gap-2 rounded-lg border border-slate-200 bg-white p-1.5 shadow-sm">
+      <div className="flex flex-wrap gap-2 rounded-lg border border-slate-200 dark:border-slate-700 bg-white dark:bg-slate-900 p-1.5 shadow-sm">
         {REPORT_TABS.map((tab) => (
           <button
             key={tab.key}
             type="button"
             onClick={() => setReportType(tab.key)}
             className={`flex items-center gap-2 rounded-md px-3 py-2 text-sm font-medium transition-colors ${
-              reportType === tab.key ? "bg-brand-500 text-white" : "text-slate-600 hover:bg-slate-100"
+              reportType === tab.key ? "bg-brand-500 text-white" : "text-slate-600 dark:text-slate-300 hover:bg-slate-100 dark:hover:bg-slate-700"
             }`}
           >
             {tab.icon}
@@ -307,11 +307,11 @@ export default function Reports() {
       </div>
 
       {/* Filter bar */}
-      <div className="grid grid-cols-2 gap-3 rounded-lg border border-slate-200 bg-white p-3 shadow-sm sm:flex sm:flex-wrap sm:items-end sm:gap-3">
+      <div className="grid grid-cols-2 gap-3 rounded-lg border border-slate-200 dark:border-slate-700 bg-white dark:bg-slate-900 p-3 shadow-sm sm:flex sm:flex-wrap sm:items-end sm:gap-3">
         <div className="flex flex-col gap-1">
-          <label className="text-xs font-medium text-slate-500">Year</label>
+          <label className="text-xs font-medium text-slate-500 dark:text-slate-400">Year</label>
           <select
-            className="w-full rounded-md border border-slate-300 px-3 py-1.5 text-sm sm:w-auto"
+            className="w-full rounded-md border border-slate-300 dark:border-slate-600 dark:bg-slate-800 dark:text-slate-100 px-3 py-1.5 text-sm sm:w-auto"
             value={yearId}
             onChange={(e) => setYearId(e.target.value)}
           >
@@ -323,9 +323,9 @@ export default function Reports() {
           </select>
         </div>
         <div className="flex flex-col gap-1">
-          <label className="text-xs font-medium text-slate-500">Quarter</label>
+          <label className="text-xs font-medium text-slate-500 dark:text-slate-400">Quarter</label>
           <select
-            className="w-full rounded-md border border-slate-300 px-3 py-1.5 text-sm sm:w-auto"
+            className="w-full rounded-md border border-slate-300 dark:border-slate-600 dark:bg-slate-800 dark:text-slate-100 px-3 py-1.5 text-sm sm:w-auto"
             value={quarter}
             onChange={(e) => setQuarter(Number(e.target.value))}
           >
@@ -338,9 +338,9 @@ export default function Reports() {
           </select>
         </div>
         <div className="flex flex-col gap-1">
-          <label className="text-xs font-medium text-slate-500">Business Unit</label>
+          <label className="text-xs font-medium text-slate-500 dark:text-slate-400">Business Unit</label>
           <select
-            className="w-full rounded-md border border-slate-300 px-3 py-1.5 text-sm sm:min-w-[160px]"
+            className="w-full rounded-md border border-slate-300 dark:border-slate-600 dark:bg-slate-800 dark:text-slate-100 px-3 py-1.5 text-sm sm:min-w-[160px]"
             value={businessUnitId}
             onChange={(e) => {
               setBusinessUnitId(e.target.value);
@@ -357,9 +357,9 @@ export default function Reports() {
         </div>
         {reportType !== "executive-summary" && (
           <div className="flex flex-col gap-1">
-            <label className="text-xs font-medium text-slate-500">Company</label>
+            <label className="text-xs font-medium text-slate-500 dark:text-slate-400">Company</label>
             <select
-              className="w-full rounded-md border border-slate-300 px-3 py-1.5 text-sm sm:min-w-[160px]"
+              className="w-full rounded-md border border-slate-300 dark:border-slate-600 dark:bg-slate-800 dark:text-slate-100 px-3 py-1.5 text-sm sm:min-w-[160px]"
               value={companyId}
               onChange={(e) => setCompanyId(e.target.value)}
             >
@@ -375,9 +375,9 @@ export default function Reports() {
         {reportType === "rocks" && (
           <>
             <div className="flex flex-col gap-1">
-              <label className="text-xs font-medium text-slate-500">Business Goal</label>
+              <label className="text-xs font-medium text-slate-500 dark:text-slate-400">Business Goal</label>
               <select
-                className="w-full rounded-md border border-slate-300 px-3 py-1.5 text-sm sm:min-w-[160px]"
+                className="w-full rounded-md border border-slate-300 dark:border-slate-600 dark:bg-slate-800 dark:text-slate-100 px-3 py-1.5 text-sm sm:min-w-[160px]"
                 value={businessGoalId}
                 onChange={(e) => setBusinessGoalId(e.target.value)}
               >
@@ -390,9 +390,9 @@ export default function Reports() {
               </select>
             </div>
             <div className="flex flex-col gap-1">
-              <label className="text-xs font-medium text-slate-500">Status</label>
+              <label className="text-xs font-medium text-slate-500 dark:text-slate-400">Status</label>
               <select
-                className="w-full rounded-md border border-slate-300 px-3 py-1.5 text-sm sm:w-auto"
+                className="w-full rounded-md border border-slate-300 dark:border-slate-600 dark:bg-slate-800 dark:text-slate-100 px-3 py-1.5 text-sm sm:w-auto"
                 value={status}
                 onChange={(e) => setStatus(e.target.value as RockStatus | "")}
               >
@@ -408,18 +408,18 @@ export default function Reports() {
         )}
       </div>
 
-      {error && <div className="rounded-md bg-red-50 px-4 py-3 text-sm text-red-600">{error}</div>}
+      {error && <div className="rounded-md bg-red-50 dark:bg-red-950/40 px-4 py-3 text-sm text-red-600 dark:text-red-400">{error}</div>}
 
       {data && (
         <div className="flex flex-col gap-4">
           {/* Scope summary + export actions */}
-          <div className="flex flex-col gap-3 rounded-lg border border-slate-200 bg-white p-4 shadow-sm sm:flex-row sm:items-center sm:justify-between">
+          <div className="flex flex-col gap-3 rounded-lg border border-slate-200 dark:border-slate-700 bg-white dark:bg-slate-900 p-4 shadow-sm sm:flex-row sm:items-center sm:justify-between">
             <div>
-              <h3 className="text-base font-semibold text-slate-800">{data.title}</h3>
-              <div className="mt-1 flex flex-wrap gap-x-4 gap-y-1 text-xs text-slate-500">
+              <h3 className="text-base font-semibold text-slate-800 dark:text-slate-100">{data.title}</h3>
+              <div className="mt-1 flex flex-wrap gap-x-4 gap-y-1 text-xs text-slate-500 dark:text-slate-400">
                 {scopeSummary.map((s) => (
                   <span key={s.label}>
-                    <span className="font-medium text-slate-600">{s.label}:</span> {s.value}
+                    <span className="font-medium text-slate-600 dark:text-slate-300">{s.label}:</span> {s.value}
                   </span>
                 ))}
               </div>
@@ -429,7 +429,7 @@ export default function Reports() {
                 type="button"
                 onClick={handleExportCsv}
                 disabled={data.rows.length === 0}
-                className="flex items-center gap-2 rounded-md border border-slate-300 px-3 py-2 text-sm font-medium text-slate-700 hover:bg-slate-50 disabled:cursor-not-allowed disabled:opacity-40"
+                className="flex items-center gap-2 rounded-md border border-slate-300 dark:border-slate-600 dark:bg-slate-800 dark:text-slate-100 px-3 py-2 text-sm font-medium text-slate-700 dark:text-slate-200 hover:bg-slate-50 dark:hover:bg-slate-800 disabled:cursor-not-allowed disabled:opacity-40"
                 title="Downloads a .csv file that opens directly in Excel or Google Sheets"
               >
                 <FileSpreadsheet className="h-4 w-4" /> Export to Excel
@@ -438,7 +438,7 @@ export default function Reports() {
                 type="button"
                 onClick={handleExportPdf}
                 disabled={data.rows.length === 0}
-                className="flex items-center gap-2 rounded-md border border-slate-300 px-3 py-2 text-sm font-medium text-slate-700 hover:bg-slate-50 disabled:cursor-not-allowed disabled:opacity-40"
+                className="flex items-center gap-2 rounded-md border border-slate-300 dark:border-slate-600 dark:bg-slate-800 dark:text-slate-100 px-3 py-2 text-sm font-medium text-slate-700 dark:text-slate-200 hover:bg-slate-50 dark:hover:bg-slate-800 disabled:cursor-not-allowed disabled:opacity-40"
                 title="Opens a print-formatted view — choose 'Save as PDF' in the print dialog"
               >
                 <Printer className="h-4 w-4" /> Export to PDF
@@ -447,11 +447,11 @@ export default function Reports() {
           </div>
 
           {/* Generic preview table */}
-          <div className="overflow-hidden rounded-lg border border-slate-200 bg-white shadow-sm">
+          <div className="overflow-hidden rounded-lg border border-slate-200 dark:border-slate-700 bg-white dark:bg-slate-900 shadow-sm">
             {!loading && <Pagination page={page} pageSize={REPORTS_PAGE_SIZE} total={sortedRows.length} onPageChange={setPage} />}
             <div className="overflow-x-auto">
               <table className="w-full min-w-[720px] text-sm">
-                <thead className="bg-slate-50 text-xs font-semibold uppercase text-slate-500">
+                <thead className="bg-slate-50 dark:bg-slate-950 text-xs font-semibold uppercase text-slate-500 dark:text-slate-400">
                   <tr>
                     {data.columns.map((c) => (
                       <SortableTh
@@ -466,11 +466,11 @@ export default function Reports() {
                     ))}
                   </tr>
                 </thead>
-                <tbody className="divide-y divide-slate-100">
+                <tbody className="divide-y divide-slate-100 dark:divide-slate-800">
                   {pagedRows.map((row, i) => (
                     <tr key={i}>
                       {data.columns.map((c) => (
-                        <td key={c.key} className={`px-4 py-3 text-slate-600 ${c.type === "number" ? "text-right" : ""}`}>
+                        <td key={c.key} className={`px-4 py-3 text-slate-600 dark:text-slate-300 ${c.type === "number" ? "text-right" : ""}`}>
                           {formatCellValue(row[c.key], c.key, c.type)}
                         </td>
                       ))}
@@ -478,7 +478,7 @@ export default function Reports() {
                   ))}
                   {sortedRows.length === 0 && (
                     <tr>
-                      <td colSpan={data.columns.length} className="px-4 py-8 text-center text-slate-500">
+                      <td colSpan={data.columns.length} className="px-4 py-8 text-center text-slate-500 dark:text-slate-400">
                         No data in this scope.
                       </td>
                     </tr>
@@ -490,7 +490,7 @@ export default function Reports() {
         </div>
       )}
 
-      {loading && !data && <div className="py-12 text-center text-slate-500">Loading report...</div>}
+      {loading && !data && <div className="py-12 text-center text-slate-500 dark:text-slate-400">Loading report...</div>}
     </div>
   );
 }

@@ -59,10 +59,10 @@ const STATUS_LABELS: Record<RockStatus, string> = {
 // (including Rocks auto-flagged by the 60-day staleness rule — see
 // server/src/utils/rockAutoStatus.ts), Green = Target Met.
 const STATUS_BADGE: Record<RockStatus, string> = {
-  PENDING: "bg-orange-50 text-orange-700",
-  ON_TRACK: "bg-blue-50 text-blue-700",
-  AT_RISK: "bg-red-50 text-red-700",
-  TARGET_MET: "bg-green-50 text-green-700",
+  PENDING: "bg-orange-50 dark:bg-orange-950/40 text-orange-700 dark:text-orange-300",
+  ON_TRACK: "bg-blue-50 dark:bg-blue-950/40 text-blue-700 dark:text-blue-300",
+  AT_RISK: "bg-red-50 dark:bg-red-950/40 text-red-700 dark:text-red-300",
+  TARGET_MET: "bg-green-50 dark:bg-green-950/40 text-green-700 dark:text-green-300",
 };
 
 // Progress is entered to up to 2 decimal places — clamp to 0-100 and round
@@ -92,13 +92,13 @@ const emptyGoalForm = {
 
 function KpiCard({ icon, label, value, sub }: { icon: React.ReactNode; label: string; value: string; sub?: string }) {
   return (
-    <div className="rounded-lg border border-slate-200 bg-white p-4 shadow-sm">
-      <div className="flex items-center gap-2 text-slate-500">
+    <div className="rounded-lg border border-slate-200 dark:border-slate-700 bg-white dark:bg-slate-900 p-4 shadow-sm">
+      <div className="flex items-center gap-2 text-slate-500 dark:text-slate-400">
         {icon}
         <span className="text-xs font-medium uppercase tracking-wide">{label}</span>
       </div>
-      <div className="mt-2 text-2xl font-semibold text-slate-800">{value}</div>
-      {sub && <div className="mt-1 text-sm font-medium text-slate-500">{sub}</div>}
+      <div className="mt-2 text-2xl font-semibold text-slate-800 dark:text-slate-100">{value}</div>
+      {sub && <div className="mt-1 text-sm font-medium text-slate-500 dark:text-slate-400">{sub}</div>}
     </div>
   );
 }
@@ -118,7 +118,7 @@ function BuChecklist({
         <label
           key={bu.id}
           className={`flex cursor-pointer items-center gap-1.5 rounded-md border px-3 py-1.5 text-xs font-medium ${
-            selected.includes(bu.id) ? "border-brand-500 bg-brand-50 text-brand-700" : "border-slate-200 text-slate-600"
+            selected.includes(bu.id) ? "border-brand-500 dark:border-brand-400 bg-brand-50 dark:bg-brand-900/40 text-brand-700 dark:text-brand-300" : "border-slate-200 dark:border-slate-700 text-slate-600 dark:text-slate-300"
           }`}
         >
           <input type="checkbox" className="hidden" checked={selected.includes(bu.id)} onChange={() => onToggle(bu.id)} />
@@ -472,26 +472,26 @@ export default function Rocks() {
           so where it sits in the tree doesn't matter; auto-dismisses via the
           savedMessage effect above. */}
       {savedMessage && (
-        <div className="fixed bottom-4 right-4 z-[60] flex items-center gap-2 rounded-md border border-emerald-200 bg-emerald-50 px-4 py-3 text-sm font-medium text-emerald-700 shadow-lg">
+        <div className="fixed bottom-4 right-4 z-[60] flex items-center gap-2 rounded-md border border-emerald-200 dark:border-emerald-800 bg-emerald-50 dark:bg-emerald-950/40 px-4 py-3 text-sm font-medium text-emerald-700 dark:text-emerald-300 shadow-lg">
           <CheckCircle2 className="h-4 w-4" />
           {savedMessage}
         </div>
       )}
 
       <div>
-        <h2 className="mb-1 text-lg font-semibold text-slate-800">Rocks</h2>
-        <p className="text-sm text-slate-500">
+        <h2 className="mb-1 text-lg font-semibold text-slate-800 dark:text-slate-100">Rocks</h2>
+        <p className="text-sm text-slate-500 dark:text-slate-400">
           Track this quarter's major priorities per company. BU Integrators add and update their own Rocks; progress
           and status roll up into the summary below.
         </p>
       </div>
 
-      <div className="flex flex-col gap-4 rounded-lg border border-slate-200 bg-white p-4 shadow-sm">
+      <div className="flex flex-col gap-4 rounded-lg border border-slate-200 dark:border-slate-700 bg-white dark:bg-slate-900 p-4 shadow-sm">
         <div className="grid grid-cols-2 gap-3 sm:flex sm:flex-wrap sm:items-end sm:gap-4">
           <div className="flex flex-col gap-1">
-            <label className="text-xs font-medium text-slate-500">Year</label>
+            <label className="text-xs font-medium text-slate-500 dark:text-slate-400">Year</label>
             <select
-              className="w-full rounded-md border border-slate-300 px-3 py-1.5 text-sm sm:w-auto"
+              className="w-full rounded-md border border-slate-300 dark:border-slate-600 dark:bg-slate-800 dark:text-slate-100 px-3 py-1.5 text-sm sm:w-auto"
               value={yearId}
               onChange={(e) => setYearId(e.target.value)}
             >
@@ -503,9 +503,9 @@ export default function Rocks() {
             </select>
           </div>
           <div className="flex flex-col gap-1">
-            <label className="text-xs font-medium text-slate-500">Quarter</label>
+            <label className="text-xs font-medium text-slate-500 dark:text-slate-400">Quarter</label>
             <select
-              className="w-full rounded-md border border-slate-300 px-3 py-1.5 text-sm sm:w-auto"
+              className="w-full rounded-md border border-slate-300 dark:border-slate-600 dark:bg-slate-800 dark:text-slate-100 px-3 py-1.5 text-sm sm:w-auto"
               value={quarter}
               onChange={(e) => setQuarter(Number(e.target.value))}
             >
@@ -518,9 +518,9 @@ export default function Rocks() {
             </select>
           </div>
           <div className="col-span-2 flex flex-col gap-1 sm:col-span-1">
-            <label className="text-xs font-medium text-slate-500">Business Unit</label>
+            <label className="text-xs font-medium text-slate-500 dark:text-slate-400">Business Unit</label>
             <select
-              className="w-full rounded-md border border-slate-300 px-3 py-1.5 text-sm sm:min-w-[180px]"
+              className="w-full rounded-md border border-slate-300 dark:border-slate-600 dark:bg-slate-800 dark:text-slate-100 px-3 py-1.5 text-sm sm:min-w-[180px]"
               value={businessUnitId}
               onChange={(e) => {
                 setBusinessUnitId(e.target.value);
@@ -536,9 +536,9 @@ export default function Rocks() {
             </select>
           </div>
           <div className="col-span-2 flex flex-col gap-1 sm:col-span-1">
-            <label className="text-xs font-medium text-slate-500">Company</label>
+            <label className="text-xs font-medium text-slate-500 dark:text-slate-400">Company</label>
             <select
-              className="w-full rounded-md border border-slate-300 px-3 py-1.5 text-sm sm:min-w-[180px]"
+              className="w-full rounded-md border border-slate-300 dark:border-slate-600 dark:bg-slate-800 dark:text-slate-100 px-3 py-1.5 text-sm sm:min-w-[180px]"
               value={companyId}
               onChange={(e) => setCompanyId(e.target.value)}
             >
@@ -551,9 +551,9 @@ export default function Rocks() {
             </select>
           </div>
           <div className="col-span-2 flex flex-col gap-1 sm:col-span-1">
-            <label className="text-xs font-medium text-slate-500">Business Goal</label>
+            <label className="text-xs font-medium text-slate-500 dark:text-slate-400">Business Goal</label>
             <select
-              className="w-full rounded-md border border-slate-300 px-3 py-1.5 text-sm sm:min-w-[180px]"
+              className="w-full rounded-md border border-slate-300 dark:border-slate-600 dark:bg-slate-800 dark:text-slate-100 px-3 py-1.5 text-sm sm:min-w-[180px]"
               value={businessGoalId}
               onChange={(e) => setBusinessGoalId(e.target.value)}
             >
@@ -576,7 +576,7 @@ export default function Rocks() {
                   ? "Select a specific Quarter (not All Quarters) to roll over"
                   : "Carry every incomplete Rock in this scope forward to the next quarter"
               }
-              className="flex items-center justify-center gap-2 rounded-md border border-slate-300 bg-white px-3 py-2 text-sm font-medium text-slate-700 hover:bg-slate-50 disabled:cursor-not-allowed disabled:opacity-50"
+              className="flex items-center justify-center gap-2 rounded-md border border-slate-300 dark:border-slate-600 dark:bg-slate-800 dark:text-slate-100 bg-white dark:bg-slate-900 px-3 py-2 text-sm font-medium text-slate-700 dark:text-slate-200 hover:bg-slate-50 dark:hover:bg-slate-800 disabled:cursor-not-allowed disabled:opacity-50"
             >
               {rollingOver ? <Loader2 className="h-4 w-4 animate-spin" /> : <SkipForward className="h-4 w-4" />}
               {rollingOver ? "Rolling over..." : "Rollover"}
@@ -591,7 +591,7 @@ export default function Rocks() {
         </div>
       </div>
 
-      {error && <div className="rounded-md bg-red-50 px-4 py-3 text-sm text-red-600">{error}</div>}
+      {error && <div className="rounded-md bg-red-50 dark:bg-red-950/40 px-4 py-3 text-sm text-red-600 dark:text-red-400">{error}</div>}
 
       <div className="grid grid-cols-1 gap-4 sm:grid-cols-2 lg:grid-cols-5">
         <KpiCard icon={<ListChecks className="h-4 w-4" />} label="Total Rocks" value={String(total)} />
@@ -602,17 +602,17 @@ export default function Rocks() {
       </div>
 
       {canManageStructure && (
-        <div className="rounded-lg border border-slate-200 bg-white p-4 shadow-sm">
-          <div className="mb-2 text-xs font-semibold uppercase text-slate-500">Manage Business Goals</div>
+        <div className="rounded-lg border border-slate-200 dark:border-slate-700 bg-white dark:bg-slate-900 p-4 shadow-sm">
+          <div className="mb-2 text-xs font-semibold uppercase text-slate-500 dark:text-slate-400">Manage Business Goals</div>
           <form onSubmit={handleAddGoal} className="mb-3 flex flex-col gap-2">
             <input
-              className="w-full max-w-xs rounded-md border border-slate-300 px-2 py-1.5 text-sm"
+              className="w-full max-w-xs rounded-md border border-slate-300 dark:border-slate-600 dark:bg-slate-800 dark:text-slate-100 px-2 py-1.5 text-sm"
               placeholder="e.g. Improve Client Retention"
               value={newGoalForm.name}
               onChange={(e) => setNewGoalForm((f) => ({ ...f, name: e.target.value }))}
             />
             <div>
-              <div className="mb-1 text-xs text-slate-500">
+              <div className="mb-1 text-xs text-slate-500 dark:text-slate-400">
                 Assign to Business Unit(s) — leave blank to make it available everywhere
               </div>
               <BuChecklist businessUnits={businessUnits} selected={newGoalForm.businessUnitIds} onToggle={toggleNewGoalBu} />
@@ -625,17 +625,17 @@ export default function Rocks() {
               <Plus className="h-3.5 w-3.5" /> Add Business Goal
             </button>
           </form>
-          {goalError && <div className="mb-2 text-sm text-red-600">{goalError}</div>}
+          {goalError && <div className="mb-2 text-sm text-red-600 dark:text-red-400">{goalError}</div>}
           <div className="flex flex-col gap-2">
             {businessGoals.map((g) =>
               editingGoalId === g.id ? (
                 <form
                   key={g.id}
                   onSubmit={handleSaveGoalEdit}
-                  className="flex flex-col gap-2 rounded-md border border-brand-200 bg-brand-50/40 p-3"
+                  className="flex flex-col gap-2 rounded-md border border-brand-200 dark:border-brand-700 bg-brand-50/40 dark:bg-brand-900/30 p-3"
                 >
                   <input
-                    className="w-full max-w-xs rounded-md border border-slate-300 px-2 py-1.5 text-sm"
+                    className="w-full max-w-xs rounded-md border border-slate-300 dark:border-slate-600 dark:bg-slate-800 dark:text-slate-100 px-2 py-1.5 text-sm"
                     value={editGoalForm.name}
                     onChange={(e) => setEditGoalForm((f) => ({ ...f, name: e.target.value }))}
                   />
@@ -651,7 +651,7 @@ export default function Rocks() {
                     <button
                       type="button"
                       onClick={() => setEditingGoalId(null)}
-                      className="rounded-md border border-slate-300 px-3 py-1.5 text-xs font-medium text-slate-600 hover:bg-slate-50"
+                      className="rounded-md border border-slate-300 dark:border-slate-600 dark:bg-slate-800 dark:text-slate-100 px-3 py-1.5 text-xs font-medium text-slate-600 dark:text-slate-300 hover:bg-slate-50 dark:hover:bg-slate-800"
                     >
                       Cancel
                     </button>
@@ -660,28 +660,28 @@ export default function Rocks() {
               ) : (
                 <div
                   key={g.id}
-                  className="flex flex-wrap items-center justify-between gap-2 rounded-md border border-slate-200 px-3 py-2 text-xs"
+                  className="flex flex-wrap items-center justify-between gap-2 rounded-md border border-slate-200 dark:border-slate-700 px-3 py-2 text-xs"
                 >
                   <div className="flex flex-wrap items-center gap-2">
-                    <span className="font-medium text-slate-700">{g.name}</span>
+                    <span className="font-medium text-slate-700 dark:text-slate-200">{g.name}</span>
                     {g.businessUnits.length === 0 ? (
-                      <span className="rounded-full bg-slate-100 px-2 py-0.5 text-slate-500">Global</span>
+                      <span className="rounded-full bg-slate-100 dark:bg-slate-800 px-2 py-0.5 text-slate-500 dark:text-slate-400">Global</span>
                     ) : (
                       g.businessUnits.map((bu) => (
-                        <span key={bu.id} className="rounded-full bg-brand-50 px-2 py-0.5 text-brand-700">
+                        <span key={bu.id} className="rounded-full bg-brand-50 dark:bg-brand-900/40 px-2 py-0.5 text-brand-700 dark:text-brand-300">
                           {bu.name}
                         </span>
                       ))
                     )}
                   </div>
                   <div className="flex gap-1">
-                    <button onClick={() => startEditGoal(g)} className="rounded-md p-1 text-slate-500 hover:text-brand-600" title="Edit">
+                    <button onClick={() => startEditGoal(g)} className="rounded-md p-1 text-slate-500 dark:text-slate-400 hover:text-brand-600 dark:hover:text-brand-400" title="Edit">
                       <Pencil className="h-3.5 w-3.5" />
                     </button>
                     {canDeleteGoal && (
                       <button
                         onClick={() => handleDeleteGoal(g)}
-                        className="rounded-md p-1 text-slate-500 hover:text-red-600"
+                        className="rounded-md p-1 text-slate-500 dark:text-slate-400 hover:text-red-600 dark:hover:text-red-400"
                         title="Delete goal"
                       >
                         <X className="h-3.5 w-3.5" />
@@ -691,7 +691,7 @@ export default function Rocks() {
                 </div>
               )
             )}
-            {businessGoals.length === 0 && <span className="text-xs text-slate-500">No business goals yet.</span>}
+            {businessGoals.length === 0 && <span className="text-xs text-slate-500 dark:text-slate-400">No business goals yet.</span>}
           </div>
         </div>
       )}
@@ -704,20 +704,20 @@ export default function Rocks() {
           <form
             onSubmit={handleRockSubmit}
             onClick={(e) => e.stopPropagation()}
-            className="flex w-full max-w-3xl flex-col gap-4 rounded-lg border border-slate-200 bg-white p-4 shadow-xl sm:p-6"
+            className="flex w-full max-w-3xl flex-col gap-4 rounded-lg border border-slate-200 dark:border-slate-700 bg-white dark:bg-slate-900 p-4 shadow-xl sm:p-6"
           >
             <div className="flex items-center justify-between">
-              <div className="text-sm font-semibold text-slate-700">{rockForm.id ? "Edit Rock" : "New Rock"}</div>
-              <button type="button" onClick={() => setShowRockForm(false)} className="text-slate-500 hover:text-slate-600">
+              <div className="text-sm font-semibold text-slate-700 dark:text-slate-200">{rockForm.id ? "Edit Rock" : "New Rock"}</div>
+              <button type="button" onClick={() => setShowRockForm(false)} className="text-slate-500 dark:text-slate-400 hover:text-slate-600 dark:hover:text-slate-300">
                 <X className="h-4 w-4" />
               </button>
             </div>
 
           <div className="grid grid-cols-1 gap-4 sm:grid-cols-2 lg:grid-cols-4">
             <div className="flex flex-col gap-1">
-              <label className="text-xs font-medium text-slate-500">Business Unit</label>
+              <label className="text-xs font-medium text-slate-500 dark:text-slate-400">Business Unit</label>
               <select
-                className="rounded-md border border-slate-300 px-3 py-2 text-sm"
+                className="rounded-md border border-slate-300 dark:border-slate-600 dark:bg-slate-800 dark:text-slate-100 px-3 py-2 text-sm"
                 value={formBusinessUnitId}
                 onChange={(e) => {
                   setFormBusinessUnitId(e.target.value);
@@ -734,9 +734,9 @@ export default function Rocks() {
               </select>
             </div>
             <div className="flex flex-col gap-1">
-              <label className="text-xs font-medium text-slate-500">Company</label>
+              <label className="text-xs font-medium text-slate-500 dark:text-slate-400">Company</label>
               <select
-                className="rounded-md border border-slate-300 px-3 py-2 text-sm"
+                className="rounded-md border border-slate-300 dark:border-slate-600 dark:bg-slate-800 dark:text-slate-100 px-3 py-2 text-sm"
                 value={rockForm.companyId}
                 onChange={(e) => setRockForm((f) => ({ ...f, companyId: e.target.value }))}
                 disabled={!!rockForm.id}
@@ -751,9 +751,9 @@ export default function Rocks() {
               </select>
             </div>
             <div className="flex flex-col gap-1">
-              <label className="text-xs font-medium text-slate-500">Quarter</label>
+              <label className="text-xs font-medium text-slate-500 dark:text-slate-400">Quarter</label>
               <select
-                className="rounded-md border border-slate-300 px-3 py-2 text-sm"
+                className="rounded-md border border-slate-300 dark:border-slate-600 dark:bg-slate-800 dark:text-slate-100 px-3 py-2 text-sm"
                 value={rockForm.quarter}
                 onChange={(e) => setRockForm((f) => ({ ...f, quarter: Number(e.target.value) }))}
               >
@@ -765,9 +765,9 @@ export default function Rocks() {
               </select>
             </div>
             <div className="flex flex-col gap-1">
-              <label className="text-xs font-medium text-slate-500">Business Goal</label>
+              <label className="text-xs font-medium text-slate-500 dark:text-slate-400">Business Goal</label>
               <select
-                className="rounded-md border border-slate-300 px-3 py-2 text-sm"
+                className="rounded-md border border-slate-300 dark:border-slate-600 dark:bg-slate-800 dark:text-slate-100 px-3 py-2 text-sm"
                 value={rockForm.businessGoalId}
                 onChange={(e) => setRockForm((f) => ({ ...f, businessGoalId: e.target.value }))}
               >
@@ -782,9 +782,9 @@ export default function Rocks() {
           </div>
 
           <div className="flex flex-col gap-1">
-            <label className="text-xs font-medium text-slate-500">Title</label>
+            <label className="text-xs font-medium text-slate-500 dark:text-slate-400">Title</label>
             <input
-              className="rounded-md border border-slate-300 px-3 py-2 text-sm"
+              className="rounded-md border border-slate-300 dark:border-slate-600 dark:bg-slate-800 dark:text-slate-100 px-3 py-2 text-sm"
               placeholder="e.g. Launch new client onboarding process"
               value={rockForm.title}
               onChange={(e) => setRockForm((f) => ({ ...f, title: e.target.value }))}
@@ -793,18 +793,18 @@ export default function Rocks() {
           </div>
 
           <div className="flex flex-col gap-1">
-            <label className="text-xs font-medium text-slate-500">Target(s)</label>
+            <label className="text-xs font-medium text-slate-500 dark:text-slate-400">Target(s)</label>
             <textarea
-              className="min-h-[70px] rounded-md border border-slate-300 px-3 py-2 text-sm"
+              className="min-h-[70px] rounded-md border border-slate-300 dark:border-slate-600 dark:bg-slate-800 dark:text-slate-100 px-3 py-2 text-sm"
               value={rockForm.description}
               onChange={(e) => setRockForm((f) => ({ ...f, description: e.target.value }))}
             />
           </div>
 
           <div className="flex flex-col gap-1">
-            <label className="text-xs font-medium text-slate-500">Remarks (optional)</label>
+            <label className="text-xs font-medium text-slate-500 dark:text-slate-400">Remarks (optional)</label>
             <textarea
-              className="min-h-[60px] rounded-md border border-slate-300 px-3 py-2 text-sm"
+              className="min-h-[60px] rounded-md border border-slate-300 dark:border-slate-600 dark:bg-slate-800 dark:text-slate-100 px-3 py-2 text-sm"
               placeholder="Notes on progress, blockers, updates..."
               value={rockForm.remarks}
               onChange={(e) => setRockForm((f) => ({ ...f, remarks: e.target.value }))}
@@ -813,18 +813,18 @@ export default function Rocks() {
 
           <div className="grid grid-cols-1 gap-4 sm:grid-cols-3">
             <div className="flex flex-col gap-1">
-              <label className="text-xs font-medium text-slate-500">Owner (optional)</label>
+              <label className="text-xs font-medium text-slate-500 dark:text-slate-400">Owner (optional)</label>
               <input
-                className="rounded-md border border-slate-300 px-3 py-2 text-sm"
+                className="rounded-md border border-slate-300 dark:border-slate-600 dark:bg-slate-800 dark:text-slate-100 px-3 py-2 text-sm"
                 placeholder="Who's accountable"
                 value={rockForm.ownerName}
                 onChange={(e) => setRockForm((f) => ({ ...f, ownerName: e.target.value }))}
               />
             </div>
             <div className="flex flex-col gap-1">
-              <label className="text-xs font-medium text-slate-500">Status</label>
+              <label className="text-xs font-medium text-slate-500 dark:text-slate-400">Status</label>
               <select
-                className="rounded-md border border-slate-300 px-3 py-2 text-sm"
+                className="rounded-md border border-slate-300 dark:border-slate-600 dark:bg-slate-800 dark:text-slate-100 px-3 py-2 text-sm"
                 value={rockForm.status}
                 onChange={(e) => setRockForm((f) => ({ ...f, status: e.target.value as RockStatus }))}
               >
@@ -836,13 +836,13 @@ export default function Rocks() {
               </select>
             </div>
             <div className="flex flex-col gap-1">
-              <label className="text-xs font-medium text-slate-500">Progress % (up to 2 decimal places)</label>
+              <label className="text-xs font-medium text-slate-500 dark:text-slate-400">Progress % (up to 2 decimal places)</label>
               <input
                 type="number"
                 min={0}
                 max={100}
                 step="0.01"
-                className="rounded-md border border-slate-300 px-3 py-2 text-sm"
+                className="rounded-md border border-slate-300 dark:border-slate-600 dark:bg-slate-800 dark:text-slate-100 px-3 py-2 text-sm"
                 value={rockForm.progressPct}
                 onChange={(e) =>
                   setRockForm((f) => ({ ...f, progressPct: clampProgress(Number(e.target.value)) }))
@@ -851,7 +851,7 @@ export default function Rocks() {
             </div>
           </div>
 
-          {rockError && <div className="rounded-md bg-red-50 px-3 py-2 text-sm text-red-600">{rockError}</div>}
+          {rockError && <div className="rounded-md bg-red-50 dark:bg-red-950/40 px-3 py-2 text-sm text-red-600 dark:text-red-400">{rockError}</div>}
 
           <div className="flex gap-2">
             <button
@@ -864,7 +864,7 @@ export default function Rocks() {
             <button
               type="button"
               onClick={() => setShowRockForm(false)}
-              className="rounded-md border border-slate-300 px-4 py-2 text-sm font-medium text-slate-600 hover:bg-slate-50"
+              className="rounded-md border border-slate-300 dark:border-slate-600 dark:bg-slate-800 dark:text-slate-100 px-4 py-2 text-sm font-medium text-slate-600 dark:text-slate-300 hover:bg-slate-50 dark:hover:bg-slate-800"
             >
               Cancel
             </button>
@@ -873,13 +873,13 @@ export default function Rocks() {
         </div>
       )}
 
-      <div className="overflow-hidden rounded-lg border border-slate-200 bg-white shadow-sm">
+      <div className="overflow-hidden rounded-lg border border-slate-200 dark:border-slate-700 bg-white dark:bg-slate-900 shadow-sm">
         {!loading && (
           <Pagination page={page} pageSize={ROCKS_PAGE_SIZE} total={sortedRocks.length} onPageChange={setPage} />
         )}
         <div className="overflow-x-auto">
           <table className="w-full min-w-[1020px] text-sm">
-            <thead className="bg-slate-50 text-left text-xs font-semibold uppercase text-slate-500">
+            <thead className="bg-slate-50 dark:bg-slate-950 text-left text-xs font-semibold uppercase text-slate-500 dark:text-slate-400">
               <tr>
                 <SortableTh label="Company" sortKey="companyName" activeKey={sort.key} dir={sort.dir} onClick={handleSort} />
                 <SortableTh label="Quarter" sortKey="quarter" activeKey={sort.key} dir={sort.dir} onClick={handleSort} />
@@ -897,25 +897,25 @@ export default function Rocks() {
                 <th className="px-4 py-3 text-right">Actions</th>
               </tr>
             </thead>
-            <tbody className="divide-y divide-slate-100">
+            <tbody className="divide-y divide-slate-100 dark:divide-slate-800">
               {pagedRocks.map((r) => (
                 <tr
                   key={r.id}
                   onClick={() => setDetailRock(r)}
-                  className="cursor-pointer hover:bg-slate-50"
+                  className="cursor-pointer hover:bg-slate-50 dark:hover:bg-slate-800"
                   title="Click for Rock details"
                 >
-                  <td className="px-4 py-3 font-medium text-slate-800">{r.company.name}</td>
-                  <td className="px-4 py-3 text-slate-600">Q{r.quarter}</td>
-                  <td className="px-4 py-3 text-slate-700">
+                  <td className="px-4 py-3 font-medium text-slate-800 dark:text-slate-100">{r.company.name}</td>
+                  <td className="px-4 py-3 text-slate-600 dark:text-slate-300">Q{r.quarter}</td>
+                  <td className="px-4 py-3 text-slate-700 dark:text-slate-200">
                     <div className="max-w-xs font-medium">{r.title}</div>
-                    {r.description && <div className="mt-0.5 max-w-xs text-xs text-slate-500 line-clamp-2">{r.description}</div>}
+                    {r.description && <div className="mt-0.5 max-w-xs text-xs text-slate-500 dark:text-slate-400 line-clamp-2">{r.description}</div>}
                     {r.remarks && (
-                      <div className="mt-0.5 max-w-xs text-xs italic text-slate-500 line-clamp-2">Remarks: {r.remarks}</div>
+                      <div className="mt-0.5 max-w-xs text-xs italic text-slate-500 dark:text-slate-400 line-clamp-2">Remarks: {r.remarks}</div>
                     )}
                   </td>
-                  <td className="px-4 py-3 text-slate-600">{r.businessGoal?.name || "—"}</td>
-                  <td className="px-4 py-3 text-slate-600">{r.ownerName || "—"}</td>
+                  <td className="px-4 py-3 text-slate-600 dark:text-slate-300">{r.businessGoal?.name || "—"}</td>
+                  <td className="px-4 py-3 text-slate-600 dark:text-slate-300">{r.ownerName || "—"}</td>
                   {/* The next three cells hold their own click targets (Status
                       select, Progress input, Edit/Delete buttons) — each stops
                       the click from bubbling up to the row so quickly changing
@@ -940,7 +940,7 @@ export default function Rocks() {
                         min={0}
                         max={100}
                         step="0.01"
-                        className="w-20 rounded-md border border-slate-200 px-2 py-1 text-xs"
+                        className="w-20 rounded-md border border-slate-200 dark:border-slate-700 px-2 py-1 text-xs"
                         defaultValue={r.progressPct}
                         onBlur={(e) => {
                           const next = clampProgress(Number(e.target.value) || 0);
@@ -954,12 +954,12 @@ export default function Rocks() {
                   </td>
                   <td className="px-4 py-3" onClick={(e) => e.stopPropagation()}>
                     <div className="flex justify-end gap-2">
-                      <button onClick={() => startEditRock(r)} className="rounded-md p-1.5 text-slate-500 hover:bg-slate-100" title="Edit">
+                      <button onClick={() => startEditRock(r)} className="rounded-md p-1.5 text-slate-500 dark:text-slate-400 hover:bg-slate-100 dark:hover:bg-slate-700" title="Edit">
                         <Pencil className="h-4 w-4" />
                       </button>
                       <button
                         onClick={() => handleDeleteRock(r)}
-                        className="rounded-md p-1.5 text-slate-500 hover:bg-red-50 hover:text-red-600"
+                        className="rounded-md p-1.5 text-slate-500 dark:text-slate-400 hover:bg-red-50 dark:hover:bg-red-900/40 hover:text-red-600 dark:hover:text-red-400"
                         title="Delete"
                       >
                         <Trash2 className="h-4 w-4" />
@@ -970,7 +970,7 @@ export default function Rocks() {
               ))}
               {sortedRocks.length === 0 && !loading && (
                 <tr>
-                  <td colSpan={8} className="px-4 py-6 text-center text-slate-500">
+                  <td colSpan={8} className="px-4 py-6 text-center text-slate-500 dark:text-slate-400">
                     No Rocks for this scope yet.
                   </td>
                 </tr>
@@ -979,7 +979,7 @@ export default function Rocks() {
           </table>
         </div>
         {loading && (
-          <div className="flex items-center justify-center gap-2 py-4 text-sm text-slate-500">
+          <div className="flex items-center justify-center gap-2 py-4 text-sm text-slate-500 dark:text-slate-400">
             <Loader2 className="h-4 w-4 animate-spin" /> Loading...
           </div>
         )}
@@ -995,18 +995,18 @@ export default function Rocks() {
         >
           <div
             onClick={(e) => e.stopPropagation()}
-            className="flex w-full max-w-lg flex-col gap-4 rounded-lg border border-slate-200 bg-white p-4 shadow-xl sm:p-6"
+            className="flex w-full max-w-lg flex-col gap-4 rounded-lg border border-slate-200 dark:border-slate-700 bg-white dark:bg-slate-900 p-4 shadow-xl sm:p-6"
           >
             <div className="flex items-start justify-between gap-3">
               <div>
-                <h3 className="text-base font-semibold text-slate-800">{detailRock.title}</h3>
-                <p className="text-xs text-slate-500">
+                <h3 className="text-base font-semibold text-slate-800 dark:text-slate-100">{detailRock.title}</h3>
+                <p className="text-xs text-slate-500 dark:text-slate-400">
                   {detailRock.company.name} &middot; Q{detailRock.quarter}
                 </p>
               </div>
               <button
                 onClick={() => setDetailRock(null)}
-                className="rounded-md p-1 text-slate-400 hover:bg-slate-100 hover:text-slate-600"
+                className="rounded-md p-1 text-slate-400 dark:text-slate-500 hover:bg-slate-100 dark:hover:bg-slate-700 hover:text-slate-600 dark:hover:text-slate-300"
                 title="Close"
               >
                 <X className="h-4 w-4" />
@@ -1018,7 +1018,7 @@ export default function Rocks() {
                 {STATUS_LABELS[detailRock.status]}
               </span>
               <div className="flex items-center gap-2">
-                <div className="h-1.5 w-24 overflow-hidden rounded-full bg-slate-100">
+                <div className="h-1.5 w-24 overflow-hidden rounded-full bg-slate-100 dark:bg-slate-800">
                   <div
                     className="h-full rounded-full bg-brand-500"
                     style={{ width: `${Math.min(100, detailRock.progressPct)}%` }}
@@ -1032,30 +1032,30 @@ export default function Rocks() {
 
             <div className="grid grid-cols-2 gap-3 text-sm">
               <div>
-                <div className="text-xs font-medium uppercase tracking-wide text-slate-400">Owner</div>
-                <div className="text-slate-700">{detailRock.ownerName || "—"}</div>
+                <div className="text-xs font-medium uppercase tracking-wide text-slate-400 dark:text-slate-500">Owner</div>
+                <div className="text-slate-700 dark:text-slate-200">{detailRock.ownerName || "—"}</div>
               </div>
               <div>
-                <div className="text-xs font-medium uppercase tracking-wide text-slate-400">Business Goal</div>
-                <div className="text-slate-700">{detailRock.businessGoal?.name || "—"}</div>
+                <div className="text-xs font-medium uppercase tracking-wide text-slate-400 dark:text-slate-500">Business Goal</div>
+                <div className="text-slate-700 dark:text-slate-200">{detailRock.businessGoal?.name || "—"}</div>
               </div>
             </div>
 
             {detailRock.description && (
               <div>
-                <div className="text-xs font-medium uppercase tracking-wide text-slate-400">Target(s)</div>
-                <div className="whitespace-pre-wrap text-sm text-slate-700">{detailRock.description}</div>
+                <div className="text-xs font-medium uppercase tracking-wide text-slate-400 dark:text-slate-500">Target(s)</div>
+                <div className="whitespace-pre-wrap text-sm text-slate-700 dark:text-slate-200">{detailRock.description}</div>
               </div>
             )}
 
             {detailRock.remarks && (
               <div>
-                <div className="text-xs font-medium uppercase tracking-wide text-slate-400">Remarks</div>
-                <div className="whitespace-pre-wrap text-sm italic text-slate-700">{detailRock.remarks}</div>
+                <div className="text-xs font-medium uppercase tracking-wide text-slate-400 dark:text-slate-500">Remarks</div>
+                <div className="whitespace-pre-wrap text-sm italic text-slate-700 dark:text-slate-200">{detailRock.remarks}</div>
               </div>
             )}
 
-            <div className="flex flex-col gap-1 border-t border-slate-100 pt-3 text-xs text-slate-400">
+            <div className="flex flex-col gap-1 border-t border-slate-100 dark:border-slate-800 pt-3 text-xs text-slate-400 dark:text-slate-500">
               <div>
                 Created {new Date(detailRock.createdAt).toLocaleString()}
                 {detailRock.createdBy && <> by {detailRock.createdBy.name}</>}
@@ -1078,7 +1078,7 @@ export default function Rocks() {
               </button>
               <button
                 onClick={() => setDetailRock(null)}
-                className="rounded-md border border-slate-300 px-4 py-2 text-sm font-medium text-slate-600 hover:bg-slate-50"
+                className="rounded-md border border-slate-300 dark:border-slate-600 dark:bg-slate-800 dark:text-slate-100 px-4 py-2 text-sm font-medium text-slate-600 dark:text-slate-300 hover:bg-slate-50 dark:hover:bg-slate-800"
               >
                 Close
               </button>

@@ -82,16 +82,16 @@ export default function AdminSmtp() {
   return (
     <div className="flex flex-col gap-6">
       <div>
-        <h3 className="text-base font-semibold text-slate-800">SMTP Settings</h3>
-        <p className="text-sm text-slate-500">Used to send email notifications from the dashboard.</p>
+        <h3 className="text-base font-semibold text-slate-800 dark:text-slate-100">SMTP Settings</h3>
+        <p className="text-sm text-slate-500 dark:text-slate-400">Used to send email notifications from the dashboard.</p>
       </div>
 
-      <form onSubmit={handleSubmit} className="flex flex-col gap-4 rounded-lg border border-slate-200 bg-white p-4 shadow-sm sm:p-6">
+      <form onSubmit={handleSubmit} className="flex flex-col gap-4 rounded-lg border border-slate-200 dark:border-slate-700 bg-white dark:bg-slate-900 p-4 shadow-sm sm:p-6">
         <div className="grid grid-cols-1 gap-4 sm:grid-cols-2">
           <div className="flex flex-col gap-1">
-            <label className="text-xs font-medium text-slate-500">SMTP Host</label>
+            <label className="text-xs font-medium text-slate-500 dark:text-slate-400">SMTP Host</label>
             <input
-              className="rounded-md border border-slate-300 px-3 py-2 text-sm"
+              className="rounded-md border border-slate-300 dark:border-slate-600 dark:bg-slate-800 dark:text-slate-100 px-3 py-2 text-sm"
               placeholder="smtp.example.com"
               value={form.host}
               onChange={(e) => setForm((f) => ({ ...f, host: e.target.value }))}
@@ -99,10 +99,10 @@ export default function AdminSmtp() {
             />
           </div>
           <div className="flex flex-col gap-1">
-            <label className="text-xs font-medium text-slate-500">Port</label>
+            <label className="text-xs font-medium text-slate-500 dark:text-slate-400">Port</label>
             <input
               type="number"
-              className="rounded-md border border-slate-300 px-3 py-2 text-sm"
+              className="rounded-md border border-slate-300 dark:border-slate-600 dark:bg-slate-800 dark:text-slate-100 px-3 py-2 text-sm"
               value={form.port}
               onChange={(e) => setForm((f) => ({ ...f, port: Number(e.target.value) }))}
               required
@@ -115,35 +115,35 @@ export default function AdminSmtp() {
               checked={form.secure}
               onChange={(e) => setForm((f) => ({ ...f, secure: e.target.checked }))}
             />
-            <label htmlFor="smtp-secure" className="text-sm text-slate-600">
+            <label htmlFor="smtp-secure" className="text-sm text-slate-600 dark:text-slate-300">
               Use TLS/SSL (secure connection)
             </label>
           </div>
           <div />
           <div className="flex flex-col gap-1">
-            <label className="text-xs font-medium text-slate-500">SMTP Username</label>
+            <label className="text-xs font-medium text-slate-500 dark:text-slate-400">SMTP Username</label>
             <input
-              className="rounded-md border border-slate-300 px-3 py-2 text-sm"
+              className="rounded-md border border-slate-300 dark:border-slate-600 dark:bg-slate-800 dark:text-slate-100 px-3 py-2 text-sm"
               value={form.username}
               onChange={(e) => setForm((f) => ({ ...f, username: e.target.value }))}
             />
           </div>
           <div className="flex flex-col gap-1">
-            <label className="text-xs font-medium text-slate-500">
-              SMTP Password {hasPassword && <span className="text-slate-500">(leave blank to keep current)</span>}
+            <label className="text-xs font-medium text-slate-500 dark:text-slate-400">
+              SMTP Password {hasPassword && <span className="text-slate-500 dark:text-slate-400">(leave blank to keep current)</span>}
             </label>
             <input
               type="password"
-              className="rounded-md border border-slate-300 px-3 py-2 text-sm"
+              className="rounded-md border border-slate-300 dark:border-slate-600 dark:bg-slate-800 dark:text-slate-100 px-3 py-2 text-sm"
               value={form.password}
               onChange={(e) => setForm((f) => ({ ...f, password: e.target.value }))}
             />
           </div>
           <div className="flex flex-col gap-1">
-            <label className="text-xs font-medium text-slate-500">From Address</label>
+            <label className="text-xs font-medium text-slate-500 dark:text-slate-400">From Address</label>
             <input
               type="email"
-              className="rounded-md border border-slate-300 px-3 py-2 text-sm"
+              className="rounded-md border border-slate-300 dark:border-slate-600 dark:bg-slate-800 dark:text-slate-100 px-3 py-2 text-sm"
               placeholder="notifications@yourcompany.com"
               value={form.fromAddress}
               onChange={(e) => setForm((f) => ({ ...f, fromAddress: e.target.value }))}
@@ -151,9 +151,9 @@ export default function AdminSmtp() {
             />
           </div>
           <div className="flex flex-col gap-1">
-            <label className="text-xs font-medium text-slate-500">From Name (optional)</label>
+            <label className="text-xs font-medium text-slate-500 dark:text-slate-400">From Name (optional)</label>
             <input
-              className="rounded-md border border-slate-300 px-3 py-2 text-sm"
+              className="rounded-md border border-slate-300 dark:border-slate-600 dark:bg-slate-800 dark:text-slate-100 px-3 py-2 text-sm"
               placeholder="EOS Dashboard"
               value={form.fromName}
               onChange={(e) => setForm((f) => ({ ...f, fromName: e.target.value }))}
@@ -161,8 +161,8 @@ export default function AdminSmtp() {
           </div>
         </div>
 
-        {error && <div className="rounded-md bg-red-50 px-3 py-2 text-sm text-red-600">{error}</div>}
-        {updatedAt && <div className="text-xs text-slate-500">Last saved {new Date(updatedAt).toLocaleString()}</div>}
+        {error && <div className="rounded-md bg-red-50 dark:bg-red-950/40 px-3 py-2 text-sm text-red-600 dark:text-red-400">{error}</div>}
+        {updatedAt && <div className="text-xs text-slate-500 dark:text-slate-400">Last saved {new Date(updatedAt).toLocaleString()}</div>}
 
         <button
           type="submit"
@@ -174,25 +174,25 @@ export default function AdminSmtp() {
         </button>
       </form>
 
-      <div className="flex flex-col gap-3 rounded-lg border border-slate-200 bg-white p-4 shadow-sm sm:p-6">
-        <div className="text-sm font-semibold text-slate-700">Send a test email</div>
+      <div className="flex flex-col gap-3 rounded-lg border border-slate-200 dark:border-slate-700 bg-white dark:bg-slate-900 p-4 shadow-sm sm:p-6">
+        <div className="text-sm font-semibold text-slate-700 dark:text-slate-200">Send a test email</div>
         <div className="flex flex-col gap-2 xs:flex-row">
           <input
             type="email"
             placeholder="you@example.com"
-            className="w-full rounded-md border border-slate-300 px-3 py-2 text-sm xs:max-w-xs"
+            className="w-full rounded-md border border-slate-300 dark:border-slate-600 dark:bg-slate-800 dark:text-slate-100 px-3 py-2 text-sm xs:max-w-xs"
             value={testTo}
             onChange={(e) => setTestTo(e.target.value)}
           />
           <button
             onClick={handleTest}
             disabled={testing || !testTo.trim()}
-            className="flex items-center justify-center gap-2 rounded-md bg-slate-800 px-4 py-2 text-sm font-medium text-white hover:bg-slate-900 disabled:opacity-50"
+            className="flex items-center justify-center gap-2 rounded-md bg-slate-800 dark:bg-slate-700 px-4 py-2 text-sm font-medium text-white hover:bg-slate-900 dark:hover:bg-slate-600 disabled:opacity-50"
           >
             <Send className="h-4 w-4" /> {testing ? "Sending..." : "Send Test"}
           </button>
         </div>
-        {testResult && <div className="text-sm text-slate-600">{testResult}</div>}
+        {testResult && <div className="text-sm text-slate-600 dark:text-slate-300">{testResult}</div>}
       </div>
     </div>
   );

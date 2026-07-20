@@ -24,13 +24,13 @@ export default function SortableTh<K extends string>({
 }) {
   return (
     <th
-      className={`cursor-pointer select-none px-4 py-3 hover:text-slate-700 ${align === "right" ? "text-right" : "text-left"}`}
+      className={`cursor-pointer select-none px-4 py-3 hover:text-slate-700 dark:hover:text-slate-200 ${align === "right" ? "text-right" : "text-left"}`}
       onClick={() => onClick(sortKey)}
     >
       <span className={`inline-flex items-center gap-1 ${align === "right" ? "flex-row-reverse" : ""}`}>
         {label}
-        <ArrowUpDown className={`h-3 w-3 ${activeKey === sortKey ? "text-brand-600" : "text-slate-300"}`} />
-        {activeKey === sortKey && <span className="text-[10px] text-brand-600">{dir === "asc" ? "↑" : "↓"}</span>}
+        <ArrowUpDown className={`h-3 w-3 ${activeKey === sortKey ? "text-brand-600 dark:text-brand-400" : "text-slate-300 dark:text-slate-600"}`} />
+        {activeKey === sortKey && <span className="text-[10px] text-brand-600 dark:text-brand-400">{dir === "asc" ? "↑" : "↓"}</span>}
       </span>
     </th>
   );

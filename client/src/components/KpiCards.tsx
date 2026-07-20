@@ -19,10 +19,10 @@ interface Props {
 // one category (Actual/YTD) stay neutral.
 type Tone = "revenue" | "collections" | "expenses" | "neutral";
 const TONES: Record<Tone, { bg: string; border: string; icon: string; value: string }> = {
-  revenue: { bg: "bg-blue-50", border: "border-blue-200", icon: "text-blue-600", value: "text-blue-900" },
-  collections: { bg: "bg-emerald-50", border: "border-emerald-200", icon: "text-emerald-600", value: "text-emerald-900" },
-  expenses: { bg: "bg-amber-50", border: "border-amber-200", icon: "text-amber-600", value: "text-amber-900" },
-  neutral: { bg: "bg-white", border: "border-slate-200", icon: "text-slate-500", value: "text-slate-800" },
+  revenue: { bg: "bg-blue-50 dark:bg-blue-950/40", border: "border-blue-200 dark:border-blue-800", icon: "text-blue-600 dark:text-blue-400", value: "text-blue-900 dark:text-blue-100" },
+  collections: { bg: "bg-emerald-50 dark:bg-emerald-950/40", border: "border-emerald-200 dark:border-emerald-800", icon: "text-emerald-600 dark:text-emerald-400", value: "text-emerald-900 dark:text-emerald-100" },
+  expenses: { bg: "bg-amber-50 dark:bg-amber-950/40", border: "border-amber-200 dark:border-amber-800", icon: "text-amber-600 dark:text-amber-400", value: "text-amber-900 dark:text-amber-100" },
+  neutral: { bg: "bg-white dark:bg-slate-900", border: "border-slate-200 dark:border-slate-700", icon: "text-slate-500 dark:text-slate-400", value: "text-slate-800 dark:text-slate-100" },
 };
 
 // Per-category config: which Kpis fields feed the cards, the tone/icon, and
@@ -91,7 +91,7 @@ function Card({
       <div className={`mt-2 text-2xl font-semibold ${t.value}`} title={fullValue}>
         {value}
       </div>
-      {sub && <div className={`mt-1 text-sm font-medium ${subColor || "text-slate-500"}`}>{sub}</div>}
+      {sub && <div className={`mt-1 text-sm font-medium ${subColor || "text-slate-500 dark:text-slate-400"}`}>{sub}</div>}
     </div>
   );
 }

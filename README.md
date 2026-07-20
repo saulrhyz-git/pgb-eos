@@ -1588,3 +1588,66 @@ box; typing in a Remarks box and clicking away still saves it (same
 Remarks box with the "select a quarter" note instead of hiding all of them
 at once; and the Expenses sub-tab's single card lays its 3 items out in
 columns on a wide screen and stacks them on mobile.
+
+**Financials Revenue tab: KPI cards rearranged into a 2x2 grid.**
+`client/src/components/KpiCards.tsx`'s Revenue layout changed from a row of
+3 cards followed by a lone Year-to-Date card, to a proper 2x2: Annual
+Revenue Target next to Year-to-Date Actual on top, Quarter Target next to
+Quarter Actual underneath. Collections/Expenses are unaffected — they still
+show their single row of 3 cards, since neither has a Year-to-Date figure to
+pair with a 4th card.
+
+**Light/dark theme toggle, high-contrast in both modes.** The whole app now
+supports a dark theme, toggled from a sun/moon button in the header
+(`client/src/components/Layout.tsx`, next to the profile icon) and, since
+that header only exists once someone's signed in, a matching button in the
+top-right corner of the Login page too (`client/src/pages/Login.tsx`) so
+the theme is reachable before login as well.
+
+`client/tailwind.config.js` now sets `darkMode: "class"` — every `dark:`
+utility in the app is keyed off a `dark` class on `<html>`, toggled by a new
+`ThemeProvider`/`useTheme()` context (`client/src/contexts/ThemeContext.tsx`,
+wired into `main.tsx`). The choice persists in `localStorage`
+(`eos_theme`) so it survives reloads; on a person's very first visit, with
+nothing saved yet, it defaults to their OS-level `prefers-color-scheme`
+instead of always opening light. `index.css` also sets `color-scheme: dark`
+on `.dark` so the browser's own native chrome — scrollbars, checkboxes, date
+pickers, autofill — follows suit instead of staying stuck light.
+
+Since the app's color classes (`bg-white`, `border-slate-200`,
+`text-slate-500`, the tone-card families like `bg-emerald-50`/`text-amber-700`,
+etc.) are the same handful of recurring Tailwind tokens repeated across every
+page and component, adding `dark:` variants file-by-file wasn't practical —
+instead, every occurrence of ~70 recurring class tokens across all 34
+`.tsx` files was mapped to a matching dark-mode variant and applied in one
+pass (verified before and after with a balance/paren check across every
+file). The mapping was built for contrast, not just "make it dark": page
+background → `slate-950`, card surfaces → `slate-900`, subtle
+hover/secondary fills → `slate-800`/`slate-700`, body text → `slate-100`
+down to `slate-400` depending on original weight, and every tinted
+badge/card family (blue/emerald/amber/red/purple/cyan/rose/orange/green)
+got a `-950/40`-ish tinted dark background with a `-300`/`-400` text shade
+that reads clearly against it. Form inputs specifically (anywhere
+`border-slate-300` was used, ~108 spots) also picked up an explicit
+`dark:bg-slate-800 dark:text-slate-100`, since browser-default white input
+backgrounds would otherwise stay white-on-white-adjacent even inside a dark
+card. The `brand` blue in `tailwind.config.js` gained new `200`/`300`/`400`/
+`800`/`900` shades (previously only `50`/`100`/`500`/`600`/`700` existed) so
+brand-colored text/borders/badges have a legible dark-mode variant instead
+of reusing the same shade meant for a light background.
+
+Two spots use hardcoded hex colors instead of Tailwind classes and so
+couldn't be covered by the bulk pass: the Revenue Trend charts in
+`ProgressChart.tsx` and `Scorecard.tsx` pass raw hex strings to recharts'
+`CartesianGrid`/`XAxis`/`YAxis` as SVG attributes, which `dark:` variants
+can't reach. Both now read `useTheme()` and pick a grid/tick color directly
+(`#e2e8f0`/`#64748b` in light, `#334155`/`#94a3b8` in dark) so the chart grid
+and axis labels stay visible on a dark card instead of nearly disappearing.
+Worth checking by hand: toggling the header button (and the Login page's)
+flips the whole app between themes instantly with no reload; every page —
+Scorecard, Financials' 4 sub-tabs, Rocks (including its modals), Reports,
+Compare, Data Entry, Target Setup, every Admin page, Profile, Login, Change
+Password — reads clearly in dark mode, including status badges, table
+headers/hover rows, and form inputs; the Revenue Trend chart's grid lines
+and axis labels are still visible (not just the bars/lines) after switching
+to dark; and the choice survives a full page reload.

@@ -141,7 +141,7 @@ export default function AdminUsers() {
   return (
     <div className="flex flex-col gap-6">
       <div className="flex flex-wrap items-center justify-between gap-2">
-        <h3 className="text-base font-semibold text-slate-800">Users</h3>
+        <h3 className="text-base font-semibold text-slate-800 dark:text-slate-100">Users</h3>
         <button
           onClick={startCreate}
           className="flex items-center gap-2 rounded-md bg-brand-500 px-3 py-2 text-sm font-medium text-white hover:bg-brand-600"
@@ -151,45 +151,45 @@ export default function AdminUsers() {
       </div>
 
       {showForm && (
-        <form onSubmit={handleSubmit} className="flex flex-col gap-4 rounded-lg border border-slate-200 bg-white p-4 shadow-sm sm:p-6">
+        <form onSubmit={handleSubmit} className="flex flex-col gap-4 rounded-lg border border-slate-200 dark:border-slate-700 bg-white dark:bg-slate-900 p-4 shadow-sm sm:p-6">
           <div className="flex items-center justify-between">
-            <div className="text-sm font-semibold text-slate-700">{form.id ? "Edit User" : "New User"}</div>
-            <button type="button" onClick={() => setShowForm(false)} className="text-slate-500 hover:text-slate-600">
+            <div className="text-sm font-semibold text-slate-700 dark:text-slate-200">{form.id ? "Edit User" : "New User"}</div>
+            <button type="button" onClick={() => setShowForm(false)} className="text-slate-500 dark:text-slate-400 hover:text-slate-600 dark:hover:text-slate-300">
               <X className="h-4 w-4" />
             </button>
           </div>
           <div className="grid grid-cols-1 gap-4 sm:grid-cols-2">
             <div className="flex flex-col gap-1">
-              <label className="text-xs font-medium text-slate-500">Name</label>
+              <label className="text-xs font-medium text-slate-500 dark:text-slate-400">Name</label>
               <input
-                className="rounded-md border border-slate-300 px-3 py-2 text-sm"
+                className="rounded-md border border-slate-300 dark:border-slate-600 dark:bg-slate-800 dark:text-slate-100 px-3 py-2 text-sm"
                 value={form.name}
                 onChange={(e) => setForm((f) => ({ ...f, name: e.target.value }))}
                 required
               />
             </div>
             <div className="flex flex-col gap-1">
-              <label className="text-xs font-medium text-slate-500">Email</label>
+              <label className="text-xs font-medium text-slate-500 dark:text-slate-400">Email</label>
               <input
                 type="email"
-                className="rounded-md border border-slate-300 px-3 py-2 text-sm"
+                className="rounded-md border border-slate-300 dark:border-slate-600 dark:bg-slate-800 dark:text-slate-100 px-3 py-2 text-sm"
                 value={form.email}
                 onChange={(e) => setForm((f) => ({ ...f, email: e.target.value }))}
                 required
               />
             </div>
             <div className="flex flex-col gap-1">
-              <label className="text-xs font-medium text-slate-500">Username (optional)</label>
+              <label className="text-xs font-medium text-slate-500 dark:text-slate-400">Username (optional)</label>
               <input
-                className="rounded-md border border-slate-300 px-3 py-2 text-sm"
+                className="rounded-md border border-slate-300 dark:border-slate-600 dark:bg-slate-800 dark:text-slate-100 px-3 py-2 text-sm"
                 value={form.username}
                 onChange={(e) => setForm((f) => ({ ...f, username: e.target.value }))}
               />
             </div>
             <div className="flex flex-col gap-1">
-              <label className="text-xs font-medium text-slate-500">Role</label>
+              <label className="text-xs font-medium text-slate-500 dark:text-slate-400">Role</label>
               <select
-                className="rounded-md border border-slate-300 px-3 py-2 text-sm"
+                className="rounded-md border border-slate-300 dark:border-slate-600 dark:bg-slate-800 dark:text-slate-100 px-3 py-2 text-sm"
                 value={form.role}
                 onChange={(e) => setForm((f) => ({ ...f, role: e.target.value as Role | "" }))}
               >
@@ -201,15 +201,15 @@ export default function AdminUsers() {
                 ))}
               </select>
               {form.role === "" && (
-                <span className="text-xs text-slate-500">
+                <span className="text-xs text-slate-500 dark:text-slate-400">
                   This user has no base-role access at all — assign a Custom Role below so they can see anything.
                 </span>
               )}
             </div>
             <div className="flex flex-col gap-1 sm:col-span-2">
-              <label className="text-xs font-medium text-slate-500">Description (optional)</label>
+              <label className="text-xs font-medium text-slate-500 dark:text-slate-400">Description (optional)</label>
               <textarea
-                className="rounded-md border border-slate-300 px-3 py-2 text-sm"
+                className="rounded-md border border-slate-300 dark:border-slate-600 dark:bg-slate-800 dark:text-slate-100 px-3 py-2 text-sm"
                 rows={2}
                 placeholder="e.g. their title or team — shown in the app header instead of their role"
                 value={form.description}
@@ -217,18 +217,18 @@ export default function AdminUsers() {
               />
             </div>
             <div className="flex flex-col gap-1 sm:col-span-2">
-              <label className="text-xs font-medium text-slate-500">
+              <label className="text-xs font-medium text-slate-500 dark:text-slate-400">
                 {form.id ? "Reset password (leave blank to keep current)" : "Password"}
               </label>
               <input
                 type="password"
-                className="rounded-md border border-slate-300 px-3 py-2 text-sm"
+                className="rounded-md border border-slate-300 dark:border-slate-600 dark:bg-slate-800 dark:text-slate-100 px-3 py-2 text-sm"
                 value={form.password}
                 onChange={(e) => setForm((f) => ({ ...f, password: e.target.value }))}
                 minLength={8}
                 required={!form.id}
               />
-              <span className="text-xs text-slate-500">
+              <span className="text-xs text-slate-500 dark:text-slate-400">
                 {form.id
                   ? "Setting a new password will require the user to change it again on next login."
                   : "User will be required to change this password on first login."}
@@ -238,7 +238,7 @@ export default function AdminUsers() {
 
           {(form.role === "BU_INTEGRATOR" || form.role === "GROUP_INTEGRATOR") && (
             <div className="flex flex-col gap-2">
-              <label className="text-xs font-medium text-slate-500">
+              <label className="text-xs font-medium text-slate-500 dark:text-slate-400">
                 {form.role === "BU_INTEGRATOR" ? "Assigned Business Units (required)" : "Assigned Business Units (optional)"}
               </label>
               <div className="flex flex-wrap gap-2">
@@ -247,8 +247,8 @@ export default function AdminUsers() {
                     key={bu.id}
                     className={`flex cursor-pointer items-center gap-1.5 rounded-md border px-3 py-1.5 text-xs font-medium ${
                       form.businessUnitIds.includes(bu.id)
-                        ? "border-brand-500 bg-brand-50 text-brand-700"
-                        : "border-slate-200 text-slate-600"
+                        ? "border-brand-500 dark:border-brand-400 bg-brand-50 dark:bg-brand-900/40 text-brand-700 dark:text-brand-300"
+                        : "border-slate-200 dark:border-slate-700 text-slate-600 dark:text-slate-300"
                     }`}
                   >
                     <input
@@ -261,7 +261,7 @@ export default function AdminUsers() {
                   </label>
                 ))}
               </div>
-              <span className="text-xs text-slate-500">
+              <span className="text-xs text-slate-500 dark:text-slate-400">
                 {form.role === "BU_INTEGRATOR"
                   ? "A BU Integrator must be tied to at least one Business Unit."
                   : "Leave none selected for global access to all Business Units, or select one or more to scope this Group Integrator to just those."}
@@ -271,9 +271,9 @@ export default function AdminUsers() {
 
           {form.role !== "SUPERADMIN" && (
             <div className="flex flex-col gap-2">
-              <label className="text-xs font-medium text-slate-500">Custom Roles (optional, any number)</label>
+              <label className="text-xs font-medium text-slate-500 dark:text-slate-400">Custom Roles (optional, any number)</label>
               {customRoles.length === 0 ? (
-                <span className="text-xs text-slate-500">
+                <span className="text-xs text-slate-500 dark:text-slate-400">
                   No Custom Roles have been created yet — manage them under the Roles tab.
                 </span>
               ) : (
@@ -283,8 +283,8 @@ export default function AdminUsers() {
                       key={r.id}
                       className={`flex cursor-pointer items-center gap-1.5 rounded-md border px-3 py-1.5 text-xs font-medium ${
                         form.customRoleIds.includes(r.id)
-                          ? "border-brand-500 bg-brand-50 text-brand-700"
-                          : "border-slate-200 text-slate-600"
+                          ? "border-brand-500 dark:border-brand-400 bg-brand-50 dark:bg-brand-900/40 text-brand-700 dark:text-brand-300"
+                          : "border-slate-200 dark:border-slate-700 text-slate-600 dark:text-slate-300"
                       }`}
                     >
                       <input
@@ -298,7 +298,7 @@ export default function AdminUsers() {
                   ))}
                 </div>
               )}
-              <span className="text-xs text-slate-500">
+              <span className="text-xs text-slate-500 dark:text-slate-400">
                 Additional, more granular layer(s) on top of the role above — each assigned Custom Role adds its own
                 View/Edit/Delete grants for its Business Units/Companies and resources
                 (Targets/Revenue/Collections/Expenses/Rocks/Scorecard/Audit Log) on top of the default access above; a role
@@ -308,7 +308,7 @@ export default function AdminUsers() {
             </div>
           )}
 
-          {error && <div className="rounded-md bg-red-50 px-3 py-2 text-sm text-red-600">{error}</div>}
+          {error && <div className="rounded-md bg-red-50 dark:bg-red-950/40 px-3 py-2 text-sm text-red-600 dark:text-red-400">{error}</div>}
 
           <div className="flex gap-2">
             <button
@@ -321,7 +321,7 @@ export default function AdminUsers() {
             <button
               type="button"
               onClick={() => setShowForm(false)}
-              className="rounded-md border border-slate-300 px-4 py-2 text-sm font-medium text-slate-600 hover:bg-slate-50"
+              className="rounded-md border border-slate-300 dark:border-slate-600 dark:bg-slate-800 dark:text-slate-100 px-4 py-2 text-sm font-medium text-slate-600 dark:text-slate-300 hover:bg-slate-50 dark:hover:bg-slate-800"
             >
               Cancel
             </button>
@@ -329,10 +329,10 @@ export default function AdminUsers() {
         </form>
       )}
 
-      <div className="overflow-hidden rounded-lg border border-slate-200 bg-white shadow-sm">
+      <div className="overflow-hidden rounded-lg border border-slate-200 dark:border-slate-700 bg-white dark:bg-slate-900 shadow-sm">
         <div className="overflow-x-auto">
         <table className="w-full min-w-[960px] text-sm">
-          <thead className="bg-slate-50 text-left text-xs font-semibold uppercase text-slate-500">
+          <thead className="bg-slate-50 dark:bg-slate-950 text-left text-xs font-semibold uppercase text-slate-500 dark:text-slate-400">
             <tr>
               <th className="px-4 py-3">Name</th>
               <th className="px-4 py-3">Description</th>
@@ -344,30 +344,30 @@ export default function AdminUsers() {
               <th className="px-4 py-3 text-right">Actions</th>
             </tr>
           </thead>
-          <tbody className="divide-y divide-slate-100">
+          <tbody className="divide-y divide-slate-100 dark:divide-slate-800">
             {users.map((u) => (
               <tr key={u.id}>
-                <td className="px-4 py-3 font-medium text-slate-800">{u.name}</td>
-                <td className="px-4 py-3 text-slate-500">
+                <td className="px-4 py-3 font-medium text-slate-800 dark:text-slate-100">{u.name}</td>
+                <td className="px-4 py-3 text-slate-500 dark:text-slate-400">
                   <span className="line-clamp-2 max-w-xs">{u.description || "—"}</span>
                 </td>
-                <td className="px-4 py-3 text-slate-600">
+                <td className="px-4 py-3 text-slate-600 dark:text-slate-300">
                   <div>{u.email}</div>
-                  {u.username && <div className="text-xs text-slate-500">@{u.username}</div>}
+                  {u.username && <div className="text-xs text-slate-500 dark:text-slate-400">@{u.username}</div>}
                 </td>
-                <td className="px-4 py-3 text-slate-600">
+                <td className="px-4 py-3 text-slate-600 dark:text-slate-300">
                   {u.role ? (
                     ROLE_LABELS[u.role]
                   ) : (
-                    <span className="rounded-full bg-slate-100 px-2 py-0.5 text-xs font-medium text-slate-600">
+                    <span className="rounded-full bg-slate-100 dark:bg-slate-800 px-2 py-0.5 text-xs font-medium text-slate-600 dark:text-slate-300">
                       No base role
                     </span>
                   )}
                 </td>
-                <td className="px-4 py-3 text-slate-600">
+                <td className="px-4 py-3 text-slate-600 dark:text-slate-300">
                   {u.customRoles.length ? u.customRoles.map((r) => r.name).join(", ") : "—"}
                 </td>
-                <td className="px-4 py-3 text-slate-600">
+                <td className="px-4 py-3 text-slate-600 dark:text-slate-300">
                   {u.businessUnits.length
                     ? u.businessUnits.map((b) => b.name).join(", ")
                     : u.role === "GROUP_INTEGRATOR"
@@ -376,22 +376,22 @@ export default function AdminUsers() {
                 </td>
                 <td className="px-4 py-3">
                   {u.mustChangePassword ? (
-                    <span className="rounded-full bg-amber-50 px-2 py-0.5 text-xs font-medium text-amber-700">
+                    <span className="rounded-full bg-amber-50 dark:bg-amber-950/40 px-2 py-0.5 text-xs font-medium text-amber-700 dark:text-amber-300">
                       Pending password change
                     </span>
                   ) : (
-                    <span className="rounded-full bg-emerald-50 px-2 py-0.5 text-xs font-medium text-emerald-700">Active</span>
+                    <span className="rounded-full bg-emerald-50 dark:bg-emerald-950/40 px-2 py-0.5 text-xs font-medium text-emerald-700 dark:text-emerald-300">Active</span>
                   )}
                 </td>
                 <td className="px-4 py-3">
                   <div className="flex justify-end gap-2">
-                    <button onClick={() => startEdit(u)} className="rounded-md p-1.5 text-slate-500 hover:bg-slate-100" title="Edit">
+                    <button onClick={() => startEdit(u)} className="rounded-md p-1.5 text-slate-500 dark:text-slate-400 hover:bg-slate-100 dark:hover:bg-slate-700" title="Edit">
                       <Pencil className="h-4 w-4" />
                     </button>
                     <button
                       onClick={() => handleDelete(u)}
                       disabled={u.id === me?.id}
-                      className="rounded-md p-1.5 text-slate-500 hover:bg-red-50 hover:text-red-600 disabled:opacity-30"
+                      className="rounded-md p-1.5 text-slate-500 dark:text-slate-400 hover:bg-red-50 dark:hover:bg-red-900/40 hover:text-red-600 dark:hover:text-red-400 disabled:opacity-30"
                       title={u.id === me?.id ? "You cannot delete your own account" : "Delete"}
                     >
                       <Trash2 className="h-4 w-4" />
@@ -402,7 +402,7 @@ export default function AdminUsers() {
             ))}
             {users.length === 0 && (
               <tr>
-                <td colSpan={8} className="px-4 py-6 text-center text-slate-500">
+                <td colSpan={8} className="px-4 py-6 text-center text-slate-500 dark:text-slate-400">
                   No users yet.
                 </td>
               </tr>

@@ -14,9 +14,9 @@ interface Props {
 // Collections = emerald, Expenses = amber) so the two are easy to
 // cross-reference at a glance.
 const ALL_CATEGORIES: { key: "revenue" | "collections" | "expenses"; label: string; dot: string; text: string }[] = [
-  { key: "revenue", label: "Revenue", dot: "bg-blue-500", text: "text-blue-700" },
-  { key: "collections", label: "Collections", dot: "bg-emerald-500", text: "text-emerald-700" },
-  { key: "expenses", label: "Expenses", dot: "bg-amber-500", text: "text-amber-700" },
+  { key: "revenue", label: "Revenue", dot: "bg-blue-500", text: "text-blue-700 dark:text-blue-300" },
+  { key: "collections", label: "Collections", dot: "bg-emerald-500", text: "text-emerald-700 dark:text-emerald-300" },
+  { key: "expenses", label: "Expenses", dot: "bg-amber-500", text: "text-amber-700 dark:text-amber-300" },
 ];
 
 export default function TargetMatrix({ rows, category }: Props) {
@@ -26,12 +26,12 @@ export default function TargetMatrix({ rows, category }: Props) {
   // three, since there's nothing left to distinguish rows within a BU.
   const showCategoryColumn = CATEGORIES.length > 1;
   return (
-    <div className="rounded-lg border border-slate-200 bg-white p-3 shadow-sm sm:p-4">
-      <h3 className="mb-4 text-sm font-semibold text-slate-700">Target Distribution Matrix (Quarter targets per Business Unit)</h3>
+    <div className="rounded-lg border border-slate-200 dark:border-slate-700 bg-white dark:bg-slate-900 p-3 shadow-sm sm:p-4">
+      <h3 className="mb-4 text-sm font-semibold text-slate-700 dark:text-slate-200">Target Distribution Matrix (Quarter targets per Business Unit)</h3>
       <div className="overflow-x-auto">
         <table className="w-full min-w-[640px] text-sm">
           <thead>
-            <tr className="border-b border-slate-200 text-left text-xs font-medium uppercase text-slate-500">
+            <tr className="border-b border-slate-200 dark:border-slate-700 text-left text-xs font-medium uppercase text-slate-500 dark:text-slate-400">
               <th className="py-2 pr-3">Business Unit</th>
               {showCategoryColumn && <th className="py-2 pr-3">Category</th>}
               <th className="py-2 pr-3 text-right">Q1</th>
@@ -47,10 +47,10 @@ export default function TargetMatrix({ rows, category }: Props) {
                 {CATEGORIES.map((cat, i) => (
                   <tr
                     key={`${row.businessUnitId}-${cat.key}`}
-                    className={`border-b border-slate-100 ${i === CATEGORIES.length - 1 ? "last:border-0" : ""}`}
+                    className={`border-b border-slate-100 dark:border-slate-800 ${i === CATEGORIES.length - 1 ? "last:border-0" : ""}`}
                   >
                     {i === 0 && (
-                      <td className="py-2 pr-3 align-top font-medium text-slate-700" rowSpan={CATEGORIES.length}>
+                      <td className="py-2 pr-3 align-top font-medium text-slate-700 dark:text-slate-200" rowSpan={CATEGORIES.length}>
                         {row.businessUnitName}
                       </td>
                     )}
@@ -63,18 +63,18 @@ export default function TargetMatrix({ rows, category }: Props) {
                       </td>
                     )}
                     {row.quarterTargets.map((q) => (
-                      <td key={q.quarter} className="py-2 pr-3 text-right text-slate-600">
+                      <td key={q.quarter} className="py-2 pr-3 text-right text-slate-600 dark:text-slate-300">
                         {formatCurrency(q[cat.key])}
                       </td>
                     ))}
-                    <td className="py-2 text-right font-medium text-slate-700">{formatCurrency(row.annualTarget[cat.key])}</td>
+                    <td className="py-2 text-right font-medium text-slate-700 dark:text-slate-200">{formatCurrency(row.annualTarget[cat.key])}</td>
                   </tr>
                 ))}
               </Fragment>
             ))}
             {rows.length === 0 && (
               <tr>
-                <td colSpan={showCategoryColumn ? 7 : 6} className="py-6 text-center text-slate-500">
+                <td colSpan={showCategoryColumn ? 7 : 6} className="py-6 text-center text-slate-500 dark:text-slate-400">
                   No target data for this scope yet.
                 </td>
               </tr>

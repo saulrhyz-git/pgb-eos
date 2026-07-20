@@ -164,10 +164,10 @@ export default function Compare() {
 
   if (forbidden) {
     return (
-      <div className="flex flex-col items-center gap-3 rounded-lg border border-slate-200 bg-white p-12 text-center shadow-sm">
-        <ShieldAlert className="h-10 w-10 text-slate-300" />
-        <h2 className="text-lg font-semibold text-slate-700">Comparison access required</h2>
-        <p className="max-w-md text-sm text-slate-500">
+      <div className="flex flex-col items-center gap-3 rounded-lg border border-slate-200 dark:border-slate-700 bg-white dark:bg-slate-900 p-12 text-center shadow-sm">
+        <ShieldAlert className="h-10 w-10 text-slate-300 dark:text-slate-600" />
+        <h2 className="text-lg font-semibold text-slate-700 dark:text-slate-200">Comparison access required</h2>
+        <p className="max-w-md text-sm text-slate-500 dark:text-slate-400">
           You don't currently have access to this page. Ask a Superadmin to grant your account (or a Custom Role assigned to
           you) view access to Comparison.
         </p>
@@ -178,8 +178,8 @@ export default function Compare() {
   return (
     <div className="flex flex-col gap-6">
       <div>
-        <h2 className="mb-1 text-xl font-bold text-slate-800">Side-by-Side Comparison</h2>
-        <p className="text-sm text-slate-500">
+        <h2 className="mb-1 text-xl font-bold text-slate-800 dark:text-slate-100">Side-by-Side Comparison</h2>
+        <p className="text-sm text-slate-500 dark:text-slate-400">
           Pick a Year/Quarter/Business Unit/Company for each period independently — Revenue, Collections, Expenses, Rocks,
           and Disbursements are compared below.
         </p>
@@ -187,23 +187,23 @@ export default function Compare() {
 
       <div className="grid grid-cols-1 gap-4 lg:grid-cols-2">
         <div className="flex flex-col gap-2">
-          <h3 className="text-sm font-semibold text-slate-700">Period A</h3>
+          <h3 className="text-sm font-semibold text-slate-700 dark:text-slate-200">Period A</h3>
           <FilterBar filters={leftFilters} onChange={setLeftFilters} />
         </div>
         <div className="flex flex-col gap-2">
-          <h3 className="text-sm font-semibold text-slate-700">Period B</h3>
+          <h3 className="text-sm font-semibold text-slate-700 dark:text-slate-200">Period B</h3>
           <FilterBar filters={rightFilters} onChange={setRightFilters} />
         </div>
       </div>
 
-      {leftError && <div className="rounded-md bg-red-50 px-4 py-3 text-sm text-red-600">{leftError}</div>}
-      {rightError && <div className="rounded-md bg-red-50 px-4 py-3 text-sm text-red-600">{rightError}</div>}
+      {leftError && <div className="rounded-md bg-red-50 dark:bg-red-950/40 px-4 py-3 text-sm text-red-600 dark:text-red-400">{leftError}</div>}
+      {rightError && <div className="rounded-md bg-red-50 dark:bg-red-950/40 px-4 py-3 text-sm text-red-600 dark:text-red-400">{rightError}</div>}
 
       {leftData && rightData && (
-        <div className="overflow-hidden rounded-lg border border-slate-200 bg-white shadow-sm">
+        <div className="overflow-hidden rounded-lg border border-slate-200 dark:border-slate-700 bg-white dark:bg-slate-900 shadow-sm">
           <div className="overflow-x-auto">
             <table className="w-full min-w-[720px] text-sm">
-              <thead className="bg-slate-50 text-left text-xs font-semibold uppercase text-slate-500">
+              <thead className="bg-slate-50 dark:bg-slate-950 text-left text-xs font-semibold uppercase text-slate-500 dark:text-slate-400">
                 <tr>
                   <th className="px-4 py-3">Metric</th>
                   <th className="px-4 py-3">{scopeLabel(leftData.scope)}</th>
@@ -211,11 +211,11 @@ export default function Compare() {
                   <th className="px-4 py-3">{scopeLabel(rightData.scope)}</th>
                 </tr>
               </thead>
-              <tbody className="divide-y divide-slate-100">
+              <tbody className="divide-y divide-slate-100 dark:divide-slate-800">
                 {SECTIONS.map((section) => (
                   <Fragment key={section.title}>
-                    <tr className="bg-slate-50/60">
-                      <td colSpan={4} className="px-4 py-1.5 text-xs font-semibold uppercase tracking-wide text-slate-400">
+                    <tr className="bg-slate-50/60 dark:bg-slate-950/60">
+                      <td colSpan={4} className="px-4 py-1.5 text-xs font-semibold uppercase tracking-wide text-slate-400 dark:text-slate-500">
                         {section.title}
                       </td>
                     </tr>
@@ -227,11 +227,11 @@ export default function Compare() {
                       const delta = computeDelta(m.type, a, b);
                       const DeltaIcon = delta.direction === "up" ? ArrowUp : delta.direction === "down" ? ArrowDown : Minus;
                       const deltaColor =
-                        delta.direction === "up" ? "text-emerald-600" : delta.direction === "down" ? "text-rose-600" : "text-slate-400";
+                        delta.direction === "up" ? "text-emerald-600 dark:text-emerald-400" : delta.direction === "down" ? "text-rose-600 dark:text-rose-400" : "text-slate-400 dark:text-slate-500";
                       return (
                         <tr key={m.key}>
-                          <td className="px-4 py-3 text-slate-600">{m.label}</td>
-                          <td className="px-4 py-3 font-medium text-slate-800" title={av.title}>
+                          <td className="px-4 py-3 text-slate-600 dark:text-slate-300">{m.label}</td>
+                          <td className="px-4 py-3 font-medium text-slate-800 dark:text-slate-100" title={av.title}>
                             {av.text}
                           </td>
                           <td className="px-4 py-3 text-center">
@@ -240,10 +240,10 @@ export default function Compare() {
                                 <DeltaIcon className="h-3 w-3" />
                                 {delta.primary}
                               </span>
-                              {delta.secondary && <span className="text-[10px] text-slate-400">{delta.secondary}</span>}
+                              {delta.secondary && <span className="text-[10px] text-slate-400 dark:text-slate-500">{delta.secondary}</span>}
                             </div>
                           </td>
-                          <td className="px-4 py-3 font-medium text-slate-800" title={bv.title}>
+                          <td className="px-4 py-3 font-medium text-slate-800 dark:text-slate-100" title={bv.title}>
                             {bv.text}
                           </td>
                         </tr>
@@ -254,14 +254,14 @@ export default function Compare() {
               </tbody>
             </table>
           </div>
-          <div className="border-t border-slate-100 px-4 py-2 text-xs text-slate-400">
+          <div className="border-t border-slate-100 dark:border-slate-800 px-4 py-2 text-xs text-slate-400 dark:text-slate-500">
             Change shows Period B minus Period A. Arrows/color indicate direction only — an increase isn't necessarily
             favorable for every metric (e.g. Expenses).
           </div>
         </div>
       )}
 
-      {loading && !leftData && !rightData && <div className="py-12 text-center text-slate-500">Loading comparison...</div>}
+      {loading && !leftData && !rightData && <div className="py-12 text-center text-slate-500 dark:text-slate-400">Loading comparison...</div>}
     </div>
   );
 }

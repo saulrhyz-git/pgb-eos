@@ -12,6 +12,7 @@ import {
 } from "recharts";
 import type { ChartPoint } from "../api/types";
 import { formatCurrency } from "../utils/format";
+import { useTheme } from "../contexts/ThemeContext";
 
 type Breakdown = "combined" | "internal-external";
 
@@ -21,6 +22,15 @@ interface Props {
 
 export default function ProgressChart({ chart }: Props) {
   const [breakdown, setBreakdown] = useState<Breakdown>("combined");
+  // Recharts renders its grid/axis text as raw SVG attributes, not Tailwind
+  // classes, so dark: variants can't reach them — they need an explicit
+  // color picked in JS based on the active theme instead. The light-mode
+  // colors (#e2e8f0 grid, #64748b tick text) are Tailwind slate-200/slate-500;
+  // the dark-mode ones are slate-700/slate-400, so the grid/labels stay at
+  // the same relative contrast against the card background in both themes.
+  const { theme } = useTheme();
+  const gridColor = theme === "dark" ? "#334155" : "#e2e8f0";
+  const tickColor = theme === "dark" ? "#94a3b8" : "#64748b";
 
   const data = useMemo(
     () =>
@@ -37,19 +47,19 @@ export default function ProgressChart({ chart }: Props) {
   );
 
   return (
-    <div className="rounded-lg border border-slate-200 bg-white p-3 shadow-sm sm:p-4">
+    <div className="rounded-lg border border-slate-200 dark:border-slate-700 bg-white dark:bg-slate-900 p-3 shadow-sm sm:p-4">
       <div className="mb-4 flex flex-col gap-2 sm:flex-row sm:items-center sm:justify-between">
-        <h3 className="text-sm font-semibold text-slate-700">Quarterly Revenue vs Target</h3>
-        <div className="flex rounded-md border border-slate-200 p-0.5 text-xs">
+        <h3 className="text-sm font-semibold text-slate-700 dark:text-slate-200">Quarterly Revenue vs Target</h3>
+        <div className="flex rounded-md border border-slate-200 dark:border-slate-700 p-0.5 text-xs">
           <button
             onClick={() => setBreakdown("combined")}
-            className={`flex-1 rounded px-2 py-1 ${breakdown === "combined" ? "bg-brand-500 text-white" : "text-slate-500"}`}
+            className={`flex-1 rounded px-2 py-1 ${breakdown === "combined" ? "bg-brand-500 text-white" : "text-slate-500 dark:text-slate-400"}`}
           >
             Combined
           </button>
           <button
             onClick={() => setBreakdown("internal-external")}
-            className={`flex-1 rounded px-2 py-1 ${breakdown === "internal-external" ? "bg-brand-500 text-white" : "text-slate-500"}`}
+            className={`flex-1 rounded px-2 py-1 ${breakdown === "internal-external" ? "bg-brand-500 text-white" : "text-slate-500 dark:text-slate-400"}`}
           >
             Internal vs External
           </button>
@@ -57,9 +67,9 @@ export default function ProgressChart({ chart }: Props) {
       </div>
       <ResponsiveContainer width="100%" height={280} minWidth={0}>
         <ComposedChart data={data} margin={{ top: 8, right: 8, left: 0, bottom: 8 }}>
-          <CartesianGrid strokeDasharray="3 3" stroke="#e2e8f0" />
-          <XAxis dataKey="label" tick={{ fontSize: 11 }} />
-          <YAxis tickFormatter={(v) => formatCurrency(v)} tick={{ fontSize: 10 }} width={64} />
+          <CartesianGrid strokeDasharray="3 3" stroke={gridColor} />
+          <XAxis dataKey="label" tick={{ fontSize: 11, fill: tickColor }} />
+          <YAxis tickFormatter={(v) => formatCurrency(v)} tick={{ fontSize: 10, fill: tickColor }} width={64} />
           <Tooltip formatter={(v: number) => formatCurrency(v)} />
           <Legend />
           {breakdown === "combined" ? (

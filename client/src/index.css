@@ -5,3 +5,12 @@
 body {
   font-family: -apple-system, BlinkMacSystemFont, "Segoe UI", Roboto, Helvetica, Arial, sans-serif;
 }
+
+/* Tells the browser to render its own native chrome — scrollbars, date/time
+   pickers, the default checkbox/radio look, autofill highlighting — using
+   its dark UI variant whenever the "dark" class (toggled by ThemeContext) is
+   on <html>, so those un-stylable-by-Tailwind bits of the UI don't stay
+   stuck looking like light mode. */
+.dark {
+  color-scheme: dark;
+}

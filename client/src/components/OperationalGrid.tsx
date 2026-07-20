@@ -89,10 +89,10 @@ export default function OperationalGrid({ rows, yearId, quarter, onRemarksSaved,
     const draft = drafts[key] ?? row[field];
     return (
       <div className="flex flex-col gap-1">
-        {label && <label className="text-xs font-medium text-slate-500">{label}</label>}
+        {label && <label className="text-xs font-medium text-slate-500 dark:text-slate-400">{label}</label>}
         <div className="flex items-center gap-2">
           <input
-            className="w-full min-w-[140px] rounded-md border border-slate-200 px-2 py-1 text-xs"
+            className="w-full min-w-[140px] rounded-md border border-slate-200 dark:border-slate-700 px-2 py-1 text-xs"
             value={draft}
             placeholder="Add remarks..."
             onChange={(e) => setDrafts((d) => ({ ...d, [key]: e.target.value }))}
@@ -100,7 +100,7 @@ export default function OperationalGrid({ rows, yearId, quarter, onRemarksSaved,
               if (e.target.value !== row[field]) saveRemarks(row.companyId, field, e.target.value);
             }}
           />
-          {saving[key] && <Loader2 className="h-3 w-3 animate-spin shrink-0 text-slate-500" />}
+          {saving[key] && <Loader2 className="h-3 w-3 animate-spin shrink-0 text-slate-500 dark:text-slate-400" />}
         </div>
       </div>
     );
@@ -125,9 +125,9 @@ export default function OperationalGrid({ rows, yearId, quarter, onRemarksSaved,
     category === "REVENUE" ? "Business Unit Operational Grid" : category === "COLLECTIONS" ? "Collections Operational Grid" : "Expenses Operational Grid";
 
   return (
-    <div className="rounded-lg border border-slate-200 bg-white p-3 shadow-sm sm:p-4">
-      <h3 className="mb-4 text-sm font-semibold text-slate-700">{title}</h3>
-      <p className="mb-4 text-xs text-slate-500">
+    <div className="rounded-lg border border-slate-200 dark:border-slate-700 bg-white dark:bg-slate-900 p-3 shadow-sm sm:p-4">
+      <h3 className="mb-4 text-sm font-semibold text-slate-700 dark:text-slate-200">{title}</h3>
+      <p className="mb-4 text-xs text-slate-500 dark:text-slate-400">
         {category === "REVENUE"
           ? "Annual/Quarter targets are set per Company and roll up into their Business Unit's total. Expand a Business Unit to see each Company's own recognized actuals and remarks, which roll up into the totals below."
           : `Quarter targets are set per Company and roll up into their Business Unit's total. Expand a Business Unit to see each Company's own ${category === "COLLECTIONS" ? "Collections" : "Expenses"} breakdown and remarks.`}
@@ -135,7 +135,7 @@ export default function OperationalGrid({ rows, yearId, quarter, onRemarksSaved,
       <div className="overflow-x-auto">
         <table className="w-full min-w-[880px] text-sm">
           <thead>
-            <tr className="border-b border-slate-200 text-left text-xs font-medium uppercase text-slate-500">
+            <tr className="border-b border-slate-200 dark:border-slate-700 text-left text-xs font-medium uppercase text-slate-500 dark:text-slate-400">
               <th className="py-2 pr-3 w-6"></th>
               <th className="py-2 pr-3">Business Unit</th>
               {category === "REVENUE" && <th className="py-2 pr-3 text-right">Annual Target</th>}
@@ -159,18 +159,18 @@ export default function OperationalGrid({ rows, yearId, quarter, onRemarksSaved,
               const attainmentPct = category === "REVENUE" ? row.quarterAttainmentPct : category === "COLLECTIONS" ? row.collectionsAttainmentPct : row.expensesAttainmentPct;
               return (
                 <Fragment key={row.businessUnitId}>
-                  <tr className="border-b border-slate-100">
+                  <tr className="border-b border-slate-100 dark:border-slate-800">
                     <td className="py-2 pr-3">
                       <button
                         onClick={() => toggle(row.businessUnitId)}
-                        className="flex items-center gap-1 text-slate-500 hover:text-slate-700"
+                        className="flex items-center gap-1 text-slate-500 dark:text-slate-400 hover:text-slate-700 dark:hover:text-slate-200"
                         title={hasRemarks ? "Has remarks" : "Expand for per-company detail & remarks"}
                       >
                         {isOpen ? <ChevronDown className="h-4 w-4" /> : <ChevronRight className="h-4 w-4" />}
-                        {hasRemarks && !isOpen && <MessageSquare className="h-3 w-3 text-brand-500" />}
+                        {hasRemarks && !isOpen && <MessageSquare className="h-3 w-3 text-brand-500 dark:text-brand-400" />}
                       </button>
                     </td>
-                    <td className="py-2 pr-3 font-medium text-slate-700">{row.businessUnitName}</td>
+                    <td className="py-2 pr-3 font-medium text-slate-700 dark:text-slate-200">{row.businessUnitName}</td>
                     {category === "REVENUE" && <td className="py-2 pr-3 text-right">{formatCurrency(row.annualTarget)}</td>}
                     <td className="py-2 pr-3 text-right">{formatCurrency(quarterTarget)}</td>
                     <td className="py-2 pr-3 text-right">{formatCurrency(quarterActual)}</td>
@@ -185,35 +185,35 @@ export default function OperationalGrid({ rows, yearId, quarter, onRemarksSaved,
                     )}
                   </tr>
                   {isOpen && (
-                    <tr className="border-b border-slate-100 bg-slate-50/60">
+                    <tr className="border-b border-slate-100 dark:border-slate-800 bg-slate-50/60 dark:bg-slate-950/60">
                       <td></td>
                       <td colSpan={columnCount - 1} className="py-3 pr-3">
                         {row.companies.length === 0 && (
-                          <div className="text-xs text-slate-500">No companies in this Business Unit yet.</div>
+                          <div className="text-xs text-slate-500 dark:text-slate-400">No companies in this Business Unit yet.</div>
                         )}
                         <div className="flex flex-col gap-4">
                           {row.companies.map((c) => (
-                            <div key={c.companyId} className="rounded-md border border-slate-200 bg-white p-3">
-                              <div className="mb-2 text-xs font-semibold text-slate-600">{c.companyName}</div>
+                            <div key={c.companyId} className="rounded-md border border-slate-200 dark:border-slate-700 bg-white dark:bg-slate-900 p-3">
+                              <div className="mb-2 text-xs font-semibold text-slate-600 dark:text-slate-300">{c.companyName}</div>
 
                               {category === "REVENUE" && (
                                 <>
-                                  <div className="mb-3 grid grid-cols-2 gap-x-8 gap-y-1 text-xs text-slate-600 sm:grid-cols-3">
+                                  <div className="mb-3 grid grid-cols-2 gap-x-8 gap-y-1 text-xs text-slate-600 dark:text-slate-300 sm:grid-cols-3">
                                     <div>
-                                      <span className="font-medium text-slate-500">Revenue Internal:</span>{" "}
+                                      <span className="font-medium text-slate-500 dark:text-slate-400">Revenue Internal:</span>{" "}
                                       {formatCurrency(c.quarterActual.internal)}
                                     </div>
                                     <div>
-                                      <span className="font-medium text-slate-500">Revenue External:</span>{" "}
+                                      <span className="font-medium text-slate-500 dark:text-slate-400">Revenue External:</span>{" "}
                                       {formatCurrency(c.quarterActual.external)}
                                     </div>
                                     <div>
-                                      <span className="font-medium text-slate-500">YTD Actual:</span>{" "}
+                                      <span className="font-medium text-slate-500 dark:text-slate-400">YTD Actual:</span>{" "}
                                       {formatCurrency(c.ytdActual)}
                                     </div>
                                   </div>
                                   {isAllQuarters ? (
-                                    <p className="text-xs italic text-slate-500">
+                                    <p className="text-xs italic text-slate-500 dark:text-slate-400">
                                       Remarks are logged per quarter — select a specific quarter to view or edit them.
                                     </p>
                                   ) : (
@@ -232,21 +232,21 @@ export default function OperationalGrid({ rows, yearId, quarter, onRemarksSaved,
                               {category === "COLLECTIONS" && (
                                 <div className="grid grid-cols-1 gap-3 sm:grid-cols-2">
                                   {(["Internal", "External"] as const).map((side) => (
-                                    <div key={side} className="rounded-md border border-emerald-100 bg-emerald-50/40 p-3">
-                                      <div className="mb-2 text-xs font-semibold uppercase tracking-wide text-emerald-700">
+                                    <div key={side} className="rounded-md border border-emerald-100 dark:border-emerald-800 bg-emerald-50/40 dark:bg-emerald-950/30 p-3">
+                                      <div className="mb-2 text-xs font-semibold uppercase tracking-wide text-emerald-700 dark:text-emerald-300">
                                         Collections — {side}
                                       </div>
-                                      <div className="flex flex-col divide-y divide-emerald-100">
+                                      <div className="flex flex-col divide-y divide-emerald-100 dark:divide-emerald-800">
                                         {COLLECTIONS_BREAKDOWN.filter((b) => b.title === side).map((b) => (
                                           <div key={b.value} className="flex flex-col gap-1.5 py-2 first:pt-0 last:pb-0">
                                             <div className="flex items-baseline justify-between gap-2">
-                                              <span className="text-xs text-slate-600">{b.label}</span>
-                                              <span className="whitespace-nowrap text-sm font-semibold text-slate-800">
+                                              <span className="text-xs text-slate-600 dark:text-slate-300">{b.label}</span>
+                                              <span className="whitespace-nowrap text-sm font-semibold text-slate-800 dark:text-slate-100">
                                                 {formatCurrency(c.quarterActual[b.value] as number)}
                                               </span>
                                             </div>
                                             {isAllQuarters ? (
-                                              <p className="text-[11px] italic text-slate-400">Select a quarter to view/edit Remarks.</p>
+                                              <p className="text-[11px] italic text-slate-400 dark:text-slate-500">Select a quarter to view/edit Remarks.</p>
                                             ) : (
                                               <RemarksInput row={c} field={b.remarksField} />
                                             )}
@@ -259,19 +259,19 @@ export default function OperationalGrid({ rows, yearId, quarter, onRemarksSaved,
                               )}
 
                               {category === "EXPENSES" && (
-                                <div className="rounded-md border border-amber-100 bg-amber-50/40 p-3">
-                                  <div className="mb-2 text-xs font-semibold uppercase tracking-wide text-amber-700">Expenses</div>
-                                  <div className="grid grid-cols-1 gap-x-6 divide-y divide-amber-100 sm:grid-cols-3 sm:divide-y-0">
+                                <div className="rounded-md border border-amber-100 dark:border-amber-800 bg-amber-50/40 dark:bg-amber-950/30 p-3">
+                                  <div className="mb-2 text-xs font-semibold uppercase tracking-wide text-amber-700 dark:text-amber-300">Expenses</div>
+                                  <div className="grid grid-cols-1 gap-x-6 divide-y divide-amber-100 dark:divide-amber-800 sm:grid-cols-3 sm:divide-y-0">
                                     {EXPENSES_BREAKDOWN.map((b) => (
                                       <div key={b.value} className="flex flex-col gap-1.5 py-2 first:pt-0 last:pb-0 sm:py-0">
                                         <div className="flex items-baseline justify-between gap-2 sm:flex-col sm:items-start sm:gap-1">
-                                          <span className="text-xs text-slate-600">{b.label}</span>
-                                          <span className="whitespace-nowrap text-sm font-semibold text-slate-800">
+                                          <span className="text-xs text-slate-600 dark:text-slate-300">{b.label}</span>
+                                          <span className="whitespace-nowrap text-sm font-semibold text-slate-800 dark:text-slate-100">
                                             {formatCurrency(c.quarterActual[b.value] as number)}
                                           </span>
                                         </div>
                                         {isAllQuarters ? (
-                                          <p className="text-[11px] italic text-slate-400">Select a quarter to view/edit Remarks.</p>
+                                          <p className="text-[11px] italic text-slate-400 dark:text-slate-500">Select a quarter to view/edit Remarks.</p>
                                         ) : (
                                           <RemarksInput row={c} field={b.remarksField} />
                                         )}
@@ -291,7 +291,7 @@ export default function OperationalGrid({ rows, yearId, quarter, onRemarksSaved,
             })}
             {rows.length === 0 && (
               <tr>
-                <td colSpan={columnCount} className="py-6 text-center text-slate-500">
+                <td colSpan={columnCount} className="py-6 text-center text-slate-500 dark:text-slate-400">
                   No Business Unit data for this scope yet.
                 </td>
               </tr>

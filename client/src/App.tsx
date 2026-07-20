@@ -25,7 +25,7 @@ import AdminLayout from "./pages/admin/AdminLayout";
 
 function RequireAuth({ children }: { children: JSX.Element }) {
   const { user, loading } = useAuth();
-  if (loading) return <div className="flex min-h-screen items-center justify-center text-slate-500">Loading...</div>;
+  if (loading) return <div className="flex min-h-screen items-center justify-center text-slate-500 dark:text-slate-400">Loading...</div>;
   if (!user) return <Navigate to="/login" replace />;
   if (user.mustChangePassword) return <Navigate to="/change-password" replace />;
   return children;
@@ -33,7 +33,7 @@ function RequireAuth({ children }: { children: JSX.Element }) {
 
 function RequireChangePassword({ children }: { children: JSX.Element }) {
   const { user, loading } = useAuth();
-  if (loading) return <div className="flex min-h-screen items-center justify-center text-slate-500">Loading...</div>;
+  if (loading) return <div className="flex min-h-screen items-center justify-center text-slate-500 dark:text-slate-400">Loading...</div>;
   if (!user) return <Navigate to="/login" replace />;
   return children;
 }

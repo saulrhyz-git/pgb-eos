@@ -10,14 +10,17 @@ import {
   LayoutDashboard,
   LogOut,
   Menu,
+  Moon,
   Mountain,
   ScrollText,
   Settings,
   ShieldCheck,
+  Sun,
   UserCircle,
   X,
 } from "lucide-react";
 import { useAuth } from "../contexts/AuthContext";
+import { useTheme } from "../contexts/ThemeContext";
 
 // Persists whether the desktop sidebar is collapsed to icon-only across
 // reloads — purely a display preference, not app data, so plain
@@ -26,6 +29,7 @@ const SIDEBAR_COLLAPSED_KEY = "eos_sidebar_collapsed";
 
 export default function Layout() {
   const { user, logout } = useAuth();
+  const { theme, toggleTheme } = useTheme();
 
   const [mobileOpen, setMobileOpen] = useState(false);
   const [collapsed, setCollapsed] = useState(() => localStorage.getItem(SIDEBAR_COLLAPSED_KEY) === "1");
@@ -40,7 +44,7 @@ export default function Layout() {
 
   const linkClass = ({ isActive }: { isActive: boolean }) =>
     `flex items-center gap-3 rounded-md px-3 py-2 text-sm font-medium transition-colors ${
-      isActive ? "bg-brand-500 text-white" : "text-slate-600 hover:bg-slate-100"
+      isActive ? "bg-brand-500 text-white" : "text-slate-600 dark:text-slate-300 hover:bg-slate-100 dark:hover:bg-slate-700"
     }`;
 
   // Rendered twice (desktop sidebar + mobile drawer) so both stay in sync
@@ -106,14 +110,14 @@ export default function Layout() {
   }
 
   return (
-    <div className="flex min-h-screen bg-slate-50">
+    <div className="flex min-h-screen bg-slate-50 dark:bg-slate-950">
       {/* ---------- Desktop sidebar (collapsible icon-only / icon+label) ---------- */}
       <aside
-        className={`sticky top-0 hidden h-screen shrink-0 flex-col border-r border-slate-200 bg-white transition-[width] duration-200 md:flex ${
+        className={`sticky top-0 hidden h-screen shrink-0 flex-col border-r border-slate-200 dark:border-slate-700 bg-white dark:bg-slate-900 transition-[width] duration-200 md:flex ${
           collapsed ? "w-16" : "w-60"
         }`}
       >
-        <div className={`flex items-center gap-2 border-b border-slate-200 px-3 py-3 ${collapsed ? "justify-center" : "justify-between"}`}>
+        <div className={`flex items-center gap-2 border-b border-slate-200 dark:border-slate-700 px-3 py-3 ${collapsed ? "justify-center" : "justify-between"}`}>
           {/* The logo itself doubles as a collapse/expand toggle — clicking
               it anywhere (collapsed or expanded) flips `collapsed`, same
               action as the dedicated chevron buttons below, just faster to
@@ -126,7 +130,7 @@ export default function Layout() {
             aria-label={collapsed ? "Expand sidebar" : "Collapse sidebar"}
           >
             <img src="/EOS-logo.png" alt="EOS" className="h-7 w-auto shrink-0" />
-            {!collapsed && <span className="truncate text-sm font-semibold text-slate-800">Executive Dashboard</span>}
+            {!collapsed && <span className="truncate text-sm font-semibold text-slate-800 dark:text-slate-100">Executive Dashboard</span>}
           </button>
           {/* Always visible when expanded — a second, explicit way to
               collapse the sidebar for anyone who doesn't notice the logo
@@ -135,7 +139,7 @@ export default function Layout() {
           {!collapsed && (
             <button
               onClick={() => setCollapsed(true)}
-              className="shrink-0 rounded-md p-1.5 text-slate-400 hover:bg-slate-100 hover:text-slate-700"
+              className="shrink-0 rounded-md p-1.5 text-slate-400 dark:text-slate-500 hover:bg-slate-100 dark:hover:bg-slate-700 hover:text-slate-700 dark:hover:text-slate-200"
               title="Collapse sidebar"
               aria-label="Collapse sidebar"
             >
@@ -151,7 +155,7 @@ export default function Layout() {
             this is the way to expand back out. */}
         <button
           onClick={() => setCollapsed((v) => !v)}
-          className="flex items-center justify-center gap-2 border-t border-slate-200 p-3 text-xs font-medium text-slate-500 hover:bg-slate-100"
+          className="flex items-center justify-center gap-2 border-t border-slate-200 dark:border-slate-700 p-3 text-xs font-medium text-slate-500 dark:text-slate-400 hover:bg-slate-100 dark:hover:bg-slate-700"
           title={collapsed ? "Expand sidebar" : "Collapse sidebar"}
           aria-label={collapsed ? "Expand sidebar" : "Collapse sidebar"}
         >
@@ -169,13 +173,13 @@ export default function Layout() {
       {mobileOpen && (
         <div className="fixed inset-0 z-50 md:hidden" onClick={closeMobile}>
           <div className="absolute inset-0 bg-slate-900/50" />
-          <div onClick={(e) => e.stopPropagation()} className="relative flex h-full w-64 flex-col bg-white shadow-xl">
-            <div className="flex items-center justify-between gap-2 border-b border-slate-200 px-3 py-3">
+          <div onClick={(e) => e.stopPropagation()} className="relative flex h-full w-64 flex-col bg-white dark:bg-slate-900 shadow-xl">
+            <div className="flex items-center justify-between gap-2 border-b border-slate-200 dark:border-slate-700 px-3 py-3">
               <div className="flex items-center gap-2">
                 <img src="/EOS-logo.png" alt="EOS" className="h-7 w-auto shrink-0" />
-                <span className="truncate text-sm font-semibold text-slate-800">Executive Dashboard</span>
+                <span className="truncate text-sm font-semibold text-slate-800 dark:text-slate-100">Executive Dashboard</span>
               </div>
-              <button onClick={closeMobile} className="rounded-md p-1.5 text-slate-500 hover:bg-slate-100" aria-label="Close navigation menu">
+              <button onClick={closeMobile} className="rounded-md p-1.5 text-slate-500 dark:text-slate-400 hover:bg-slate-100 dark:hover:bg-slate-700" aria-label="Close navigation menu">
                 <X className="h-4 w-4" />
               </button>
             </div>
@@ -188,12 +192,12 @@ export default function Layout() {
 
       {/* ---------- Main column ---------- */}
       <div className="flex min-h-screen flex-1 flex-col">
-        <header className="border-b border-slate-200 bg-white">
+        <header className="border-b border-slate-200 dark:border-slate-700 bg-white dark:bg-slate-900">
           <div className="flex items-center justify-between gap-2 px-4 py-3 sm:px-6">
             <div className="flex items-center gap-2">
               <button
                 onClick={() => setMobileOpen(true)}
-                className="rounded-md p-2 text-slate-500 hover:bg-slate-100 hover:text-slate-800 md:hidden"
+                className="rounded-md p-2 text-slate-500 dark:text-slate-400 hover:bg-slate-100 dark:hover:bg-slate-700 hover:text-slate-800 dark:hover:text-slate-100 md:hidden"
                 title="Menu"
                 aria-label="Open navigation menu"
               >
@@ -204,14 +208,22 @@ export default function Layout() {
               <img src="/EOS-logo.png" alt="EOS" className="h-7 w-auto shrink-0 md:hidden" />
             </div>
             <div className="flex items-center gap-1 sm:gap-3">
+              <button
+                onClick={toggleTheme}
+                className="rounded-md p-2 text-slate-500 dark:text-slate-400 hover:bg-slate-100 dark:hover:bg-slate-700 hover:text-slate-800 dark:hover:text-slate-100 dark:text-slate-400 dark:hover:bg-slate-700 dark:hover:text-slate-100"
+                title={theme === "dark" ? "Switch to light theme" : "Switch to dark theme"}
+                aria-label={theme === "dark" ? "Switch to light theme" : "Switch to dark theme"}
+              >
+                {theme === "dark" ? <Sun className="h-4 w-4" /> : <Moon className="h-4 w-4" />}
+              </button>
               <Link to="/profile" className="hidden text-right hover:opacity-80 sm:block" title="My Profile">
-                <div className="text-sm font-medium text-slate-800">{user?.name}</div>
-                {user?.description && <div className="text-xs text-slate-500">{user.description}</div>}
+                <div className="text-sm font-medium text-slate-800 dark:text-slate-100">{user?.name}</div>
+                {user?.description && <div className="text-xs text-slate-500 dark:text-slate-400">{user.description}</div>}
               </Link>
-              <Link to="/profile" className="rounded-md p-2 text-slate-500 hover:bg-slate-100 hover:text-slate-800" title="My Profile">
+              <Link to="/profile" className="rounded-md p-2 text-slate-500 dark:text-slate-400 hover:bg-slate-100 dark:hover:bg-slate-700 hover:text-slate-800 dark:hover:text-slate-100" title="My Profile">
                 <UserCircle className="h-4 w-4" />
               </Link>
-              <button onClick={logout} className="rounded-md p-2 text-slate-500 hover:bg-slate-100 hover:text-slate-800" title="Log out">
+              <button onClick={logout} className="rounded-md p-2 text-slate-500 dark:text-slate-400 hover:bg-slate-100 dark:hover:bg-slate-700 hover:text-slate-800 dark:hover:text-slate-100" title="Log out">
                 <LogOut className="h-4 w-4" />
               </button>
             </div>

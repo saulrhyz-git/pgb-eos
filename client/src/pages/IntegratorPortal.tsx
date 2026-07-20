@@ -138,18 +138,18 @@ function BreakdownField({
   return (
     <div className="flex flex-col gap-2">
       <div className="flex flex-col gap-1">
-        <label className="text-xs font-medium text-slate-500">{label}</label>
+        <label className="text-xs font-medium text-slate-500 dark:text-slate-400">{label}</label>
         <input
           type="number"
           min={0}
           step="0.01"
-          className="rounded-md border border-slate-300 px-3 py-2 text-sm"
+          className="rounded-md border border-slate-300 dark:border-slate-600 dark:bg-slate-800 dark:text-slate-100 px-3 py-2 text-sm"
           value={value}
           onChange={(e) => onValueChange(e.target.value)}
         />
       </div>
       <input
-        className="rounded-md border border-slate-200 px-2 py-1 text-xs"
+        className="rounded-md border border-slate-200 dark:border-slate-700 px-2 py-1 text-xs"
         placeholder="Remarks..."
         value={remarks}
         onChange={(e) => onRemarksChange(e.target.value)}
@@ -333,18 +333,18 @@ export default function IntegratorPortal() {
 
   return (
     <div className="mx-auto max-w-3xl">
-      <h2 className="mb-1 text-lg font-semibold text-slate-800">Quarterly Data Entry</h2>
-      <p className="mb-6 text-sm text-slate-500">
+      <h2 className="mb-1 text-lg font-semibold text-slate-800 dark:text-slate-100">Quarterly Data Entry</h2>
+      <p className="mb-6 text-sm text-slate-500 dark:text-slate-400">
         {user?.role === "BU_INTEGRATOR"
           ? "Submit Revenue, Collections, Expenses, and Disbursements for the companies in your assigned Business Unit(s)."
           : "You can enter or override Revenue, Collections, Expenses, and Disbursements figures for any company."}
       </p>
 
-      <form onSubmit={handleSubmit} className="flex flex-col gap-6 rounded-lg border border-slate-200 bg-white p-4 shadow-sm sm:p-6">
+      <form onSubmit={handleSubmit} className="flex flex-col gap-6 rounded-lg border border-slate-200 dark:border-slate-700 bg-white dark:bg-slate-900 p-4 shadow-sm sm:p-6">
         <div className="grid grid-cols-1 gap-4 xs:grid-cols-2 sm:grid-cols-4">
           <div className="flex flex-col gap-1">
-            <label className="text-xs font-medium text-slate-500">Year</label>
-            <select className="rounded-md border border-slate-300 px-3 py-2 text-sm" value={yearId} onChange={(e) => setYearId(e.target.value)}>
+            <label className="text-xs font-medium text-slate-500 dark:text-slate-400">Year</label>
+            <select className="rounded-md border border-slate-300 dark:border-slate-600 dark:bg-slate-800 dark:text-slate-100 px-3 py-2 text-sm" value={yearId} onChange={(e) => setYearId(e.target.value)}>
               {years.map((y) => (
                 <option key={y.id} value={y.id}>
                   {y.year}
@@ -353,8 +353,8 @@ export default function IntegratorPortal() {
             </select>
           </div>
           <div className="flex flex-col gap-1">
-            <label className="text-xs font-medium text-slate-500">Quarter</label>
-            <select className="rounded-md border border-slate-300 px-3 py-2 text-sm" value={quarter} onChange={(e) => setQuarter(Number(e.target.value))}>
+            <label className="text-xs font-medium text-slate-500 dark:text-slate-400">Quarter</label>
+            <select className="rounded-md border border-slate-300 dark:border-slate-600 dark:bg-slate-800 dark:text-slate-100 px-3 py-2 text-sm" value={quarter} onChange={(e) => setQuarter(Number(e.target.value))}>
               {[1, 2, 3, 4].map((q) => (
                 <option key={q} value={q}>
                   Q{q}
@@ -363,9 +363,9 @@ export default function IntegratorPortal() {
             </select>
           </div>
           <div className="flex flex-col gap-1">
-            <label className="text-xs font-medium text-slate-500">Business Unit</label>
+            <label className="text-xs font-medium text-slate-500 dark:text-slate-400">Business Unit</label>
             <select
-              className="rounded-md border border-slate-300 px-3 py-2 text-sm"
+              className="rounded-md border border-slate-300 dark:border-slate-600 dark:bg-slate-800 dark:text-slate-100 px-3 py-2 text-sm"
               value={businessUnitId}
               onChange={(e) => setBusinessUnitId(e.target.value)}
             >
@@ -377,8 +377,8 @@ export default function IntegratorPortal() {
             </select>
           </div>
           <div className="flex flex-col gap-1">
-            <label className="text-xs font-medium text-slate-500">Company</label>
-            <select className="rounded-md border border-slate-300 px-3 py-2 text-sm" value={companyId} onChange={(e) => setCompanyId(e.target.value)}>
+            <label className="text-xs font-medium text-slate-500 dark:text-slate-400">Company</label>
+            <select className="rounded-md border border-slate-300 dark:border-slate-600 dark:bg-slate-800 dark:text-slate-100 px-3 py-2 text-sm" value={companyId} onChange={(e) => setCompanyId(e.target.value)}>
               {companies.map((c) => (
                 <option key={c.id} value={c.id}>
                   {c.name}
@@ -390,37 +390,37 @@ export default function IntegratorPortal() {
 
         {/* ---------- Revenue ---------- */}
         <div className="grid grid-cols-1 gap-4">
-          <h3 className="-mb-2 text-xs font-semibold uppercase tracking-wide text-slate-400">Revenue</h3>
-          <div className="rounded-md border border-slate-100 bg-slate-50/60 p-3 sm:p-4">
-            <div className="mb-2 text-sm font-semibold text-slate-700">{REVENUE_GROUP.title}</div>
+          <h3 className="-mb-2 text-xs font-semibold uppercase tracking-wide text-slate-400 dark:text-slate-500">Revenue</h3>
+          <div className="rounded-md border border-slate-100 dark:border-slate-800 bg-slate-50/60 dark:bg-slate-950/60 p-3 sm:p-4">
+            <div className="mb-2 text-sm font-semibold text-slate-700 dark:text-slate-200">{REVENUE_GROUP.title}</div>
             <div className="grid grid-cols-1 gap-4 xs:grid-cols-2">
               <div className="flex flex-col gap-1">
-                <label className="text-xs font-medium text-slate-500">Internal</label>
+                <label className="text-xs font-medium text-slate-500 dark:text-slate-400">Internal</label>
                 <input
                   type="number"
                   min={0}
                   step="0.01"
-                  className="rounded-md border border-slate-300 px-3 py-2 text-sm"
+                  className="rounded-md border border-slate-300 dark:border-slate-600 dark:bg-slate-800 dark:text-slate-100 px-3 py-2 text-sm"
                   value={form[REVENUE_GROUP.internal]}
                   onChange={(e) => setForm((f) => ({ ...f, [REVENUE_GROUP.internal]: e.target.value }))}
                 />
               </div>
               <div className="flex flex-col gap-1">
-                <label className="text-xs font-medium text-slate-500">External</label>
+                <label className="text-xs font-medium text-slate-500 dark:text-slate-400">External</label>
                 <input
                   type="number"
                   min={0}
                   step="0.01"
-                  className="rounded-md border border-slate-300 px-3 py-2 text-sm"
+                  className="rounded-md border border-slate-300 dark:border-slate-600 dark:bg-slate-800 dark:text-slate-100 px-3 py-2 text-sm"
                   value={form[REVENUE_GROUP.external]}
                   onChange={(e) => setForm((f) => ({ ...f, [REVENUE_GROUP.external]: e.target.value }))}
                 />
               </div>
             </div>
             <div className="mt-3 flex flex-col gap-1">
-              <label className="text-xs font-medium text-slate-500">Revenue Remarks</label>
+              <label className="text-xs font-medium text-slate-500 dark:text-slate-400">Revenue Remarks</label>
               <textarea
-                className="min-h-[60px] rounded-md border border-slate-300 px-3 py-2 text-sm"
+                className="min-h-[60px] rounded-md border border-slate-300 dark:border-slate-600 dark:bg-slate-800 dark:text-slate-100 px-3 py-2 text-sm"
                 value={remarks[REVENUE_GROUP.remarks]}
                 onChange={(e) => setRemarks((r) => ({ ...r, [REVENUE_GROUP.remarks]: e.target.value }))}
                 placeholder="Notes on this quarter's revenue..."
@@ -431,10 +431,10 @@ export default function IntegratorPortal() {
 
         {/* ---------- Collections ---------- */}
         <div className="grid grid-cols-1 gap-4">
-          <h3 className="-mb-2 text-xs font-semibold uppercase tracking-wide text-slate-400">Collections</h3>
+          <h3 className="-mb-2 text-xs font-semibold uppercase tracking-wide text-slate-400 dark:text-slate-500">Collections</h3>
           {COLLECTIONS_GROUPS.map((group) => (
-            <div key={group.title} className="rounded-md border border-slate-100 bg-slate-50/60 p-3 sm:p-4">
-              <div className="mb-2 text-sm font-semibold text-slate-700">Collections — {group.title}</div>
+            <div key={group.title} className="rounded-md border border-slate-100 dark:border-slate-800 bg-slate-50/60 dark:bg-slate-950/60 p-3 sm:p-4">
+              <div className="mb-2 text-sm font-semibold text-slate-700 dark:text-slate-200">Collections — {group.title}</div>
               <div className="grid grid-cols-1 gap-4 sm:grid-cols-3">
                 {group.fields.map((f) => (
                   <BreakdownField
@@ -453,8 +453,8 @@ export default function IntegratorPortal() {
 
         {/* ---------- Expenses ---------- */}
         <div className="grid grid-cols-1 gap-4">
-          <h3 className="-mb-2 text-xs font-semibold uppercase tracking-wide text-slate-400">Expenses</h3>
-          <div className="rounded-md border border-slate-100 bg-slate-50/60 p-3 sm:p-4">
+          <h3 className="-mb-2 text-xs font-semibold uppercase tracking-wide text-slate-400 dark:text-slate-500">Expenses</h3>
+          <div className="rounded-md border border-slate-100 dark:border-slate-800 bg-slate-50/60 dark:bg-slate-950/60 p-3 sm:p-4">
             <div className="grid grid-cols-1 gap-4 sm:grid-cols-3">
               {EXPENSES_FIELDS.map((f) => (
                 <BreakdownField
@@ -472,18 +472,18 @@ export default function IntegratorPortal() {
 
         {/* ---------- Disbursements ---------- */}
         <div className="grid grid-cols-1 gap-4">
-          <h3 className="-mb-2 text-xs font-semibold uppercase tracking-wide text-slate-400">Disbursements</h3>
+          <h3 className="-mb-2 text-xs font-semibold uppercase tracking-wide text-slate-400 dark:text-slate-500">Disbursements</h3>
           {DISBURSEMENT_GROUPS.map((group) => (
-            <div key={group.title} className="rounded-md border border-slate-100 bg-slate-50/60 p-3 sm:p-4">
-              <div className="mb-2 text-sm font-semibold text-slate-700">{group.title}</div>
+            <div key={group.title} className="rounded-md border border-slate-100 dark:border-slate-800 bg-slate-50/60 dark:bg-slate-950/60 p-3 sm:p-4">
+              <div className="mb-2 text-sm font-semibold text-slate-700 dark:text-slate-200">{group.title}</div>
               <div className="grid grid-cols-1 gap-4 xs:grid-cols-2">
                 <div className="flex flex-col gap-1">
-                  <label className="text-xs font-medium text-slate-500">Internal</label>
+                  <label className="text-xs font-medium text-slate-500 dark:text-slate-400">Internal</label>
                   <input
                     type="number"
                     min={0}
                     step="0.01"
-                    className="rounded-md border border-slate-300 px-3 py-2 text-sm"
+                    className="rounded-md border border-slate-300 dark:border-slate-600 dark:bg-slate-800 dark:text-slate-100 px-3 py-2 text-sm"
                     value={disbForm[group.category].internal}
                     onChange={(e) =>
                       setDisbForm((f) => ({ ...f, [group.category]: { ...f[group.category], internal: e.target.value } }))
@@ -491,12 +491,12 @@ export default function IntegratorPortal() {
                   />
                 </div>
                 <div className="flex flex-col gap-1">
-                  <label className="text-xs font-medium text-slate-500">External</label>
+                  <label className="text-xs font-medium text-slate-500 dark:text-slate-400">External</label>
                   <input
                     type="number"
                     min={0}
                     step="0.01"
-                    className="rounded-md border border-slate-300 px-3 py-2 text-sm"
+                    className="rounded-md border border-slate-300 dark:border-slate-600 dark:bg-slate-800 dark:text-slate-100 px-3 py-2 text-sm"
                     value={disbForm[group.category].external}
                     onChange={(e) =>
                       setDisbForm((f) => ({ ...f, [group.category]: { ...f[group.category], external: e.target.value } }))
@@ -505,9 +505,9 @@ export default function IntegratorPortal() {
                 </div>
               </div>
               <div className="mt-3 flex flex-col gap-1">
-                <label className="text-xs font-medium text-slate-500">{group.title} Remarks</label>
+                <label className="text-xs font-medium text-slate-500 dark:text-slate-400">{group.title} Remarks</label>
                 <textarea
-                  className="min-h-[60px] rounded-md border border-slate-300 px-3 py-2 text-sm"
+                  className="min-h-[60px] rounded-md border border-slate-300 dark:border-slate-600 dark:bg-slate-800 dark:text-slate-100 px-3 py-2 text-sm"
                   value={disbForm[group.category].remarks}
                   onChange={(e) =>
                     setDisbForm((f) => ({ ...f, [group.category]: { ...f[group.category], remarks: e.target.value } }))
@@ -519,7 +519,7 @@ export default function IntegratorPortal() {
           ))}
         </div>
 
-        {error && <div className="rounded-md bg-red-50 px-3 py-2 text-sm text-red-600">{error}</div>}
+        {error && <div className="rounded-md bg-red-50 dark:bg-red-950/40 px-3 py-2 text-sm text-red-600 dark:text-red-400">{error}</div>}
 
         <button
           type="submit"
