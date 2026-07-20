@@ -1651,3 +1651,39 @@ Password — reads clearly in dark mode, including status badges, table
 headers/hover rows, and form inputs; the Revenue Trend chart's grid lines
 and axis labels are still visible (not just the bars/lines) after switching
 to dark; and the choice survives a full page reload.
+
+**Target Setup: Collections/Expenses can be entered as one total, split
+evenly across their 3 breakdowns.** Collections Internal, Collections
+External, and Expenses each gained their own independent "One Total" vs
+"Split" toggle in `client/src/pages/TargetConfig.tsx` — the same idea as
+Revenue's existing Combined/Split toggle, but with a different mechanic:
+Revenue's "Combined" just dumps the whole figure into Internal and zeroes
+External, whereas here entering One Total for, say, Collections Internal
+splits that amount evenly across its 3 breakdowns (Revenue - Earned /
+Advance Payments - Unearned / Others) so all 3 contribute an equal share of
+the target — same for Collections External (its own 3 breakdowns) and for
+Expenses (Interest / Depreciation / Other Non-Cash Expenses). A new shared
+`ThreeWayFieldGroup` component (replacing the previous always-split-only
+rendering) handles this for both `CollectionsFieldsEditor` and
+`ExpensesFieldsEditor`, reused by both the per-Quarter form and the Annual
+Target form. The split uses a `splitEvenlyThree()` helper that always sums
+back to exactly the entered total (the third share absorbs whatever
+rounding the first two picked up, so ₱100 splits to 33.33/33.33/33.34
+rather than losing or gaining a cent). Switching from Split to One Total
+re-normalizes whatever the 3 fields currently hold into equal thirds of
+their sum; switching back to Split just makes them individually editable
+again without changing their values. Which mode a group opens in is
+inferred from its saved data — if the 3 values are exactly equal (which is
+what One Total always produces, including all-zero/blank) it opens as One
+Total, otherwise as Split, so previously-entered uneven breakdowns aren't
+silently flattened. This only affects Target Setup — Data Entry
+(`IntegratorPortal.tsx`) is unchanged, since actual recognized Collections/
+Expenses figures are real, independent amounts that shouldn't be assumed
+equal. Worth checking by hand: entering a Collections Internal Total of
+900 and saving shows 300/300/300 across the 3 breakdowns in Split view
+afterward; toggling Split→One Total on a group with uneven values (e.g.
+500/200/100) collapses it to a One Total input showing 800, and toggling
+back to Split shows the normalized 266.67/266.67/266.66 rather than the
+original 500/200/100; the same behavior works independently for Collections
+External and for Expenses; and it works the same way in both the "Set by
+Quarter" and "Set Annual Target" forms.

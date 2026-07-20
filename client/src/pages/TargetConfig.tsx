@@ -38,21 +38,56 @@ const FIELD_GROUPS: { title: string; internal: FigureKey; external: FigureKey }[
 ];
 
 // Collections is Internal/External, each broken into three recognition
-// types — no single Internal/External *number* to toggle Combined-vs-Split
-// on anymore, so it gets its own straightforward (always-split) editor below
-// instead of reusing FigureFieldsEditor.
+// types (Earned/Unearned/Others). There's no single Internal/External
+// *number* to toggle Combined-vs-Split on the way Revenue does — instead
+// each side gets its own Combined-vs-Split toggle: "Combined" here means
+// entering ONE total for that side, which is then split evenly across its
+// 3 breakdowns (so Earned/Unearned/Others each contribute an equal share of
+// the side's target) rather than Revenue's "dump it all into Internal"
+// convenience. See CollectionsFieldsEditor below.
 const COLLECTIONS_GROUPS: { title: string; earned: FigureKey; unearned: FigureKey; others: FigureKey }[] = [
   { title: "Internal", earned: "collectionsInternalEarned", unearned: "collectionsInternalUnearned", others: "collectionsInternalOthers" },
   { title: "External", earned: "collectionsExternalEarned", unearned: "collectionsExternalUnearned", others: "collectionsExternalOthers" },
 ];
 
 // Expenses has no Internal/External split at all — three single-value
-// breakdowns instead.
+// breakdowns instead, each treated as one group for the same
+// Combined-vs-Split even-split behavior as Collections above.
 const EXPENSES_FIELDS: { key: FigureKey; label: string }[] = [
   { key: "expensesInterest", label: "Interest" },
   { key: "expensesDepreciation", label: "Depreciation" },
   { key: "expensesOtherNonCash", label: "Other Non-Cash Expenses" },
 ];
+const EXPENSES_GROUP = { title: "Expenses", a: "expensesInterest" as FigureKey, b: "expensesDepreciation" as FigureKey, c: "expensesOtherNonCash" as FigureKey };
+
+// Splits a total evenly across 3 fields so they sum back to exactly the
+// original total (unlike a plain total/3, which can lose or gain a cent to
+// rounding) — the third share absorbs whatever the first two's rounding
+// left over.
+function splitEvenlyThree(total: number): [number, number, number] {
+  const share = Math.round((total / 3) * 100) / 100;
+  const remainder = Math.round((total - share * 2) * 100) / 100;
+  return [share, share, remainder];
+}
+
+// Combined-vs-Split defaults/inference for Collections' two sides and
+// Expenses' one group — "Combined" is inferred whenever the 3 underlying
+// values are exactly equal (which is what entering a Combined total always
+// produces, including the all-zero/blank starting state).
+const emptyThreeWayFieldModes: Record<string, FieldMode> = { Internal: "combined", External: "combined", Expenses: "combined" };
+
+function threeWayFieldModesFrom(existing: Record<string, any>, groups: { title: string; a: FigureKey; b: FigureKey; c: FigureKey }[]): Record<string, FieldMode> {
+  const modes: Record<string, FieldMode> = {};
+  for (const group of groups) {
+    const a = Number(existing[group.a] ?? 0);
+    const b = Number(existing[group.b] ?? 0);
+    const c = Number(existing[group.c] ?? 0);
+    modes[group.title] = a === b && b === c ? "combined" : "split";
+  }
+  return modes;
+}
+
+const COLLECTIONS_THREEWAY_GROUPS = COLLECTIONS_GROUPS.map((g) => ({ title: g.title, a: g.earned, b: g.unearned, c: g.others }));
 
 // A target's total is always Internal + External under the hood — "Combined"
 // is purely a data-entry convenience that writes the whole figure into the
@@ -69,46 +104,150 @@ function fieldModesFrom(existing: Record<string, any>): Record<string, FieldMode
   return modes;
 }
 
-// Collections/Expenses entry grids — always-split (no Combined/Split toggle,
-// since there's no single Internal/External number to collapse into one
-// anymore), reused by both the per-Quarter form and the Annual Target form.
+// One group's worth of UI: a "One Total" / "Split" toggle, then either a
+// single Total input (whose value is split evenly across the 3 underlying
+// fields on every keystroke) or the 3 individual breakdown inputs. Shared by
+// both CollectionsFieldsEditor (called once per side) and
+// ExpensesFieldsEditor (called once, since Expenses has only one group).
+function ThreeWayFieldGroup({
+  title,
+  modeKey,
+  fields,
+  form,
+  setForm,
+  fieldModes,
+  setFieldModes,
+  disabled,
+}: {
+  title: string;
+  // Key used to look up/store this group's Combined-vs-Split mode — separate
+  // from `title` (which is just the display heading) because Collections'
+  // two groups are displayed as "Collections — Internal"/"Collections —
+  // External" but share mode-tracking with COLLECTIONS_GROUPS' plain
+  // "Internal"/"External" titles (used elsewhere for inference).
+  modeKey: string;
+  fields: { key: FigureKey; label: string }[];
+  form: Record<FigureKey, string>;
+  setForm: Dispatch<SetStateAction<Record<FigureKey, string>>>;
+  fieldModes: Record<string, FieldMode>;
+  setFieldModes: Dispatch<SetStateAction<Record<string, FieldMode>>>;
+  disabled?: boolean;
+}) {
+  const [a, b, c] = fields;
+  const isCombined = fieldModes[modeKey] !== "split";
+  const total = (Number(form[a.key]) || 0) + (Number(form[b.key]) || 0) + (Number(form[c.key]) || 0);
+
+  function applyTotal(rawValue: string) {
+    const total = Number(rawValue) || 0;
+    const [sa, sb, sc] = splitEvenlyThree(total);
+    setForm((prev) => ({
+      ...prev,
+      [a.key]: rawValue === "" ? "" : String(sa),
+      [b.key]: rawValue === "" ? "" : String(sb),
+      [c.key]: rawValue === "" ? "" : String(sc),
+    }));
+  }
+
+  return (
+    <div className="rounded-md border border-slate-100 dark:border-slate-800 bg-slate-50/60 dark:bg-slate-950/60 p-3 sm:p-4">
+      <div className="mb-2 flex flex-wrap items-center justify-between gap-2">
+        <div className="text-sm font-semibold text-slate-700 dark:text-slate-200">{title}</div>
+        <div className="flex rounded-md border border-slate-200 dark:border-slate-700 p-0.5 text-[11px]">
+          <button
+            type="button"
+            disabled={disabled}
+            onClick={() => {
+              setFieldModes((m) => ({ ...m, [modeKey]: "combined" }));
+              applyTotal(total ? String(total) : "");
+            }}
+            className={`rounded px-2 py-1 font-medium disabled:opacity-50 ${isCombined ? "bg-brand-500 text-white" : "text-slate-500 dark:text-slate-400"}`}
+          >
+            One Total
+          </button>
+          <button
+            type="button"
+            disabled={disabled}
+            onClick={() => setFieldModes((m) => ({ ...m, [modeKey]: "split" }))}
+            className={`rounded px-2 py-1 font-medium disabled:opacity-50 ${!isCombined ? "bg-brand-500 text-white" : "text-slate-500 dark:text-slate-400"}`}
+            title={fields.map((f) => f.label).join(" / ")}
+          >
+            Split
+          </button>
+        </div>
+      </div>
+      {isCombined ? (
+        <div className="flex flex-col gap-1">
+          <label className="text-xs font-medium text-slate-500 dark:text-slate-400">Total</label>
+          <input
+            type="number"
+            min={0}
+            step="0.01"
+            disabled={disabled}
+            className="rounded-md border border-slate-300 dark:border-slate-600 dark:bg-slate-800 dark:text-slate-100 px-3 py-2 text-sm disabled:bg-slate-100 disabled:text-slate-400"
+            value={total ? String(total) : ""}
+            onChange={(e) => applyTotal(e.target.value)}
+          />
+          <p className="text-[11px] text-slate-400 dark:text-slate-500">
+            Split evenly across {fields.map((f) => f.label).join(", ")}.
+          </p>
+        </div>
+      ) : (
+        <div className="grid grid-cols-1 gap-4 sm:grid-cols-3">
+          {fields.map((f) => (
+            <div key={f.key} className="flex flex-col gap-1">
+              <label className="text-xs font-medium text-slate-500 dark:text-slate-400">{f.label}</label>
+              <input
+                type="number"
+                min={0}
+                step="0.01"
+                disabled={disabled}
+                className="rounded-md border border-slate-300 dark:border-slate-600 dark:bg-slate-800 dark:text-slate-100 px-3 py-2 text-sm disabled:bg-slate-100 disabled:text-slate-400"
+                value={form[f.key]}
+                onChange={(e) => setForm((prev) => ({ ...prev, [f.key]: e.target.value }))}
+              />
+            </div>
+          ))}
+        </div>
+      )}
+    </div>
+  );
+}
+
+// Collections/Expenses entry grids, reused by both the per-Quarter form and
+// the Annual Target form. Each group (Collections' Internal, Collections'
+// External, and Expenses) has its own independent Combined-vs-Split toggle —
+// see ThreeWayFieldGroup above.
 function CollectionsFieldsEditor({
   form,
   setForm,
+  fieldModes,
+  setFieldModes,
   disabled,
 }: {
   form: Record<FigureKey, string>;
   setForm: Dispatch<SetStateAction<Record<FigureKey, string>>>;
+  fieldModes: Record<string, FieldMode>;
+  setFieldModes: Dispatch<SetStateAction<Record<string, FieldMode>>>;
   disabled?: boolean;
 }) {
   return (
     <div className="grid grid-cols-1 gap-4">
       {COLLECTIONS_GROUPS.map((group) => (
-        <div key={group.title} className="rounded-md border border-slate-100 dark:border-slate-800 bg-slate-50/60 dark:bg-slate-950/60 p-3 sm:p-4">
-          <div className="mb-2 text-sm font-semibold text-slate-700 dark:text-slate-200">Collections — {group.title}</div>
-          <div className="grid grid-cols-1 gap-4 sm:grid-cols-3">
-            {(
-              [
-                { key: group.earned, label: "Revenue - Earned" },
-                { key: group.unearned, label: "Advance Payments - Unearned" },
-                { key: group.others, label: "Others" },
-              ] as const
-            ).map((f) => (
-              <div key={f.key} className="flex flex-col gap-1">
-                <label className="text-xs font-medium text-slate-500 dark:text-slate-400">{f.label}</label>
-                <input
-                  type="number"
-                  min={0}
-                  step="0.01"
-                  disabled={disabled}
-                  className="rounded-md border border-slate-300 dark:border-slate-600 dark:bg-slate-800 dark:text-slate-100 px-3 py-2 text-sm disabled:bg-slate-100 disabled:text-slate-400"
-                  value={form[f.key]}
-                  onChange={(e) => setForm((prev) => ({ ...prev, [f.key]: e.target.value }))}
-                />
-              </div>
-            ))}
-          </div>
-        </div>
+        <ThreeWayFieldGroup
+          key={group.title}
+          title={`Collections — ${group.title}`}
+          modeKey={group.title}
+          fields={[
+            { key: group.earned, label: "Revenue - Earned" },
+            { key: group.unearned, label: "Advance Payments - Unearned" },
+            { key: group.others, label: "Others" },
+          ]}
+          form={form}
+          setForm={setForm}
+          fieldModes={fieldModes}
+          setFieldModes={setFieldModes}
+          disabled={disabled}
+        />
       ))}
     </div>
   );
@@ -117,32 +256,27 @@ function CollectionsFieldsEditor({
 function ExpensesFieldsEditor({
   form,
   setForm,
+  fieldModes,
+  setFieldModes,
   disabled,
 }: {
   form: Record<FigureKey, string>;
   setForm: Dispatch<SetStateAction<Record<FigureKey, string>>>;
+  fieldModes: Record<string, FieldMode>;
+  setFieldModes: Dispatch<SetStateAction<Record<string, FieldMode>>>;
   disabled?: boolean;
 }) {
   return (
-    <div className="rounded-md border border-slate-100 dark:border-slate-800 bg-slate-50/60 dark:bg-slate-950/60 p-3 sm:p-4">
-      <div className="mb-2 text-sm font-semibold text-slate-700 dark:text-slate-200">Expenses</div>
-      <div className="grid grid-cols-1 gap-4 sm:grid-cols-3">
-        {EXPENSES_FIELDS.map((f) => (
-          <div key={f.key} className="flex flex-col gap-1">
-            <label className="text-xs font-medium text-slate-500 dark:text-slate-400">{f.label}</label>
-            <input
-              type="number"
-              min={0}
-              step="0.01"
-              disabled={disabled}
-              className="rounded-md border border-slate-300 dark:border-slate-600 dark:bg-slate-800 dark:text-slate-100 px-3 py-2 text-sm disabled:bg-slate-100 disabled:text-slate-400"
-              value={form[f.key]}
-              onChange={(e) => setForm((prev) => ({ ...prev, [f.key]: e.target.value }))}
-            />
-          </div>
-        ))}
-      </div>
-    </div>
+    <ThreeWayFieldGroup
+      title="Expenses"
+      modeKey="Expenses"
+      fields={EXPENSES_FIELDS}
+      form={form}
+      setForm={setForm}
+      fieldModes={fieldModes}
+      setFieldModes={setFieldModes}
+      disabled={disabled}
+    />
   );
 }
 
@@ -277,9 +411,16 @@ export default function TargetConfig() {
   const [companyId, setCompanyId] = useState("");
   const [form, setForm] = useState(emptyForm);
   const [fieldModes, setFieldModes] = useState<Record<string, FieldMode>>(emptyFieldModes);
+  // Collections' two sides (Internal/External) and Expenses' one group each
+  // get their own independent Combined-vs-Split mode — "Internal"/"External"/
+  // "Expenses" keys, shared by CollectionsFieldsEditor/ExpensesFieldsEditor.
+  const [collectionsFieldModes, setCollectionsFieldModes] = useState<Record<string, FieldMode>>(emptyThreeWayFieldModes);
+  const [expensesFieldModes, setExpensesFieldModes] = useState<Record<string, FieldMode>>(emptyThreeWayFieldModes);
 
   const [annualForm, setAnnualForm] = useState(emptyForm);
   const [annualFieldModes, setAnnualFieldModes] = useState<Record<string, FieldMode>>(emptyFieldModes);
+  const [annualCollectionsFieldModes, setAnnualCollectionsFieldModes] = useState<Record<string, FieldMode>>(emptyThreeWayFieldModes);
+  const [annualExpensesFieldModes, setAnnualExpensesFieldModes] = useState<Record<string, FieldMode>>(emptyThreeWayFieldModes);
 
   // The real calendar quarter "right now" (server clock) — used only to
   // default the initial Year/Quarter selection to the current one. It has
@@ -444,9 +585,13 @@ export default function TargetConfig() {
         // was (or should be treated as) split; otherwise default to the
         // simpler single-total view.
         setFieldModes(fieldModesFrom(existing));
+        setCollectionsFieldModes(threeWayFieldModesFrom(existing, COLLECTIONS_THREEWAY_GROUPS));
+        setExpensesFieldModes(threeWayFieldModesFrom(existing, [EXPENSES_GROUP]));
       } else {
         setForm(emptyForm);
         setFieldModes(emptyFieldModes);
+        setCollectionsFieldModes(emptyThreeWayFieldModes);
+        setExpensesFieldModes(emptyThreeWayFieldModes);
       }
     });
   }
@@ -489,6 +634,8 @@ export default function TargetConfig() {
       ) as Record<FigureKey, string>;
       setAnnualForm(asStrings);
       setAnnualFieldModes(fieldModesFrom(totals));
+      setAnnualCollectionsFieldModes(threeWayFieldModesFrom(totals, COLLECTIONS_THREEWAY_GROUPS));
+      setAnnualExpensesFieldModes(threeWayFieldModesFrom(totals, [EXPENSES_GROUP]));
     });
   }
 
@@ -792,8 +939,20 @@ export default function TargetConfig() {
               setFieldModes={setFieldModes}
               disabled={quarterLocked}
             />
-            <CollectionsFieldsEditor form={form} setForm={setForm} disabled={quarterLocked} />
-            <ExpensesFieldsEditor form={form} setForm={setForm} disabled={quarterLocked} />
+            <CollectionsFieldsEditor
+              form={form}
+              setForm={setForm}
+              fieldModes={collectionsFieldModes}
+              setFieldModes={setCollectionsFieldModes}
+              disabled={quarterLocked}
+            />
+            <ExpensesFieldsEditor
+              form={form}
+              setForm={setForm}
+              fieldModes={expensesFieldModes}
+              setFieldModes={setExpensesFieldModes}
+              disabled={quarterLocked}
+            />
 
             {error && <div className="rounded-md bg-red-50 dark:bg-red-950/40 px-3 py-2 text-sm text-red-600 dark:text-red-400">{error}</div>}
 
@@ -837,8 +996,20 @@ export default function TargetConfig() {
               setFieldModes={setAnnualFieldModes}
               disabled={allQuartersLocked}
             />
-            <CollectionsFieldsEditor form={annualForm} setForm={setAnnualForm} disabled={allQuartersLocked} />
-            <ExpensesFieldsEditor form={annualForm} setForm={setAnnualForm} disabled={allQuartersLocked} />
+            <CollectionsFieldsEditor
+              form={annualForm}
+              setForm={setAnnualForm}
+              fieldModes={annualCollectionsFieldModes}
+              setFieldModes={setAnnualCollectionsFieldModes}
+              disabled={allQuartersLocked}
+            />
+            <ExpensesFieldsEditor
+              form={annualForm}
+              setForm={setAnnualForm}
+              fieldModes={annualExpensesFieldModes}
+              setFieldModes={setAnnualExpensesFieldModes}
+              disabled={allQuartersLocked}
+            />
 
             {annualError && <div className="rounded-md bg-red-50 dark:bg-red-950/40 px-3 py-2 text-sm text-red-600 dark:text-red-400">{annualError}</div>}
             {annualSaved && (
