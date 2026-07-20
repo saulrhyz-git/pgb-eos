@@ -1398,3 +1398,18 @@ six categories' existing figures correctly; "Save All Figures" saves
 everything in one click; the sidebar no longer has a separate Disbursements
 entry; and visiting the old `/disbursements/advances` (etc.) URL directly no
 longer resolves (falls through to the catch-all redirect to `/`).
+
+**Sidebar: logo click toggles collapse/expand.** In `client/src/components/
+Layout.tsx`, the EOS logo (and, when expanded, the "Executive Dashboard"
+title next to it) in the desktop sidebar's header row is now itself a button
+that flips `collapsed`, the same action as the dedicated chevron toggle
+buttons — it's just the fastest thing to click since it's always the first
+element in the sidebar, in both the collapsed (icon-only) and expanded
+states. The existing explicit toggle buttons (the chevron next to the logo
+when expanded, and the full-width button at the bottom of the sidebar) are
+unchanged and still work exactly as before — this is an additional way to
+collapse/expand, not a replacement. The mobile drawer's logo (a separate,
+non-collapsible header) is untouched. Worth checking by hand: clicking the
+logo in the desktop sidebar (both collapsed and expanded) toggles its width;
+the existing chevron buttons still work too; the mobile drawer's logo is
+still non-interactive (mobile has no collapse concept).

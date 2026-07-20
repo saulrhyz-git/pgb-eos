@@ -111,13 +111,24 @@ export default function Layout() {
         }`}
       >
         <div className={`flex items-center gap-2 border-b border-slate-200 px-3 py-3 ${collapsed ? "justify-center" : "justify-between"}`}>
-          <div className="flex min-w-0 items-center gap-2">
+          {/* The logo itself doubles as a collapse/expand toggle — clicking
+              it anywhere (collapsed or expanded) flips `collapsed`, same
+              action as the dedicated chevron buttons below, just faster to
+              reach since it's always the first thing in the sidebar. */}
+          <button
+            type="button"
+            onClick={() => setCollapsed((v) => !v)}
+            className="flex min-w-0 items-center gap-2 rounded-md hover:opacity-80"
+            title={collapsed ? "Expand sidebar" : "Collapse sidebar"}
+            aria-label={collapsed ? "Expand sidebar" : "Collapse sidebar"}
+          >
             <img src="/EOS-logo.png" alt="EOS" className="h-7 w-auto shrink-0" />
             {!collapsed && <span className="truncate text-sm font-semibold text-slate-800">Executive Dashboard</span>}
-          </div>
-          {/* Always visible, in both collapsed and expanded states — the
-              main (only) way to toggle the sidebar. Its icon direction
-              itself communicates what clicking it will do. */}
+          </button>
+          {/* Always visible when expanded — a second, explicit way to
+              collapse the sidebar for anyone who doesn't notice the logo
+              itself is clickable. Its icon direction communicates what
+              clicking it will do. */}
           {!collapsed && (
             <button
               onClick={() => setCollapsed(true)}
