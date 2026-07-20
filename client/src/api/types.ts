@@ -18,7 +18,8 @@ export type Resource =
   | "SCORECARD"
   | "AUDIT_LOG"
   | "REPORTS"
-  | "DISBURSEMENTS";
+  | "DISBURSEMENTS"
+  | "COMPARISON";
 
 export interface AuthUser {
   id: string;
@@ -380,6 +381,47 @@ export interface Rock {
   businessGoal: { id: string; name: string } | null;
   createdBy: { id: string; name: string } | null;
   updatedBy: { id: string; name: string } | null;
+}
+
+// ---------- Comparison ----------
+// Side-by-side scope comparison: each panel independently picks a Year,
+// Quarter, Business Unit, and Company, and fetches its own snapshot of
+// "everything" on the Executive Scorecard (Revenue/Collections/Expenses
+// Target+Actual+attainment, Rocks status counts, Disbursements actuals) —
+// see server/src/routes/comparison.ts. The frontend computes delta/%-change
+// between two snapshots itself; the backend just returns each side's raw
+// totals, already masked per the caller's Custom Role grants.
+export interface ComparisonScope {
+  yearId: string;
+  year: number;
+  quarter: number;
+  allQuarters: boolean;
+  businessUnitId: string | null;
+  businessUnitName: string | null;
+  companyId: string | null;
+  companyName: string | null;
+}
+
+export interface ComparisonSnapshot {
+  scope: ComparisonScope;
+  revenueTarget: number;
+  revenueActual: number;
+  revenueAttainmentPct: number;
+  collectionsTarget: number;
+  collectionsActual: number;
+  collectionsAttainmentPct: number;
+  expensesTarget: number;
+  expensesActual: number;
+  expensesAttainmentPct: number;
+  rocksTotal: number;
+  rocksTargetMet: number;
+  rocksOnTrack: number;
+  rocksAtRisk: number;
+  rocksPending: number;
+  rocksAvgProgressPct: number;
+  advancesActual: number;
+  loansActual: number;
+  interestsActual: number;
 }
 
 // ---------- Audit Log ----------

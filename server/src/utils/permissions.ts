@@ -12,19 +12,21 @@ export type Resource =
   | "SCORECARD"
   | "AUDIT_LOG"
   | "REPORTS"
-  | "DISBURSEMENTS";
+  | "DISBURSEMENTS"
+  | "COMPARISON";
 // Deliberately excludes AUDIT_LOG: ALL_RESOURCES feeds `canAny()`, which
 // meta.ts uses to decide whether a Business Unit/Company should show up in
 // dropdowns at all ("does this role have any view grant here"). Unlike the
-// other resources (including SCORECARD, REPORTS, and DISBURSEMENTS),
-// AUDIT_LOG isn't really about any one Business Unit/Company's data — it's a
-// global security log, with no BU/Company filter of its own — so a role that
-// only grants AUDIT_LOG view shouldn't cause an otherwise-invisible BU to
-// start appearing in unrelated dropdowns. REPORTS and DISBURSEMENTS, by
-// contrast, DO have their own Business Unit/Company filters (same as the
-// Scorecard and Rocks pages), so they're included here for the same reason
-// SCORECARD is: a Disbursements-only Custom Role still needs to see the
-// right BU/Company in its own filter dropdowns.
+// other resources (including SCORECARD, REPORTS, DISBURSEMENTS, and
+// COMPARISON), AUDIT_LOG isn't really about any one Business Unit/Company's
+// data — it's a global security log, with no BU/Company filter of its own —
+// so a role that only grants AUDIT_LOG view shouldn't cause an
+// otherwise-invisible BU to start appearing in unrelated dropdowns. REPORTS,
+// DISBURSEMENTS, and COMPARISON, by contrast, DO have their own Business
+// Unit/Company filters (same as the Scorecard and Rocks pages), so they're
+// included here for the same reason SCORECARD is: a role granting only one
+// of them still needs to see the right BU/Company in its own filter
+// dropdowns.
 export const ALL_RESOURCES: Resource[] = [
   "TARGETS",
   "REVENUE",
@@ -34,6 +36,7 @@ export const ALL_RESOURCES: Resource[] = [
   "SCORECARD",
   "REPORTS",
   "DISBURSEMENTS",
+  "COMPARISON",
 ];
 // The three financial categories a single QuarterActual record covers at
 // once. Its PUT endpoint submits all three together, so — since permissions

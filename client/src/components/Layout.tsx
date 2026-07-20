@@ -7,6 +7,7 @@ import {
   ClipboardEdit,
   FileSpreadsheet,
   Gauge,
+  GitCompare,
   Landmark,
   LayoutDashboard,
   LogOut,
@@ -79,6 +80,10 @@ export default function Layout() {
         <NavLink to="/rocks" className={linkClass} onClick={closeMobile} title="Rocks">
           <Mountain className="h-4 w-4 shrink-0" />
           {showLabels && "Rocks"}
+        </NavLink>
+        <NavLink to="/compare" className={linkClass} onClick={closeMobile} title="Compare">
+          <GitCompare className="h-4 w-4 shrink-0" />
+          {showLabels && "Compare"}
         </NavLink>
 
         <div>

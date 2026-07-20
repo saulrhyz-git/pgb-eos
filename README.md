@@ -1290,3 +1290,71 @@ the logo is visible without scrolling and collapses the sidebar in one
 click; every place that used to say "Loans" now says "Loan Repayments"
 (sidebar sub-link, page heading, Revenue dashboard card, Scorecard card and
 table column) while the URL and underlying data are unaffected.
+
+**Scorecard: Disbursements cards repositioned above Revenue Trend**
+(`client/src/pages/Scorecard.tsx`) moves the three Disbursements summary
+cards (Advances/Loan Repayments/Interests) from their own section further
+down the page to sit directly above the "Revenue Trend (Actual vs Target)"
+chart, inside the Revenue Performance Summary section. The per-Business-Unit
+Disbursements table that used to sit alongside those cards stays where it
+was, in its own section now titled "Disbursements by Business Unit" (cards
+removed from it, since they moved up). Worth checking by hand: the three
+Disbursement cards appear right before the Revenue Trend chart, and the
+"Disbursements by Business Unit" section further down still shows the
+sortable per-BU table with no duplicate cards above it.
+
+**New feature: side-by-side Comparison tab.** A new top-level nav item,
+"Compare" (`client/src/pages/Compare.tsx`, routed at `/compare`), lets two
+independent scopes be compared at once. Each side ("Period A"/"Period B")
+gets its own Year/Quarter/Business Unit/Company picker (reusing the existing
+`FilterBar` component — two separate instances, fully independent state) and
+fetches its own snapshot of "everything" tracked on the Executive Scorecard:
+Revenue/Collections/Expenses Target+Actual+attainment, Rocks status counts,
+and Disbursements actuals. Unlike the Executive Scorecard (BU-level-only by
+design), Comparison also supports drilling into one specific Company per
+side, since each panel's scope is meant to be fully independent. The results
+render as one table (Metric | Period A value | Change | Period B value),
+grouped into Revenue/Collections/Expenses/Rocks/Disbursements sections, with
+the middle "Change" column showing Period B minus Period A as a delta
+(currency short-form, percentage points for attainment/progress metrics, or
+plain count) plus a percent-change figure for currency/count metrics, each
+with an up/down/flat arrow. A footnote clarifies the arrows/color indicate
+direction only, not whether that direction is favorable (e.g. Expenses going
+up isn't "good").
+
+Backend: `server/src/routes/comparison.ts` (new) exposes a single endpoint,
+`GET /api/comparison/snapshot?yearId=&quarter=&businessUnitId=&companyId=`,
+returning one aggregated snapshot for that scope. It resolves the in-scope
+Company list either directly (companyId given — verified via
+`assertBusinessUnitAccess`) or via `scopedBusinessUnitFilter`, then applies
+the same masking conventions used elsewhere: per-category `isCatAllowed()`
+zeroing for Revenue/Collections/Expenses (each independently gate-able), and
+two independently-derived company lists (`rockCompanies`/`disbCompanies`,
+each filtered straight from the same raw, unfiltered company list — never
+from one another) for the single-combined-grant ROCKS and DISBURSEMENTS
+resources, mirroring `scorecard.ts`'s reference pattern rather than
+`dashboard.ts`'s original (buggy, since-fixed) one. Access to the page itself
+is gated the same way as the Executive Scorecard/Reports: Superadmin and
+Group Integrator always have it; anyone else needs a Custom Role granting
+`COMPARISON` view.
+
+Permissions plumbing: a new `COMPARISON` value was added to the
+`PermissionResource` enum (its own migration,
+`20260723010000_add_comparison_permission_resource`, since Postgres forbids
+using a new enum value in the same transaction that adds it), and wired
+through `permissions.ts` (`Resource` type + `ALL_RESOURCES`, since Comparison
+has its own Business Unit/Company filters like Scorecard/Reports/
+Disbursements), `customRoles.ts`'s `resourceEnum`, `client/src/api/types.ts`,
+and `AdminRoles.tsx`'s resource matrix (View-only — Comparison is read-only,
+so Edit/Delete are ignored for it, same as Scorecard/Audit Log/Reports).
+
+Worth checking by hand: opening `/compare` as Superadmin/Group Integrator
+shows two independent filter bars and a comparison table once both sides
+have a Year selected; changing Period A's Business Unit doesn't affect
+Period B's own selection or data; picking a specific Company on one side
+(not just a Business Unit) narrows that side's figures correctly; a
+Custom-Role user with only `DISBURSEMENTS` (or only `ROCKS`) granted, and no
+`COMPARISON` grant, gets a 403 "access required" card instead of the page;
+a Custom-Role user granted `COMPARISON` view plus, say, only `DISBURSEMENTS`
+(no Revenue/Collections/Expenses/Rocks) sees zeroed financial/Rocks rows but
+correct Disbursements figures — not everything zeroed out.

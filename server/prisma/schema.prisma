@@ -34,6 +34,11 @@ enum Role {
 // sub-categories (Advances/Loans/Interests) together — unlike REVENUE/
 // COLLECTIONS/EXPENSES, which are each independently gate-able, a single
 // DISBURSEMENTS grant covers all three at once (same granularity as ROCKS).
+// COMPARISON gates the side-by-side Comparison tab — another coarse
+// "can this user open the page at all" resource like SCORECARD/REPORTS
+// (only canView is meaningful; the page itself is read-only). It has its
+// own Business Unit/Company filters (one pair per panel), so — like
+// SCORECARD/REPORTS/DISBURSEMENTS — it's included in ALL_RESOURCES.
 enum PermissionResource {
   TARGETS
   REVENUE
@@ -44,6 +49,7 @@ enum PermissionResource {
   AUDIT_LOG
   REPORTS
   DISBURSEMENTS
+  COMPARISON
 }
 
 model User {

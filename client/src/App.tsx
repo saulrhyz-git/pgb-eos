@@ -6,6 +6,7 @@ import ChangePassword from "./pages/ChangePassword";
 import Dashboard from "./pages/Dashboard";
 import Profile from "./pages/Profile";
 import Scorecard from "./pages/Scorecard";
+import Compare from "./pages/Compare";
 import Rocks from "./pages/Rocks";
 import Reports from "./pages/Reports";
 import DisbursementEntry from "./pages/Disbursements";
@@ -64,6 +65,7 @@ export default function App() {
             navigate("/")) — Revenue moved to its own /revenue path below. */}
         <Route index element={<Scorecard />} />
         <Route path="profile" element={<Profile />} />
+        <Route path="compare" element={<Compare />} />
         <Route path="revenue" element={<Dashboard />} />
         <Route path="rocks" element={<Rocks />} />
         <Route path="reports" element={<Reports />} />

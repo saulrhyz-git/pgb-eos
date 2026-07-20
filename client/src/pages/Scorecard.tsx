@@ -415,6 +415,31 @@ export default function Scorecard() {
               />
             </div>
 
+            {/* Disbursements cards — recorded, not targeted, so no Target/
+                Attainment framing like the cards above, just this period's
+                running total per sub-category. Placed here (above Revenue
+                Trend) rather than in their own section further down. */}
+            <div className="grid grid-cols-1 gap-4 sm:grid-cols-3">
+              <SummaryStat
+                icon={<HandCoins className="h-4 w-4" />}
+                label={`${periodLabel} Advances`}
+                value={formatCurrencyShort(data.disbursements.summary.advancesActual)}
+                fullValue={formatCurrency(data.disbursements.summary.advancesActual)}
+              />
+              <SummaryStat
+                icon={<Landmark className="h-4 w-4" />}
+                label={`${periodLabel} Loan Repayments`}
+                value={formatCurrencyShort(data.disbursements.summary.loansActual)}
+                fullValue={formatCurrency(data.disbursements.summary.loansActual)}
+              />
+              <SummaryStat
+                icon={<Percent className="h-4 w-4" />}
+                label={`${periodLabel} Interests`}
+                value={formatCurrencyShort(data.disbursements.summary.interestsActual)}
+                fullValue={formatCurrency(data.disbursements.summary.interestsActual)}
+              />
+            </div>
+
             <div className="rounded-lg border border-slate-200 bg-white p-3 shadow-sm sm:p-4">
               <h4 className="mb-3 text-sm font-semibold text-slate-700">Revenue Trend (Actual vs Target)</h4>
               <ResponsiveContainer width="100%" height={240} minWidth={0}>
@@ -475,33 +500,12 @@ export default function Scorecard() {
             )}
           </section>
 
-          {/* ---------- Disbursements Summary ---------- */}
-          {/* Recorded, not targeted — same period scope as Revenue above, but
-              no Target/Attainment framing since there's nothing to compare
-              against. */}
+          {/* ---------- Disbursements by Business Unit ---------- */}
+          {/* The 3 summary cards for this section now live above, right
+              before the Revenue Trend chart — this keeps just the
+              per-Business-Unit breakdown table. */}
           <section className="flex flex-col gap-4">
-            <h3 className="text-base font-semibold text-slate-800">Disbursements Summary</h3>
-
-            <div className="grid grid-cols-1 gap-4 sm:grid-cols-3">
-              <SummaryStat
-                icon={<HandCoins className="h-4 w-4" />}
-                label={`${periodLabel} Advances`}
-                value={formatCurrencyShort(data.disbursements.summary.advancesActual)}
-                fullValue={formatCurrency(data.disbursements.summary.advancesActual)}
-              />
-              <SummaryStat
-                icon={<Landmark className="h-4 w-4" />}
-                label={`${periodLabel} Loan Repayments`}
-                value={formatCurrencyShort(data.disbursements.summary.loansActual)}
-                fullValue={formatCurrency(data.disbursements.summary.loansActual)}
-              />
-              <SummaryStat
-                icon={<Percent className="h-4 w-4" />}
-                label={`${periodLabel} Interests`}
-                value={formatCurrencyShort(data.disbursements.summary.interestsActual)}
-                fullValue={formatCurrency(data.disbursements.summary.interestsActual)}
-              />
-            </div>
+            <h3 className="text-base font-semibold text-slate-800">Disbursements by Business Unit</h3>
 
             {data.disbursements.businessUnits.length > 0 && (
               <div className="overflow-hidden rounded-lg border border-slate-200 bg-white shadow-sm">

@@ -24,6 +24,7 @@ import scorecardRoutes from "./routes/scorecard";
 import auditLogRoutes from "./routes/auditLog";
 import reportsRoutes from "./routes/reports";
 import disbursementsRoutes from "./routes/disbursements";
+import comparisonRoutes from "./routes/comparison";
 
 const app = express();
 app.use(cors({ origin: process.env.CLIENT_ORIGIN || "*" }));
@@ -45,6 +46,7 @@ app.use("/api/scorecard", scorecardRoutes);
 app.use("/api/audit-log", auditLogRoutes);
 app.use("/api/reports", reportsRoutes);
 app.use("/api/disbursements", disbursementsRoutes);
+app.use("/api/comparison", comparisonRoutes);
 
 // Generic error handler as a safety net for anything thrown above.
 app.use((err: any, _req: express.Request, res: express.Response, _next: express.NextFunction) => {

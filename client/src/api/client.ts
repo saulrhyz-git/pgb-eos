@@ -6,6 +6,7 @@ import type {
   BusinessGoal,
   BusinessUnit,
   Company,
+  ComparisonSnapshot,
   CustomRole,
   DashboardResponse,
   DisbursementActual,
@@ -403,4 +404,18 @@ export const api = {
     external: number;
     remarks?: string;
   }) => request<DisbursementActual>("/disbursements", { method: "PUT", body: JSON.stringify(payload) }),
+
+  // ---------- Comparison ----------
+  // Default access is Superadmin + Group Integrator; a BU Integrator (or
+  // blank-role user) needs a Custom Role that grants COMPARISON view to see
+  // this at all (403 otherwise). Unlike the Executive Scorecard, this
+  // supports an optional companyId drill-down too — each of the Comparison
+  // page's two panels calls this independently with its own scope.
+  comparisonSnapshot: (params: { yearId: string; quarter: number; businessUnitId?: string; companyId?: string }) => {
+    // quarter === 0 means "All Quarters" (full year), same convention as the Revenue dashboard.
+    const qs = new URLSearchParams({ yearId: params.yearId, quarter: params.quarter === 0 ? "all" : String(params.quarter) });
+    if (params.businessUnitId) qs.set("businessUnitId", params.businessUnitId);
+    if (params.companyId) qs.set("companyId", params.companyId);
+    return request<ComparisonSnapshot>(`/comparison/snapshot?${qs.toString()}`);
+  },
 };
