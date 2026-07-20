@@ -197,6 +197,30 @@ export default function AdminAuditLog() {
       {error && <div className="rounded-md bg-red-50 px-4 py-3 text-sm text-red-600">{error}</div>}
 
       <div className="overflow-hidden rounded-lg border border-slate-200 bg-white shadow-sm">
+        <div className="flex flex-col gap-2 border-b border-slate-200 px-4 py-3 text-sm text-slate-500 sm:flex-row sm:items-center sm:justify-between">
+          <span>
+            {total === 0 ? "0 entries" : `Showing ${(page - 1) * PAGE_SIZE + 1}-${Math.min(page * PAGE_SIZE, total)} of ${total}`}
+          </span>
+          <div className="flex items-center gap-2">
+            <button
+              className="flex items-center gap-1 rounded-md border border-slate-300 px-2 py-1 disabled:cursor-not-allowed disabled:opacity-40"
+              disabled={page <= 1}
+              onClick={() => setPage((p) => Math.max(1, p - 1))}
+            >
+              <ChevronLeft className="h-4 w-4" /> Prev
+            </button>
+            <span>
+              Page {page} of {totalPages}
+            </span>
+            <button
+              className="flex items-center gap-1 rounded-md border border-slate-300 px-2 py-1 disabled:cursor-not-allowed disabled:opacity-40"
+              disabled={page >= totalPages}
+              onClick={() => setPage((p) => Math.min(totalPages, p + 1))}
+            >
+              Next <ChevronRight className="h-4 w-4" />
+            </button>
+          </div>
+        </div>
         <div className="overflow-x-auto">
           <table className="w-full min-w-[820px] text-sm">
             <thead className="bg-slate-50 text-left text-xs font-semibold uppercase text-slate-500">
@@ -248,30 +272,6 @@ export default function AdminAuditLog() {
               )}
             </tbody>
           </table>
-        </div>
-        <div className="flex flex-col gap-2 border-t border-slate-200 px-4 py-3 text-sm text-slate-500 sm:flex-row sm:items-center sm:justify-between">
-          <span>
-            {total === 0 ? "0 entries" : `Showing ${(page - 1) * PAGE_SIZE + 1}-${Math.min(page * PAGE_SIZE, total)} of ${total}`}
-          </span>
-          <div className="flex items-center gap-2">
-            <button
-              className="flex items-center gap-1 rounded-md border border-slate-300 px-2 py-1 disabled:cursor-not-allowed disabled:opacity-40"
-              disabled={page <= 1}
-              onClick={() => setPage((p) => Math.max(1, p - 1))}
-            >
-              <ChevronLeft className="h-4 w-4" /> Prev
-            </button>
-            <span>
-              Page {page} of {totalPages}
-            </span>
-            <button
-              className="flex items-center gap-1 rounded-md border border-slate-300 px-2 py-1 disabled:cursor-not-allowed disabled:opacity-40"
-              disabled={page >= totalPages}
-              onClick={() => setPage((p) => Math.min(totalPages, p + 1))}
-            >
-              Next <ChevronRight className="h-4 w-4" />
-            </button>
-          </div>
         </div>
       </div>
 

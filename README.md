@@ -1413,3 +1413,19 @@ non-collapsible header) is untouched. Worth checking by hand: clicking the
 logo in the desktop sidebar (both collapsed and expanded) toggles its width;
 the existing chevron buttons still work too; the mobile drawer's logo is
 still non-interactive (mobile has no collapse concept).
+
+**Pagination moved above its table, everywhere.** The three tables with
+pagination — Rocks (`client/src/pages/Rocks.tsx`), Reports
+(`client/src/pages/Reports.tsx`), and the Audit Log
+(`client/src/pages/admin/AdminAuditLog.tsx`) — now show their "Showing X-Y
+of Z" caption and Prev/Next controls right above the table instead of below
+it, so paging doesn't require scrolling past the whole table first. The
+shared `Pagination` component (`client/src/components/Pagination.tsx`) had
+its divider flipped from `border-t` to `border-b` to match sitting above the
+table rather than below; the Audit Log's pagination footer (the one page
+that didn't use the shared component, since it needed a full `border-b`
+disclosure row rather than a compact bar) was moved the same way with the
+same border flip. No behavior changed — same page state, same page size,
+same Prev/Next logic — purely a layout reposition. Worth checking by hand:
+Rocks, Reports, and the Audit Log all show their pager above the table, and
+paging still works (Prev/Next disable at the ends, "Page X of Y" updates).

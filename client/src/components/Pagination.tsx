@@ -4,7 +4,9 @@
 // responsible for slicing its own data; this just renders the "Showing X-Y
 // of Z" caption and Prev/Next controls, and clamps itself when the total
 // shrinks (e.g. after a filter narrows the result set) so it's never stuck
-// showing a page beyond the end.
+// showing a page beyond the end. Rendered above its table (not below) at
+// every call site, so the border sits on the bottom edge to separate it from
+// the table beneath rather than the top edge.
 interface Props {
   page: number; // 1-based
   pageSize: number;
@@ -23,7 +25,7 @@ export default function Pagination({ page, pageSize, total, onPageChange }: Prop
   const end = Math.min(total, currentPage * pageSize);
 
   return (
-    <div className="flex flex-wrap items-center justify-between gap-2 border-t border-slate-100 px-4 py-3 text-sm">
+    <div className="flex flex-wrap items-center justify-between gap-2 border-b border-slate-100 px-4 py-3 text-sm">
       <div className="text-slate-500">
         Showing <span className="font-medium text-slate-700">{start}</span>-
         <span className="font-medium text-slate-700">{end}</span> of{" "}

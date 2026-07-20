@@ -448,6 +448,7 @@ export default function Reports() {
 
           {/* Generic preview table */}
           <div className="overflow-hidden rounded-lg border border-slate-200 bg-white shadow-sm">
+            {!loading && <Pagination page={page} pageSize={REPORTS_PAGE_SIZE} total={sortedRows.length} onPageChange={setPage} />}
             <div className="overflow-x-auto">
               <table className="w-full min-w-[720px] text-sm">
                 <thead className="bg-slate-50 text-xs font-semibold uppercase text-slate-500">
@@ -485,7 +486,6 @@ export default function Reports() {
                 </tbody>
               </table>
             </div>
-            {!loading && <Pagination page={page} pageSize={REPORTS_PAGE_SIZE} total={sortedRows.length} onPageChange={setPage} />}
           </div>
         </div>
       )}

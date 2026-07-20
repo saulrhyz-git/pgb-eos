@@ -874,6 +874,9 @@ export default function Rocks() {
       )}
 
       <div className="overflow-hidden rounded-lg border border-slate-200 bg-white shadow-sm">
+        {!loading && (
+          <Pagination page={page} pageSize={ROCKS_PAGE_SIZE} total={sortedRocks.length} onPageChange={setPage} />
+        )}
         <div className="overflow-x-auto">
           <table className="w-full min-w-[1020px] text-sm">
             <thead className="bg-slate-50 text-left text-xs font-semibold uppercase text-slate-500">
@@ -979,9 +982,6 @@ export default function Rocks() {
           <div className="flex items-center justify-center gap-2 py-4 text-sm text-slate-500">
             <Loader2 className="h-4 w-4 animate-spin" /> Loading...
           </div>
-        )}
-        {!loading && (
-          <Pagination page={page} pageSize={ROCKS_PAGE_SIZE} total={sortedRocks.length} onPageChange={setPage} />
         )}
       </div>
 
