@@ -75,7 +75,7 @@ export default function App() {
         <Route path="disbursements">
           <Route index element={<Navigate to="advances" replace />} />
           <Route path="advances" element={<DisbursementEntry category="ADVANCES" title="Advances" />} />
-          <Route path="loans" element={<DisbursementEntry category="LOANS" title="Loans" />} />
+          <Route path="loans" element={<DisbursementEntry category="LOANS" title="Loan Repayments" />} />
           <Route path="interests" element={<DisbursementEntry category="INTERESTS" title="Interests" />} />
         </Route>
         <Route path="data-entry" element={<IntegratorPortal />} />

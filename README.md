@@ -1237,9 +1237,10 @@ Needs a fresh `npm run prisma:migrate` for both new migrations.
   every other financial category already has.
 
 Worth checking by hand: entering an Advances figure for a Company/Year/
-Quarter under Disbursements → Advances, then switching to the Loans sub-tab
-for the same scope, shows an empty Loans form (not the Advances figures) —
-switching back to Advances still shows what was just saved; the Revenue
+Quarter under Disbursements → Advances, then switching to the Loan
+Repayments sub-tab for the same scope, shows an empty form (not the Advances
+figures) — switching back to Advances still shows what was just saved; the
+Revenue
 dashboard's new Advances/Loans/Interests cards update correctly when the
 Year/Quarter/Business Unit/Company filter changes, hovering each shows the
 full peso amount; the Executive Scorecard's new Disbursements Summary section
@@ -1268,3 +1269,24 @@ new tab showing a clean printable table with the report's title and active
 filters listed at the top, and the browser's print dialog appears
 automatically; a report with zero rows in scope shows "No data in this
 scope" in the table and both export buttons are disabled.
+
+**Sidebar collapse toggle made more discoverable + Loans renamed to "Loan
+Repayments"** (`client/src/components/Layout.tsx`, `client/src/App.tsx`,
+`client/src/components/DisbursementCards.tsx`, `client/src/pages/
+Scorecard.tsx`) are two small follow-ups to the Disbursements + sidebar work
+above. The collapse/expand control now also sits directly in the sidebar's
+header row next to the logo (in addition to the full-width button at the
+bottom, which is still there for the collapsed state) so it's visible
+immediately rather than only after scrolling down past the nav list. The
+"Loans" Disbursements sub-category is now labeled "Loan Repayments"
+everywhere it's shown to a user — the sidebar sub-link, the
+`/disbursements/loans` page's heading, the Revenue dashboard's KPI card, and
+both the Scorecard's summary card and its per-Business-Unit table column.
+The underlying category key (`LOANS`), API field names
+(`loansInternal`/`loansExternal`/`loansRemarks`/`quarterLoansActual`), and
+route path (`/disbursements/loans`) are unchanged — this is a display-label-
+only rename. Worth checking by hand: the sidebar's collapse arrow next to
+the logo is visible without scrolling and collapses the sidebar in one
+click; every place that used to say "Loans" now says "Loan Repayments"
+(sidebar sub-link, page heading, Revenue dashboard card, Scorecard card and
+table column) while the URL and underlying data are unaffected.

@@ -63,7 +63,7 @@ export default function DisbursementCards({ kpis, quarter }: Props) {
       <Card
         tone="loans"
         icon={<Landmark className="h-4 w-4" />}
-        label={`${periodLabel} Loans`}
+        label={`${periodLabel} Loan Repayments`}
         value={formatCurrencyShort(kpis.quarterLoansActual)}
         fullValue={formatCurrency(kpis.quarterLoansActual)}
       />

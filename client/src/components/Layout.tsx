@@ -113,7 +113,7 @@ export default function Layout() {
                 Advances
               </NavLink>
               <NavLink to="/disbursements/loans" className={subLinkClass} onClick={closeMobile}>
-                Loans
+                Loan Repayments
               </NavLink>
               <NavLink to="/disbursements/interests" className={subLinkClass} onClick={closeMobile}>
                 Interests
@@ -165,17 +165,36 @@ export default function Layout() {
           collapsed ? "w-16" : "w-60"
         }`}
       >
-        <div className="flex items-center gap-2 border-b border-slate-200 px-3 py-3">
-          <img src="/EOS-logo.png" alt="EOS" className="h-7 w-auto shrink-0" />
-          {!collapsed && <span className="truncate text-sm font-semibold text-slate-800">Executive Dashboard</span>}
+        <div className={`flex items-center gap-2 border-b border-slate-200 px-3 py-3 ${collapsed ? "justify-center" : "justify-between"}`}>
+          <div className="flex min-w-0 items-center gap-2">
+            <img src="/EOS-logo.png" alt="EOS" className="h-7 w-auto shrink-0" />
+            {!collapsed && <span className="truncate text-sm font-semibold text-slate-800">Executive Dashboard</span>}
+          </div>
+          {/* Always visible, in both collapsed and expanded states — the
+              main (only) way to toggle the sidebar. Its icon direction
+              itself communicates what clicking it will do. */}
+          {!collapsed && (
+            <button
+              onClick={() => setCollapsed(true)}
+              className="shrink-0 rounded-md p-1.5 text-slate-400 hover:bg-slate-100 hover:text-slate-700"
+              title="Collapse sidebar"
+              aria-label="Collapse sidebar"
+            >
+              <ChevronsLeft className="h-4 w-4" />
+            </button>
+          )}
         </div>
         <nav className="flex flex-1 flex-col gap-1 overflow-y-auto p-2">
           <NavContent showLabels={!collapsed} />
         </nav>
+        {/* Collapsed state repeats the toggle here (full-width, at the
+            bottom) since the header row above hides it to save space —
+            this is the way to expand back out. */}
         <button
           onClick={() => setCollapsed((v) => !v)}
           className="flex items-center justify-center gap-2 border-t border-slate-200 p-3 text-xs font-medium text-slate-500 hover:bg-slate-100"
           title={collapsed ? "Expand sidebar" : "Collapse sidebar"}
+          aria-label={collapsed ? "Expand sidebar" : "Collapse sidebar"}
         >
           {collapsed ? (
             <ChevronsRight className="h-4 w-4" />

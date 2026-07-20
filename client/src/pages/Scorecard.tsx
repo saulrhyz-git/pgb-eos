@@ -491,7 +491,7 @@ export default function Scorecard() {
               />
               <SummaryStat
                 icon={<Landmark className="h-4 w-4" />}
-                label={`${periodLabel} Loans`}
+                label={`${periodLabel} Loan Repayments`}
                 value={formatCurrencyShort(data.disbursements.summary.loansActual)}
                 fullValue={formatCurrency(data.disbursements.summary.loansActual)}
               />
@@ -511,7 +511,7 @@ export default function Scorecard() {
                       <tr>
                         <SortHeader label="Business Unit" sortKey="businessUnitName" active={disbSort.key} dir={disbSort.dir} onClick={toggleDisbSort} />
                         <SortHeader label="Advances" sortKey="advancesActual" active={disbSort.key} dir={disbSort.dir} onClick={toggleDisbSort} />
-                        <SortHeader label="Loans" sortKey="loansActual" active={disbSort.key} dir={disbSort.dir} onClick={toggleDisbSort} />
+                        <SortHeader label="Loan Repayments" sortKey="loansActual" active={disbSort.key} dir={disbSort.dir} onClick={toggleDisbSort} />
                         <SortHeader label="Interests" sortKey="interestsActual" active={disbSort.key} dir={disbSort.dir} onClick={toggleDisbSort} />
                       </tr>
                     </thead>
