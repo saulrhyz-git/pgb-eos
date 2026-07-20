@@ -29,10 +29,10 @@ export default function Layout() {
   // on click keeps the dropdown from staying open after navigating.
   const navLinks = (
     <>
-      <NavLink to="/scorecard" className={linkClass} onClick={() => setMenuOpen(false)}>
+      <NavLink to="/" end className={linkClass} onClick={() => setMenuOpen(false)}>
         <Gauge className="h-4 w-4" /> Scorecard
       </NavLink>
-      <NavLink to="/" end className={linkClass} onClick={() => setMenuOpen(false)}>
+      <NavLink to="/revenue" className={linkClass} onClick={() => setMenuOpen(false)}>
         <LayoutDashboard className="h-4 w-4" /> Revenue
       </NavLink>
       <NavLink to="/rocks" className={linkClass} onClick={() => setMenuOpen(false)}>

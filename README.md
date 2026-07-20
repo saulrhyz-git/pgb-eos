@@ -1042,3 +1042,18 @@ over that figure with the mouse shows a native tooltip with the exact peso
 amount to the cent; a Business Unit with only a few thousand pesos in
 targets/actuals still shows its full amount on the card (no abbreviation
 under ₱1,000).
+
+**Scorecard as the default landing page** (`client/src/App.tsx`'s route
+table, `client/src/components/Layout.tsx`'s nav links) swaps which page owns
+the root `/` path: the Executive Scorecard is now the index route (what
+`navigate("/")` after login/password-change lands on, and what a non-
+superadmin gets redirected to if they try to reach `/admin`), and the Revenue
+dashboard moved to its own `/revenue` path. Purely a route-table change, no
+schema/API/backend changes. Worth checking by hand: logging in lands
+directly on the Scorecard page instead of the Revenue dashboard; the
+Scorecard nav link is still first and now highlights as active on that
+landing page; the Revenue nav link goes to `/revenue` and highlights
+correctly there; a user without Scorecard access (a BU Integrator with no
+Custom Role granting `SCORECARD` view) sees the existing "access required"
+card immediately after logging in rather than a blank/broken page, and can
+still reach the Revenue dashboard via its nav link.

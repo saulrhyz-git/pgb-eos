@@ -58,9 +58,11 @@ export default function App() {
           </RequireAuth>
         }
       >
-        <Route index element={<Dashboard />} />
+        {/* Scorecard is the default landing page after login (see Login.tsx's
+            navigate("/")) — Revenue moved to its own /revenue path below. */}
+        <Route index element={<Scorecard />} />
         <Route path="profile" element={<Profile />} />
-        <Route path="scorecard" element={<Scorecard />} />
+        <Route path="revenue" element={<Dashboard />} />
         <Route path="rocks" element={<Rocks />} />
         <Route path="data-entry" element={<IntegratorPortal />} />
         <Route path="targets" element={<TargetConfig />} />
