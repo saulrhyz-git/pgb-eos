@@ -325,10 +325,16 @@ export interface ScorecardRevenue {
     quarterCollectionsTarget: number;
     quarterExpensesTarget: number;
     quarterActual: number;
+    // Expenses Actual for the scope in view (not just Target) — added
+    // alongside netIncome below so Net Income doesn't need its own
+    // recomputation of Expenses Actual on the frontend.
+    quarterExpensesActual: number;
     ytdTarget: number;
     ytdActual: number;
     attainmentPct: number;
     ytdAttainmentPct: number;
+    // Total Revenue (Actual) − Total Expenses (Actual) for the scope in view.
+    netIncome: number;
   };
   chart: ScorecardChartPoint[];
   businessUnits: ScorecardRevenueBuRow[];

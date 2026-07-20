@@ -194,6 +194,11 @@ router.get("/", async (req, res) => {
   let quarterCollectionsTargetTotal = 0;
   let quarterExpensesTargetTotal = 0;
   let quarterActualTotal = 0;
+  // Expenses Actual (not just Target) for the scope in view — needed to
+  // compute Net Income (Total Revenue − Total Expenses) for the headline
+  // card. Mirrors the Collections/Expenses Actual parity already added to
+  // dashboard.ts's kpis; scorecard.ts only tracked Expenses Target before.
+  let quarterExpensesActualTotal = 0;
   let ytdTargetTotal = 0;
   let ytdActualTotal = 0;
 
@@ -222,7 +227,10 @@ router.get("/", async (req, res) => {
         qa = addFigures(qa, qActualByCompanyQuarter.get(`${c.id}:${q}`) || emptyFigures());
       }
       if (isCatAllowed(c.id, c.businessUnitId, "COLLECTIONS")) quarterCollectionsTargetTotal += collectionsTotal(qt);
-      if (isCatAllowed(c.id, c.businessUnitId, "EXPENSES")) quarterExpensesTargetTotal += expensesTotal(qt);
+      if (isCatAllowed(c.id, c.businessUnitId, "EXPENSES")) {
+        quarterExpensesTargetTotal += expensesTotal(qt);
+        quarterExpensesActualTotal += expensesTotal(qa);
+      }
       if (revenueOk) {
         quarterRevenueTargetTotal += revenueTotal(qt);
         quarterActualTotal += revenueTotal(qa);
@@ -269,10 +277,17 @@ router.get("/", async (req, res) => {
       quarterCollectionsTarget: quarterCollectionsTargetTotal,
       quarterExpensesTarget: quarterExpensesTargetTotal,
       quarterActual: quarterActualTotal,
+      quarterExpensesActual: quarterExpensesActualTotal,
       ytdTarget: ytdTargetTotal,
       ytdActual: ytdActualTotal,
       attainmentPct: pct(quarterActualTotal, quarterRevenueTargetTotal),
       ytdAttainmentPct: pct(ytdActualTotal, ytdTargetTotal),
+      // Net Income = Total Revenue (Actual) − Total Expenses (Actual) for
+      // whatever scope (quarter or full year) is in view. Zeroed-out
+      // Expenses (masked by a Custom Role without EXPENSES view) simply
+      // means Net Income reflects Revenue alone, consistent with how every
+      // other masked category already behaves on this page.
+      netIncome: quarterActualTotal - quarterExpensesActualTotal,
     },
     chart,
     businessUnits: buRows,

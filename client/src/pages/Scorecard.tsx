@@ -11,6 +11,7 @@ import {
   Mountain,
   Percent,
   PhilippinePeso,
+  Scale,
   ShieldAlert,
   TrendingUp,
 } from "lucide-react";
@@ -84,6 +85,35 @@ function HeadlineCard({
           />
         </div>
         <span className={`text-sm font-semibold ${attainmentColor(pct)}`}>{formatPct(pct)}</span>
+      </div>
+    </div>
+  );
+}
+
+// Net Income has no Target to attain against (there's no "Net Income
+// Target" concept in the schema), so it can't reuse HeadlineCard's
+// attainment-badge/progress-bar framing — instead it's Profit/Loss colored
+// (green if Net Income >= 0, red if negative) with a net margin percentage
+// (Net Income / Total Revenue) shown underneath in place of a progress bar.
+function NetIncomeCard({ netIncome, revenueActual, periodLabel }: { netIncome: number; revenueActual: number; periodLabel: string }) {
+  const isProfit = netIncome >= 0;
+  const marginPct = revenueActual > 0 ? (netIncome / revenueActual) * 100 : 0;
+  return (
+    <div className="flex flex-col gap-3 rounded-xl border border-slate-200 bg-white p-4 shadow-sm sm:p-6">
+      <div className="flex flex-wrap items-center justify-between gap-2">
+        <div className="flex items-center gap-2 text-slate-500">
+          <Scale className="h-4 w-4" />
+          <span className="text-xs font-semibold uppercase tracking-wide">{periodLabel} Net Income</span>
+        </div>
+        <span className={`rounded-full px-2.5 py-1 text-xs font-semibold ${isProfit ? "bg-emerald-50 text-emerald-700" : "bg-red-50 text-red-700"}`}>
+          {isProfit ? "Profit" : "Loss"}
+        </span>
+      </div>
+      <div className={`text-3xl font-bold sm:text-4xl ${isProfit ? "text-slate-800" : "text-red-600"}`} title={formatCurrency(netIncome)}>
+        {formatCurrencyShort(netIncome)}
+      </div>
+      <div className="text-sm font-medium text-slate-500">
+        {formatPct(Math.abs(marginPct))} net margin (Total Revenue − Total Expenses)
       </div>
     </div>
   );
@@ -356,13 +386,18 @@ export default function Scorecard() {
       {data && (
         <>
           {/* ---------- Top-line traffic-light summary ---------- */}
-          <div className="grid grid-cols-1 gap-4 sm:grid-cols-2">
+          <div className="grid grid-cols-1 gap-4 sm:grid-cols-3">
             <HeadlineCard
               icon={<PhilippinePeso className="h-4 w-4" />}
               label={`${periodLabel} Revenue Attainment`}
               value={formatCurrencyShort(data.revenue.kpis.quarterActual)}
               fullValue={formatCurrency(data.revenue.kpis.quarterActual)}
               pct={data.revenue.kpis.attainmentPct}
+            />
+            <NetIncomeCard
+              netIncome={data.revenue.kpis.netIncome}
+              revenueActual={data.revenue.kpis.quarterActual}
+              periodLabel={periodLabel}
             />
             <HeadlineCard
               icon={<Mountain className="h-4 w-4" />}

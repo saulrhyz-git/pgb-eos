@@ -1537,3 +1537,54 @@ sub-tabs correctly show zeroed/masked data; and since this migration is
 destructive, confirm on a fresh seed/migrate that Collections and Expenses
 figures all start at 0 rather than carrying over any old Internal/External
 values from before the schema change.
+
+**Scorecard: new Net Income headline card.** The Executive Scorecard's
+top-line traffic-light row (`client/src/pages/Scorecard.tsx`) now shows
+three cards instead of two: Revenue Attainment, a new Net Income card, and
+Rocks Completion. Net Income = Total Revenue (Actual) − Total Expenses
+(Actual) for whatever scope (a specific Quarter or "All Quarters"/full year)
+is selected. `server/src/routes/scorecard.ts` previously only tracked an
+Expenses *Target* total, never an Expenses *Actual* total, so it gained a new
+`quarterExpensesActualTotal` accumulator (summed the same way as every other
+figure in that route, gated by the same `EXPENSES` Custom Role visibility
+check) and now returns both `quarterExpensesActual` and `netIncome` on
+`revenue.kpis`. Net Income has no natural "Target" to attain against (there's
+no Net Income Target concept anywhere in the schema), so rather than reuse
+`HeadlineCard`'s attainment-badge/progress-bar framing, it's a new
+`NetIncomeCard` component: a Profit/Loss badge (green/red) and a net margin
+percentage (Net Income ÷ Total Revenue) shown in place of a progress bar. If
+a Custom Role has Revenue visibility but not Expenses (or vice versa), Net
+Income reflects only whichever side is visible — the masked side already
+contributes 0, same masking convention used everywhere else on this page.
+Worth checking by hand: the new card sits between Revenue Attainment and
+Rocks Completion; it turns red and says "Loss" when Expenses exceed Revenue
+for the scope; switching Quarter/"All Quarters"/Business Unit updates it
+along with the other two cards; and a Custom Role granted only `COLLECTIONS`
+(no `REVENUE` or `EXPENSES`) sees a ₱0 Net Income card rather than an error.
+
+**Collections/Expenses Operational Grid: cleaner per-company breakdown
+layout.** The expanded per-company detail row on the Collections and
+Expenses Financials sub-tabs (`client/src/components/OperationalGrid.tsx`)
+was showing all of a company's breakdown values in one grid, then all of its
+Remarks boxes in a second, separate grid below — nothing tied a given
+Remarks box back to the value it was about, which felt cluttered,
+especially for Collections' 6 values. Each breakdown value is now paired
+directly with its own Remarks box immediately underneath it, inside a
+labeled card: Collections shows two side-by-side cards ("Collections —
+Internal" / "Collections — External", tinted emerald to match the
+Collections color used elsewhere), each with its 3 breakdown rows
+(value + Remarks stacked); Expenses shows one amber-tinted card with its 3
+breakdown rows laid out in columns on wider screens. `RemarksInput`'s
+`label` prop is now optional — omitted here since the breakdown's own label
+already sits directly above the box, so it's not repeated. The
+"select a quarter to view/edit Remarks" note (shown when "All Quarters" is
+selected) now appears per-breakdown-row instead of as one block at the
+bottom, consistent with the new paired layout. Revenue's detail row and the
+BU-headline table above are unchanged. Worth checking by hand: on the
+Collections sub-tab, expanding a Business Unit shows two clearly separated
+Internal/External cards, each value sitting right above its own Remarks
+box; typing in a Remarks box and clicking away still saves it (same
+`patchRemarks` call as before); switching to "All Quarters" replaces each
+Remarks box with the "select a quarter" note instead of hiding all of them
+at once; and the Expenses sub-tab's single card lays its 3 items out in
+columns on a wide screen and stacks them on mobile.

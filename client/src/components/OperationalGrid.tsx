@@ -80,15 +80,19 @@ export default function OperationalGrid({ rows, yearId, quarter, onRemarksSaved,
     }
   }
 
-  function RemarksInput({ row, field, label }: { row: OperationalGridCompanyRow; field: RemarksField; label: string }) {
+  // `label` is optional — omitted when a Remarks box is already paired with
+  // its own value row right above it (Collections/Expenses breakdowns), so
+  // the breakdown's own label isn't repeated a second time immediately
+  // above the input.
+  function RemarksInput({ row, field, label }: { row: OperationalGridCompanyRow; field: RemarksField; label?: string }) {
     const key = `${row.companyId}:${field}`;
     const draft = drafts[key] ?? row[field];
     return (
       <div className="flex flex-col gap-1">
-        <label className="text-xs font-medium text-slate-500">{label}</label>
+        {label && <label className="text-xs font-medium text-slate-500">{label}</label>}
         <div className="flex items-center gap-2">
           <input
-            className="w-full min-w-[180px] rounded-md border border-slate-200 px-2 py-1 text-xs"
+            className="w-full min-w-[140px] rounded-md border border-slate-200 px-2 py-1 text-xs"
             value={draft}
             placeholder="Add remarks..."
             onChange={(e) => setDrafts((d) => ({ ...d, [key]: e.target.value }))}
@@ -96,7 +100,7 @@ export default function OperationalGrid({ rows, yearId, quarter, onRemarksSaved,
               if (e.target.value !== row[field]) saveRemarks(row.companyId, field, e.target.value);
             }}
           />
-          {saving[key] && <Loader2 className="h-3 w-3 animate-spin text-slate-500" />}
+          {saving[key] && <Loader2 className="h-3 w-3 animate-spin shrink-0 text-slate-500" />}
         </div>
       </div>
     );
@@ -220,64 +224,61 @@ export default function OperationalGrid({ rows, yearId, quarter, onRemarksSaved,
                                 </>
                               )}
 
+                              {/* Collections/Expenses: each breakdown's value is paired directly
+                                  with its own Remarks box right underneath, instead of showing all
+                                  the values in one grid and all the Remarks boxes in a second,
+                                  disconnected grid below (the old layout, which made it hard to
+                                  tell which Remarks box belonged to which value). */}
                               {category === "COLLECTIONS" && (
-                                <>
-                                  <div className="mb-3 grid grid-cols-1 gap-4 sm:grid-cols-2">
-                                    {(["Internal", "External"] as const).map((side) => (
-                                      <div key={side}>
-                                        <div className="mb-1 text-xs font-semibold text-slate-500">Collections — {side}</div>
-                                        <div className="grid grid-cols-1 gap-1 text-xs text-slate-600 xs:grid-cols-3">
-                                          {COLLECTIONS_BREAKDOWN.filter((b) => b.title === side).map((b) => (
-                                            <div key={b.value}>
-                                              <span className="font-medium text-slate-500">{b.label}:</span>{" "}
-                                              {formatCurrency(c.quarterActual[b.value] as number)}
-                                            </div>
-                                          ))}
-                                        </div>
+                                <div className="grid grid-cols-1 gap-3 sm:grid-cols-2">
+                                  {(["Internal", "External"] as const).map((side) => (
+                                    <div key={side} className="rounded-md border border-emerald-100 bg-emerald-50/40 p-3">
+                                      <div className="mb-2 text-xs font-semibold uppercase tracking-wide text-emerald-700">
+                                        Collections — {side}
                                       </div>
-                                    ))}
-                                  </div>
-                                  {isAllQuarters ? (
-                                    <p className="text-xs italic text-slate-500">
-                                      Remarks are logged per quarter — select a specific quarter to view or edit them.
-                                    </p>
-                                  ) : (
-                                    <div className="grid grid-cols-1 gap-3 sm:grid-cols-3">
-                                      {COLLECTIONS_BREAKDOWN.map((b) => (
-                                        <RemarksInput
-                                          key={b.remarksField}
-                                          row={c}
-                                          field={b.remarksField}
-                                          label={`${b.title} — ${b.label}`}
-                                        />
-                                      ))}
+                                      <div className="flex flex-col divide-y divide-emerald-100">
+                                        {COLLECTIONS_BREAKDOWN.filter((b) => b.title === side).map((b) => (
+                                          <div key={b.value} className="flex flex-col gap-1.5 py-2 first:pt-0 last:pb-0">
+                                            <div className="flex items-baseline justify-between gap-2">
+                                              <span className="text-xs text-slate-600">{b.label}</span>
+                                              <span className="whitespace-nowrap text-sm font-semibold text-slate-800">
+                                                {formatCurrency(c.quarterActual[b.value] as number)}
+                                              </span>
+                                            </div>
+                                            {isAllQuarters ? (
+                                              <p className="text-[11px] italic text-slate-400">Select a quarter to view/edit Remarks.</p>
+                                            ) : (
+                                              <RemarksInput row={c} field={b.remarksField} />
+                                            )}
+                                          </div>
+                                        ))}
+                                      </div>
                                     </div>
-                                  )}
-                                </>
+                                  ))}
+                                </div>
                               )}
 
                               {category === "EXPENSES" && (
-                                <>
-                                  <div className="mb-3 grid grid-cols-1 gap-1 text-xs text-slate-600 sm:grid-cols-3">
+                                <div className="rounded-md border border-amber-100 bg-amber-50/40 p-3">
+                                  <div className="mb-2 text-xs font-semibold uppercase tracking-wide text-amber-700">Expenses</div>
+                                  <div className="grid grid-cols-1 gap-x-6 divide-y divide-amber-100 sm:grid-cols-3 sm:divide-y-0">
                                     {EXPENSES_BREAKDOWN.map((b) => (
-                                      <div key={b.value}>
-                                        <span className="font-medium text-slate-500">{b.label}:</span>{" "}
-                                        {formatCurrency(c.quarterActual[b.value] as number)}
+                                      <div key={b.value} className="flex flex-col gap-1.5 py-2 first:pt-0 last:pb-0 sm:py-0">
+                                        <div className="flex items-baseline justify-between gap-2 sm:flex-col sm:items-start sm:gap-1">
+                                          <span className="text-xs text-slate-600">{b.label}</span>
+                                          <span className="whitespace-nowrap text-sm font-semibold text-slate-800">
+                                            {formatCurrency(c.quarterActual[b.value] as number)}
+                                          </span>
+                                        </div>
+                                        {isAllQuarters ? (
+                                          <p className="text-[11px] italic text-slate-400">Select a quarter to view/edit Remarks.</p>
+                                        ) : (
+                                          <RemarksInput row={c} field={b.remarksField} />
+                                        )}
                                       </div>
                                     ))}
                                   </div>
-                                  {isAllQuarters ? (
-                                    <p className="text-xs italic text-slate-500">
-                                      Remarks are logged per quarter — select a specific quarter to view or edit them.
-                                    </p>
-                                  ) : (
-                                    <div className="grid grid-cols-1 gap-3 sm:grid-cols-3">
-                                      {EXPENSES_BREAKDOWN.map((b) => (
-                                        <RemarksInput key={b.remarksField} row={c} field={b.remarksField} label={b.label} />
-                                      ))}
-                                    </div>
-                                  )}
-                                </>
+                                </div>
                               )}
                             </div>
                           ))}
