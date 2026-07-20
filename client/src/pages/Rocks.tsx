@@ -694,7 +694,7 @@ export default function Rocks() {
           </div>
 
           <div className="flex flex-col gap-1">
-            <label className="text-xs font-medium text-slate-500">Target(s) (optional)</label>
+            <label className="text-xs font-medium text-slate-500">Target(s)</label>
             <textarea
               className="min-h-[70px] rounded-md border border-slate-300 px-3 py-2 text-sm"
               value={rockForm.description}
