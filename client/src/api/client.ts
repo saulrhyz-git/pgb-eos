@@ -8,6 +8,8 @@ import type {
   Company,
   CustomRole,
   DashboardResponse,
+  DisbursementActual,
+  DisbursementCategory,
   Figures,
   Rock,
   RockStatus,
@@ -374,4 +376,31 @@ export const api = {
     if (params.businessUnitId) qs.set("businessUnitId", params.businessUnitId);
     return request<ReportResult>(`/reports/executive-summary?${qs.toString()}`);
   },
+
+  // ---------- Disbursements ----------
+  // Recorded — not targeted — per Company/Year/Quarter, gated by a single
+  // combined DISBURSEMENTS Custom Role resource (unlike Revenue/Collections/
+  // Expenses, which are each independently gate-able). Default access is
+  // Superadmin + Group Integrator's normal Business Unit scoping, same as
+  // Revenue/Collections/Expenses actuals — see server/src/routes/disbursements.ts.
+  disbursements: (params: { yearId: string; quarter?: number; businessUnitId?: string; companyId?: string }) => {
+    const qs = new URLSearchParams({ yearId: params.yearId });
+    if (params.quarter) qs.set("quarter", String(params.quarter));
+    if (params.businessUnitId) qs.set("businessUnitId", params.businessUnitId);
+    if (params.companyId) qs.set("companyId", params.companyId);
+    return request<DisbursementActual[]>(`/disbursements?${qs.toString()}`);
+  },
+  // Upserts just ONE sub-category (Advances/Loans/Interests) for a Company/
+  // Year/Quarter, leaving the other two categories' figures on the same row
+  // untouched — each of the three Disbursements sub-tab pages submits only
+  // its own category.
+  putDisbursement: (payload: {
+    companyId: string;
+    yearId: string;
+    quarter: number;
+    category: DisbursementCategory;
+    internal: number;
+    external: number;
+    remarks?: string;
+  }) => request<DisbursementActual>("/disbursements", { method: "PUT", body: JSON.stringify(payload) }),
 };

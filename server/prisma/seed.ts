@@ -17,6 +17,7 @@ async function main() {
   await prisma.businessGoalBusinessUnit.deleteMany({});
   await prisma.businessGoal.deleteMany({});
   await prisma.quarterActual.deleteMany({});
+  await prisma.disbursementActual.deleteMany({});
   await prisma.quarterTarget.deleteMany({});
   await prisma.userBusinessUnit.deleteMany({});
   // role is nullable now (a user can have no base role at all — see
@@ -44,7 +45,7 @@ async function main() {
   });
 
   console.log(
-    "Reset complete. No Business Units, Companies, Years, Business Goals, Rocks, Custom Roles, or non-superadmin users remain."
+    "Reset complete. No Business Units, Companies, Years, Business Goals, Rocks, Disbursements, Custom Roles, or non-superadmin users remain."
   );
   console.log("");
   console.log("  Superadmin:  username 'saulrhyz' / password '0811837Sey@me7' (must change on first login)");

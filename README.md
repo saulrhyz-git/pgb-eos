@@ -1175,6 +1175,84 @@ text even when the table's own preview was truncated by `line-clamp-2`; the
 Edit button inside it correctly opens the pop-up form pre-filled for that
 same Rock.
 
+**Collapsible sidebar navigation** (`client/src/components/Layout.tsx`) replaces
+the old top horizontal nav bar with a left sidebar on desktop (md+): a
+collapse toggle at the bottom shrinks it to icon-only (tooltips via `title`
+take over for labels) or expands it back to icon+label, and the choice is
+remembered in `localStorage` across reloads. Below md, the sidebar becomes a
+slide-in drawer opened by a hamburger button in a slim top bar, replacing the
+old dropdown-under-the-header pattern. Purely a navigation-chrome change — no
+new routes, no access-control changes; every existing link still points
+where it always did. Worth checking by hand: toggling collapse/expand on
+desktop shrinks/grows the sidebar smoothly and the choice survives a page
+reload; every nav icon still shows a tooltip with its label while collapsed;
+on a narrow viewport the hamburger opens a full-height drawer over the page
+(with a dimmed backdrop) instead of a dropdown, and clicking a link or the
+backdrop closes it.
+
+**Disbursements** (new `PermissionResource.DISBURSEMENTS` value via
+`server/prisma/migrations/20260722010000_add_disbursements_permission_resource`,
+new `DisbursementActual` model via
+`server/prisma/migrations/20260722020000_add_disbursement_actual`, new
+`server/src/routes/disbursements.ts`, updates to `server/src/routes/
+dashboard.ts` and `server/src/routes/scorecard.ts`, new `client/src/pages/
+Disbursements.tsx`, new `client/src/components/DisbursementCards.tsx`, and a
+new "Disbursements Summary" section in `client/src/pages/Scorecard.tsx`) adds
+a fourth financial category alongside Revenue/Collections/Expenses: Advances,
+Loans, and Interests, tracked per Company/Year/Quarter exactly like the
+existing figures (split Internal/External, each with its own Remarks field).
+Needs a fresh `npm run prisma:migrate` for both new migrations.
+- **Recorded, not targeted.** Unlike Revenue/Collections/Expenses, there's no
+  Target-side counterpart or attainment percentage for Disbursements — Target
+  Setup is untouched. Each sub-category is just a running actual total for
+  whatever period is in scope (respecting the Quarter filter's "All Quarters
+  = sum of Q1-Q4" rule everywhere else already follows).
+- **One combined DISBURSEMENTS permission**, not three. A Custom Role grants
+  View/Edit/Delete for all three sub-categories together (same granularity as
+  ROCKS), rather than Advances/Loans/Interests being independently gate-able
+  the way Revenue/Collections/Expenses are. Default access follows the same
+  Business-Unit scoping as the existing Data Entry page — a BU Integrator can
+  record Disbursements for companies in their own assigned Business Unit(s);
+  a Superadmin/Group Integrator can record for any company.
+- **New nav section**: "Disbursements" in the sidebar expands to three
+  sub-tabs — Advances, Loans, Interests — each its own page
+  (`/disbursements/advances`, `/disbursements/loans`,
+  `/disbursements/interests`) sharing one parameterized component
+  (`Disbursements.tsx`) so adding a fourth sub-category later wouldn't need a
+  new page, just a new route + prop. Each sub-tab's form only ever
+  reads/writes its own category's Internal/External/Remarks fields — the
+  other two categories on the same underlying row are left untouched.
+- **New cards**: three new KPI cards (Advances/Loans/Interests actual, in
+  purple/cyan/rose to stay visually distinct from the Revenue row's
+  blue/emerald/amber) now render on the Revenue dashboard between the
+  existing KPI cards and the quarterly Revenue-vs-Target chart, each
+  abbreviated (K/M/B) with the full peso amount as a hover tooltip, same
+  convention as every other currency figure in the app. The Executive
+  Scorecard gained its own "Disbursements Summary" section (3 summary cards +
+  a sortable per-Business-Unit table) using the same period/Business-Unit
+  scope as its existing Revenue Performance Summary section.
+- **Export note**: as with the Reports engine, this sandbox has no npm
+  registry access, so nothing here needed new packages — Disbursements
+  reuses the exact same figures/currency-formatting/permission machinery
+  every other financial category already has.
+
+Worth checking by hand: entering an Advances figure for a Company/Year/
+Quarter under Disbursements → Advances, then switching to the Loans sub-tab
+for the same scope, shows an empty Loans form (not the Advances figures) —
+switching back to Advances still shows what was just saved; the Revenue
+dashboard's new Advances/Loans/Interests cards update correctly when the
+Year/Quarter/Business Unit/Company filter changes, hovering each shows the
+full peso amount; the Executive Scorecard's new Disbursements Summary section
+appears with correct per-Business-Unit sortable columns; a BU Integrator
+with no Custom Role granting `DISBURSEMENTS` can still reach the
+Disbursements sub-tabs and record figures for their own assigned Business
+Unit(s) (default access, same as Data Entry) but is blocked (403) from
+another Business Unit's companies; a Custom Role that grants `DISBURSEMENTS`
+view for one specific Company (but no Revenue/Collections/Expenses grant at
+all) still shows that Company's Disbursement figures on the Revenue
+dashboard cards and Scorecard even when that Company has nothing else
+visible on the rest of the Revenue dashboard.
+
 Worth checking by hand: a BU Integrator with no Custom Role granting
 `REPORTS` sees the "Reports access required" card when visiting `/reports`,
 and a Custom Role with `REPORTS` view checked unlocks the page for them; a

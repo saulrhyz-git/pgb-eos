@@ -8,7 +8,22 @@ import {
   resolveCompanyBusinessUnit,
   scopedBusinessUnitFilter,
 } from "../middleware/auth";
-import { addFigures, collectionsTotal, emptyFigures, expensesTotal, Figures, pct, revenueTotal, toFigures } from "../utils/aggregate";
+import {
+  addFigures,
+  advancesTotal,
+  collectionsTotal,
+  DisbursementFigures,
+  emptyDisbursementFigures,
+  emptyFigures,
+  expensesTotal,
+  Figures,
+  interestsTotal,
+  loansTotal,
+  pct,
+  revenueTotal,
+  toDisbursementFigures,
+  toFigures,
+} from "../utils/aggregate";
 import { can, canAnyOf, FINANCIAL_RESOURCES, hasAnyGrant, Resource } from "../utils/permissions";
 
 const router = Router();
@@ -86,9 +101,15 @@ router.get("/", async (req, res) => {
   // collapsing it to nothing just because `permRows` is non-empty for some
   // unrelated resource. See hasAnyGrant() in utils/permissions.ts.
   const financialRoleActive = hasAnyGrant(permRows, FINANCIAL_RESOURCES);
+  // Disbursements is gated by its own single combined resource (unlike
+  // Revenue/Collections/Expenses, which are each independently gate-able).
+  const disbursementsRoleActive = hasAnyGrant(permRows, ["DISBURSEMENTS"]);
 
-  let businessUnits = await prisma.businessUnit.findMany({ where: buWhere, orderBy: { name: "asc" } });
-  let companies = await prisma.company.findMany({ where: companyWhere, orderBy: { name: "asc" } });
+  const businessUnitsRaw = await prisma.businessUnit.findMany({ where: buWhere, orderBy: { name: "asc" } });
+  const companiesRaw = await prisma.company.findMany({ where: companyWhere, orderBy: { name: "asc" } });
+
+  let businessUnits = businessUnitsRaw;
+  let companies = companiesRaw;
 
   if (financialRoleActive) {
     // A Custom Role can grant view either at the whole-Business-Unit level or
@@ -96,16 +117,49 @@ router.get("/", async (req, res) => {
     // if EITHER is true for at least one of its Companies (or for itself
     // directly), so a narrow "just this one Company" grant isn't hidden for
     // lack of a BU-wide grant.
-    companies = companies.filter((c) =>
+    companies = companiesRaw.filter((c) =>
       canAnyOf(permRows, "view", FINANCIAL_RESOURCES, { businessUnitId: c.businessUnitId, companyId: c.id })
     );
     const permittedBuIds = new Set(companies.map((c) => c.businessUnitId));
-    for (const bu of businessUnits) {
+    for (const bu of businessUnitsRaw) {
       if (canAnyOf(permRows, "view", FINANCIAL_RESOURCES, { businessUnitId: bu.id })) permittedBuIds.add(bu.id);
     }
-    businessUnits = businessUnits.filter((bu) => permittedBuIds.has(bu.id));
+    businessUnits = businessUnitsRaw.filter((bu) => permittedBuIds.has(bu.id));
   }
   const businessUnitIds = businessUnits.map((b) => b.id);
+
+  // Disbursements visibility is computed independently of the financial
+  // narrowing above, from the same unfiltered `businessUnitsRaw`/
+  // `companiesRaw` — a Custom Role might grant DISBURSEMENTS for a Company
+  // that has no REVENUE/COLLECTIONS/EXPENSES grant at all (or vice versa).
+  // Reusing the financially-narrowed `companies` here would silently drop
+  // that Company's disbursement figures entirely instead of just masking an
+  // unrelated category, so this gets its own filtered company list and its
+  // own totals, computed up front (before the financial early-return below)
+  // so a financially-empty scope doesn't also zero out real Disbursements
+  // the user does have access to.
+  let disbCompanies = companiesRaw;
+  if (disbursementsRoleActive) {
+    disbCompanies = companiesRaw.filter((c) => can(permRows, "view", "DISBURSEMENTS", { businessUnitId: c.businessUnitId, companyId: c.id }));
+  }
+  const disbCompanyIds = disbCompanies.map((c) => c.id);
+  const disbursementActuals = disbCompanyIds.length
+    ? await prisma.disbursementActual.findMany({ where: { yearId, companyId: { in: disbCompanyIds } } })
+    : [];
+  const disbByCompanyQuarter = new Map<string, DisbursementFigures>();
+  for (const d of disbursementActuals) disbByCompanyQuarter.set(`${d.companyId}:${d.quarter}`, toDisbursementFigures(d));
+
+  let quarterAdvancesActualTotal = 0;
+  let quarterLoansActualTotal = 0;
+  let quarterInterestsActualTotal = 0;
+  for (const cid of disbCompanyIds) {
+    for (const q of quartersInScope) {
+      const d = disbByCompanyQuarter.get(`${cid}:${q}`) || emptyDisbursementFigures();
+      quarterAdvancesActualTotal += advancesTotal(d);
+      quarterLoansActualTotal += loansTotal(d);
+      quarterInterestsActualTotal += interestsTotal(d);
+    }
+  }
 
   if (businessUnitIds.length === 0) {
     return res.json({
@@ -122,6 +176,15 @@ router.get("/", async (req, res) => {
         ytdActual: 0,
         attainmentPct: 0,
         ytdAttainmentPct: 0,
+        // Unlike every other figure in this early-return branch, these three
+        // are NOT hardcoded to 0 — Disbursements visibility is independent
+        // of the financial narrowing that emptied businessUnitIds above (see
+        // disbCompanies/disbCompanyIds above), so a user with real
+        // Disbursements access still sees their real totals even when their
+        // Revenue dashboard scope is otherwise completely empty.
+        quarterAdvancesActual: quarterAdvancesActualTotal,
+        quarterLoansActual: quarterLoansActualTotal,
+        quarterInterestsActual: quarterInterestsActualTotal,
       },
       chart: [],
       targetMatrix: [],
@@ -235,6 +298,11 @@ router.get("/", async (req, res) => {
   let quarterActualTotal = 0;
   let ytdTargetTotal = 0;
   let ytdActualTotal = 0;
+  // Note: quarterAdvancesActualTotal/quarterLoansActualTotal/
+  // quarterInterestsActualTotal were already computed further up (from
+  // disbCompanies, independently of this financially-narrowed companyIds
+  // loop) — see the comment there for why Disbursements needs its own
+  // separately-scoped company list.
 
   for (const cid of companyIds) {
     const annual = annualByCompany.get(cid) || emptyFigures();
@@ -275,6 +343,9 @@ router.get("/", async (req, res) => {
     ytdActual: ytdActualTotal,
     attainmentPct: pct(quarterActualTotal, quarterRevenueTargetTotal),
     ytdAttainmentPct: pct(ytdActualTotal, ytdTargetTotal),
+    quarterAdvancesActual: quarterAdvancesActualTotal,
+    quarterLoansActual: quarterLoansActualTotal,
+    quarterInterestsActual: quarterInterestsActualTotal,
   };
 
   // ---------- Target Distribution Matrix: Q1-Q4 Target per Business Unit, by category, plus their Annual (Q1-Q4) sum ----------

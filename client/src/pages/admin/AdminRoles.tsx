@@ -3,7 +3,17 @@ import { ChevronDown, ChevronRight, Pencil, Plus, Trash2, X } from "lucide-react
 import { api } from "../../api/client";
 import type { BusinessUnit, CustomRole, Resource, RolePermission } from "../../api/types";
 
-const RESOURCES: Resource[] = ["TARGETS", "REVENUE", "COLLECTIONS", "EXPENSES", "ROCKS", "SCORECARD", "AUDIT_LOG", "REPORTS"];
+const RESOURCES: Resource[] = [
+  "TARGETS",
+  "REVENUE",
+  "COLLECTIONS",
+  "EXPENSES",
+  "ROCKS",
+  "SCORECARD",
+  "AUDIT_LOG",
+  "REPORTS",
+  "DISBURSEMENTS",
+];
 const RESOURCE_LABELS: Record<Resource, string> = {
   TARGETS: "Targets",
   REVENUE: "Revenue",
@@ -13,6 +23,7 @@ const RESOURCE_LABELS: Record<Resource, string> = {
   SCORECARD: "Executive Scorecard",
   AUDIT_LOG: "Audit Log",
   REPORTS: "Reports",
+  DISBURSEMENTS: "Disbursements",
 };
 
 type Grants = Record<Resource, { canView: boolean; canEdit: boolean; canDelete: boolean }>;
@@ -215,13 +226,15 @@ export default function AdminRoles() {
           <p className="text-sm text-slate-500">
             Named permission profiles you can assign to any user (any number at once) — pick which Business
             Units/Companies they can touch, and whether they can View, Edit, or Delete each of Targets, Revenue,
-            Collections, Expenses, Rocks, the Executive Scorecard, the Audit Log, and Reports there. Only the View
-            column matters for the Executive Scorecard, the Audit Log, and Reports — all three are read-only pages, so
-            Edit/Delete checkboxes for them are ignored. The Audit Log and Reports aren't really scoped to any one
-            Business Unit/Company the way the others are (the Audit Log is a single global log; Reports is its own
-            page-level gate, with the underlying figures still masked by whatever Revenue/Collections/Expenses/Rocks
-            grants apply), so granting either View on any one row here is enough to open that page at all — they're
-            just attached to a scope here to reuse the same picker.
+            Collections, Expenses, Rocks, Disbursements, the Executive Scorecard, the Audit Log, and Reports there.
+            Disbursements works just like Rocks — a single combined grant covering all three sub-categories
+            (Advances/Loans/Interests) together, rather than three separate resources the way Revenue/Collections/
+            Expenses are. Only the View column matters for the Executive Scorecard, the Audit Log, and Reports — all
+            three are read-only pages, so Edit/Delete checkboxes for them are ignored. The Audit Log and Reports
+            aren't really scoped to any one Business Unit/Company the way the others are (the Audit Log is a single
+            global log; Reports is its own page-level gate, with the underlying figures still masked by whatever
+            Revenue/Collections/Expenses/Rocks/Disbursements grants apply), so granting either View on any one row
+            here is enough to open that page at all — they're just attached to a scope here to reuse the same picker.
           </p>
         </div>
         <button

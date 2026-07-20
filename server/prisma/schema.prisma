@@ -30,6 +30,10 @@ enum Role {
 // Unit/Company the way the others are (it's a global security log), so a
 // Custom Role's AUDIT_LOG grant is checked without regard to which
 // Business Unit/Company row it's attached to — see routes/auditLog.ts.
+// DISBURSEMENTS is one combined resource covering all three Disbursement
+// sub-categories (Advances/Loans/Interests) together — unlike REVENUE/
+// COLLECTIONS/EXPENSES, which are each independently gate-able, a single
+// DISBURSEMENTS grant covers all three at once (same granularity as ROCKS).
 enum PermissionResource {
   TARGETS
   REVENUE
@@ -39,6 +43,7 @@ enum PermissionResource {
   SCORECARD
   AUDIT_LOG
   REPORTS
+  DISBURSEMENTS
 }
 
 model User {
@@ -81,11 +86,12 @@ model User {
   // any number of Custom Roles (see UserCustomRole below), not just one.
   customRoles UserCustomRole[]
 
-  businessUnits UserBusinessUnit[]
-  actualEdits   QuarterActual[]    @relation("ActualEditedBy")
-  rockCreations Rock[]             @relation("RockCreatedBy")
-  rockEdits     Rock[]             @relation("RockUpdatedBy")
-  targetLocks   TargetLock[]
+  businessUnits       UserBusinessUnit[]
+  actualEdits         QuarterActual[]      @relation("ActualEditedBy")
+  disbursementEdits   DisbursementActual[] @relation("DisbursementEditedBy")
+  rockCreations       Rock[]               @relation("RockCreatedBy")
+  rockEdits           Rock[]               @relation("RockUpdatedBy")
+  targetLocks         TargetLock[]
 
   @@index([role])
 }
@@ -218,11 +224,12 @@ model Company {
   businessUnitId String
   createdAt      DateTime @default(now())
 
-  businessUnit   BusinessUnit    @relation(fields: [businessUnitId], references: [id], onDelete: Cascade)
-  quarterTargets QuarterTarget[]
-  quarterActuals QuarterActual[]
-  rocks          Rock[]
-  rolePermissions RolePermission[]
+  businessUnit        BusinessUnit         @relation(fields: [businessUnitId], references: [id], onDelete: Cascade)
+  quarterTargets      QuarterTarget[]
+  quarterActuals      QuarterActual[]
+  disbursementActuals DisbursementActual[]
+  rocks               Rock[]
+  rolePermissions     RolePermission[]
 
   @@unique([businessUnitId, name])
   @@index([businessUnitId])
@@ -233,10 +240,11 @@ model Year {
   year      Int      @unique
   createdAt DateTime @default(now())
 
-  quarterTargets QuarterTarget[]
-  quarterActuals QuarterActual[]
-  rocks          Rock[]
-  targetLocks    TargetLock[]
+  quarterTargets      QuarterTarget[]
+  quarterActuals      QuarterActual[]
+  disbursementActuals DisbursementActual[]
+  rocks               Rock[]
+  targetLocks         TargetLock[]
 }
 
 // A manual, admin-controlled lock on a Year+Quarter's Targets. This is the
@@ -321,6 +329,44 @@ model QuarterActual {
   company   Company @relation(fields: [companyId], references: [id], onDelete: Cascade)
   year      Year    @relation(fields: [yearId], references: [id], onDelete: Cascade)
   updatedBy User?   @relation("ActualEditedBy", fields: [updatedById], references: [id])
+
+  @@unique([companyId, yearId, quarter])
+  @@index([yearId, quarter])
+  @@index([companyId])
+}
+
+// Disbursements: recorded — not targeted — per Company/Year/Quarter, same
+// hierarchy as Quarter Actuals but with no corresponding Target model. Feeds
+// the KPI cards on the Revenue dashboard and Executive Scorecard today, and
+// is intended as a building block toward a later consolidated financial
+// pane of glass. All three sub-categories (Advances/Loans/Interests) live on
+// one row per Company/Year/Quarter (mirroring QuarterActual's Revenue/
+// Collections/Expenses), each split Internal/External with its own Remarks,
+// gated by a single combined DISBURSEMENTS Custom Role resource (not three
+// separate ones) — see routes/disbursements.ts.
+model DisbursementActual {
+  id        String @id @default(uuid())
+  companyId String
+  yearId    String
+  quarter   Int // 1-4
+
+  advancesInternal  Decimal @default(0) @db.Decimal(14, 2)
+  advancesExternal  Decimal @default(0) @db.Decimal(14, 2)
+  loansInternal     Decimal @default(0) @db.Decimal(14, 2)
+  loansExternal     Decimal @default(0) @db.Decimal(14, 2)
+  interestsInternal Decimal @default(0) @db.Decimal(14, 2)
+  interestsExternal Decimal @default(0) @db.Decimal(14, 2)
+
+  advancesRemarks  String @default("")
+  loansRemarks     String @default("")
+  interestsRemarks String @default("")
+
+  updatedById String?
+  updatedAt   DateTime @updatedAt
+
+  company   Company @relation(fields: [companyId], references: [id], onDelete: Cascade)
+  year      Year    @relation(fields: [yearId], references: [id], onDelete: Cascade)
+  updatedBy User?   @relation("DisbursementEditedBy", fields: [updatedById], references: [id])
 
   @@unique([companyId, yearId, quarter])
   @@index([yearId, quarter])

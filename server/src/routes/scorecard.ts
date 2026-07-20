@@ -2,7 +2,23 @@ import { Router } from "express";
 import { prisma } from "../lib/prisma";
 import { blockPendingPasswordChange, loadUserPermissions, requireAuth, scopedBusinessUnitFilter } from "../middleware/auth";
 import { can, canAnyOf, FINANCIAL_RESOURCES, hasAnyGrant } from "../utils/permissions";
-import { addFigures, collectionsTotal, emptyFigures, expensesTotal, Figures, pct, revenueTotal, toFigures } from "../utils/aggregate";
+import {
+  addDisbursementFigures,
+  addFigures,
+  advancesTotal,
+  collectionsTotal,
+  DisbursementFigures,
+  emptyDisbursementFigures,
+  emptyFigures,
+  expensesTotal,
+  Figures,
+  interestsTotal,
+  loansTotal,
+  pct,
+  revenueTotal,
+  toDisbursementFigures,
+  toFigures,
+} from "../utils/aggregate";
 import { escalateStaleRocks } from "../utils/rockAutoStatus";
 
 const router = Router();
@@ -83,9 +99,12 @@ router.get("/", async (req, res) => {
   let revenueBusinessUnits = businessUnits;
   let rockCompanies = companies;
   let rockBusinessUnits = businessUnits;
+  let disbCompanies = companies;
+  let disbBusinessUnits = businessUnits;
 
   const financialRoleActive = hasAnyGrant(permRows, FINANCIAL_RESOURCES);
   const rocksRoleActive = hasAnyGrant(permRows, ["ROCKS"]);
+  const disbursementsRoleActive = hasAnyGrant(permRows, ["DISBURSEMENTS"]);
 
   if (financialRoleActive) {
     revenueCompanies = companies.filter((c) =>
@@ -105,6 +124,15 @@ router.get("/", async (req, res) => {
       if (can(permRows, "view", "ROCKS", { businessUnitId: bu.id })) permittedRockBuIds.add(bu.id);
     }
     rockBusinessUnits = businessUnits.filter((bu) => permittedRockBuIds.has(bu.id));
+  }
+
+  if (disbursementsRoleActive) {
+    disbCompanies = companies.filter((c) => can(permRows, "view", "DISBURSEMENTS", { businessUnitId: c.businessUnitId, companyId: c.id }));
+    const permittedDisbBuIds = new Set(disbCompanies.map((c) => c.businessUnitId));
+    for (const bu of businessUnits) {
+      if (can(permRows, "view", "DISBURSEMENTS", { businessUnitId: bu.id })) permittedDisbBuIds.add(bu.id);
+    }
+    disbBusinessUnits = businessUnits.filter((bu) => permittedDisbBuIds.has(bu.id));
   }
 
   function isCatAllowed(companyId: string, businessUnitId: string, resource: "REVENUE" | "COLLECTIONS" | "EXPENSES"): boolean {
@@ -314,10 +342,55 @@ router.get("/", async (req, res) => {
       })),
   };
 
+  // ---------- Disbursements Summary ----------
+  // Recorded (not targeted), same period scope as Revenue above — one
+  // running total per sub-category (Advances/Loans/Interests), summed for
+  // whichever quarter(s) are in scope, plus a per-Business-Unit breakdown.
+  const disbCompanyIds = disbCompanies.map((c) => c.id);
+  const disbursementActuals = disbCompanyIds.length
+    ? await prisma.disbursementActual.findMany({ where: { yearId, companyId: { in: disbCompanyIds } } })
+    : [];
+  const disbByCompanyQuarter = new Map<string, DisbursementFigures>();
+  for (const d of disbursementActuals) disbByCompanyQuarter.set(`${d.companyId}:${d.quarter}`, toDisbursementFigures(d));
+
+  const disbCompaniesByBu = new Map<string, typeof disbCompanies>();
+  for (const c of disbCompanies) {
+    const list = disbCompaniesByBu.get(c.businessUnitId) || [];
+    list.push(c);
+    disbCompaniesByBu.set(c.businessUnitId, list);
+  }
+
+  let advancesActualTotal = 0;
+  let loansActualTotal = 0;
+  let interestsActualTotal = 0;
+
+  const disbBuRows = disbBusinessUnits.map((bu) => {
+    const buCompanies = disbCompaniesByBu.get(bu.id) || [];
+    let agg = emptyDisbursementFigures();
+    for (const c of buCompanies) {
+      for (const q of quartersInScope) {
+        agg = addDisbursementFigures(agg, disbByCompanyQuarter.get(`${c.id}:${q}`) || emptyDisbursementFigures());
+      }
+    }
+    const advances = advancesTotal(agg);
+    const loans = loansTotal(agg);
+    const interests = interestsTotal(agg);
+    advancesActualTotal += advances;
+    loansActualTotal += loans;
+    interestsActualTotal += interests;
+    return { businessUnitId: bu.id, businessUnitName: bu.name, advancesActual: advances, loansActual: loans, interestsActual: interests };
+  });
+
+  const disbursementsSection = {
+    summary: { advancesActual: advancesActualTotal, loansActual: loansActualTotal, interestsActual: interestsActualTotal },
+    businessUnits: disbBuRows,
+  };
+
   res.json({
     scope: { yearId, quarter, allQuarters: isAllQuarters, businessUnitId: businessUnitId || null },
     revenue,
     rocks: rocksSection,
+    disbursements: disbursementsSection,
   });
 });
 

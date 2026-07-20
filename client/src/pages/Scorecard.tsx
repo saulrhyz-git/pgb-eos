@@ -5,8 +5,11 @@ import {
   CalendarRange,
   CheckCircle2,
   Gauge,
+  HandCoins,
+  Landmark,
   ListChecks,
   Mountain,
+  Percent,
   PhilippinePeso,
   ShieldAlert,
   TrendingUp,
@@ -148,6 +151,7 @@ function SummaryStat({
 
 type RevSortKey = "businessUnitName" | "quarterAttainmentPct" | "ytdVsAnnualPct" | "annualTarget" | "ytdActual";
 type RockSortKey = "businessUnitName" | "total" | "avgProgressPct" | "atRisk";
+type DisbSortKey = "businessUnitName" | "advancesActual" | "loansActual" | "interestsActual";
 
 function SortHeader<T extends string>({
   label,
@@ -193,6 +197,7 @@ export default function Scorecard() {
 
   const [revSort, setRevSort] = useState<{ key: RevSortKey; dir: "asc" | "desc" }>({ key: "businessUnitName", dir: "asc" });
   const [rockSort, setRockSort] = useState<{ key: RockSortKey; dir: "asc" | "desc" }>({ key: "businessUnitName", dir: "asc" });
+  const [disbSort, setDisbSort] = useState<{ key: DisbSortKey; dir: "asc" | "desc" }>({ key: "businessUnitName", dir: "asc" });
 
   useEffect(() => {
     Promise.all([api.years(), api.currentQuarter().catch(() => null)]).then(([ys, current]) => {
@@ -253,11 +258,26 @@ export default function Scorecard() {
     return rows;
   }, [data, rockSort]);
 
+  const sortedDisbRows = useMemo(() => {
+    if (!data) return [];
+    const rows = [...data.disbursements.businessUnits];
+    rows.sort((a, b) => {
+      const av = a[disbSort.key];
+      const bv = b[disbSort.key];
+      const cmp = typeof av === "string" ? av.localeCompare(bv as string) : (av as number) - (bv as number);
+      return disbSort.dir === "asc" ? cmp : -cmp;
+    });
+    return rows;
+  }, [data, disbSort]);
+
   function toggleRevSort(key: RevSortKey) {
     setRevSort((s) => (s.key === key ? { key, dir: s.dir === "asc" ? "desc" : "asc" } : { key, dir: "asc" }));
   }
   function toggleRockSort(key: RockSortKey) {
     setRockSort((s) => (s.key === key ? { key, dir: s.dir === "asc" ? "desc" : "asc" } : { key, dir: "asc" }));
+  }
+  function toggleDisbSort(key: DisbSortKey) {
+    setDisbSort((s) => (s.key === key ? { key, dir: s.dir === "asc" ? "desc" : "asc" } : { key, dir: "asc" }));
   }
 
   const periodLabel = quarter === 0 ? "Full Year" : `Q${quarter}`;
@@ -445,6 +465,68 @@ export default function Scorecard() {
                           <td className="px-4 py-3 text-slate-600">{formatCurrency(bu.ytdActual)}</td>
                           <td className="px-4 py-3">
                             <span className={`text-xs font-semibold ${attainmentColor(bu.ytdVsAnnualPct)}`}>{formatPct(bu.ytdVsAnnualPct)}</span>
+                          </td>
+                        </tr>
+                      ))}
+                    </tbody>
+                  </table>
+                </div>
+              </div>
+            )}
+          </section>
+
+          {/* ---------- Disbursements Summary ---------- */}
+          {/* Recorded, not targeted — same period scope as Revenue above, but
+              no Target/Attainment framing since there's nothing to compare
+              against. */}
+          <section className="flex flex-col gap-4">
+            <h3 className="text-base font-semibold text-slate-800">Disbursements Summary</h3>
+
+            <div className="grid grid-cols-1 gap-4 sm:grid-cols-3">
+              <SummaryStat
+                icon={<HandCoins className="h-4 w-4" />}
+                label={`${periodLabel} Advances`}
+                value={formatCurrencyShort(data.disbursements.summary.advancesActual)}
+                fullValue={formatCurrency(data.disbursements.summary.advancesActual)}
+              />
+              <SummaryStat
+                icon={<Landmark className="h-4 w-4" />}
+                label={`${periodLabel} Loans`}
+                value={formatCurrencyShort(data.disbursements.summary.loansActual)}
+                fullValue={formatCurrency(data.disbursements.summary.loansActual)}
+              />
+              <SummaryStat
+                icon={<Percent className="h-4 w-4" />}
+                label={`${periodLabel} Interests`}
+                value={formatCurrencyShort(data.disbursements.summary.interestsActual)}
+                fullValue={formatCurrency(data.disbursements.summary.interestsActual)}
+              />
+            </div>
+
+            {data.disbursements.businessUnits.length > 0 && (
+              <div className="overflow-hidden rounded-lg border border-slate-200 bg-white shadow-sm">
+                <div className="overflow-x-auto">
+                  <table className="w-full min-w-[560px] text-sm">
+                    <thead className="bg-slate-50 text-left text-xs font-semibold uppercase text-slate-500">
+                      <tr>
+                        <SortHeader label="Business Unit" sortKey="businessUnitName" active={disbSort.key} dir={disbSort.dir} onClick={toggleDisbSort} />
+                        <SortHeader label="Advances" sortKey="advancesActual" active={disbSort.key} dir={disbSort.dir} onClick={toggleDisbSort} />
+                        <SortHeader label="Loans" sortKey="loansActual" active={disbSort.key} dir={disbSort.dir} onClick={toggleDisbSort} />
+                        <SortHeader label="Interests" sortKey="interestsActual" active={disbSort.key} dir={disbSort.dir} onClick={toggleDisbSort} />
+                      </tr>
+                    </thead>
+                    <tbody className="divide-y divide-slate-100">
+                      {sortedDisbRows.map((bu) => (
+                        <tr key={bu.businessUnitId}>
+                          <td className="px-4 py-3 font-medium text-slate-800">{bu.businessUnitName}</td>
+                          <td className="px-4 py-3 text-slate-600" title={formatCurrency(bu.advancesActual)}>
+                            {formatCurrencyShort(bu.advancesActual)}
+                          </td>
+                          <td className="px-4 py-3 text-slate-600" title={formatCurrency(bu.loansActual)}>
+                            {formatCurrencyShort(bu.loansActual)}
+                          </td>
+                          <td className="px-4 py-3 text-slate-600" title={formatCurrency(bu.interestsActual)}>
+                            {formatCurrencyShort(bu.interestsActual)}
                           </td>
                         </tr>
                       ))}

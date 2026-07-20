@@ -9,7 +9,16 @@ export type Role = "SUPERADMIN" | "GROUP_INTEGRATOR" | "BU_INTEGRATOR";
 // see permissions.ts on the backend for why it's excluded from
 // visibility-filtering logic despite still being requested through the same
 // per-BU/Company matrix UI.
-export type Resource = "TARGETS" | "REVENUE" | "COLLECTIONS" | "EXPENSES" | "ROCKS" | "SCORECARD" | "AUDIT_LOG" | "REPORTS";
+export type Resource =
+  | "TARGETS"
+  | "REVENUE"
+  | "COLLECTIONS"
+  | "EXPENSES"
+  | "ROCKS"
+  | "SCORECARD"
+  | "AUDIT_LOG"
+  | "REPORTS"
+  | "DISBURSEMENTS";
 
 export interface AuthUser {
   id: string;
@@ -134,6 +143,12 @@ export interface Kpis {
   ytdActual: number;
   attainmentPct: number;
   ytdAttainmentPct: number;
+  // Disbursements: recorded (not targeted), so — unlike the pairs above —
+  // each of these is just one running actual total for the selected period
+  // (respects the Quarter filter, same "All Quarters = sum of Q1-Q4" rule).
+  quarterAdvancesActual: number;
+  quarterLoansActual: number;
+  quarterInterestsActual: number;
 }
 
 export interface ChartPoint {
@@ -298,10 +313,53 @@ export interface ScorecardRocks {
   attentionNeeded: ScorecardAttentionRock[];
 }
 
+export interface ScorecardDisbursementsSummary {
+  advancesActual: number;
+  loansActual: number;
+  interestsActual: number;
+}
+
+export interface ScorecardDisbursementsBuRow extends ScorecardDisbursementsSummary {
+  businessUnitId: string;
+  businessUnitName: string;
+}
+
+export interface ScorecardDisbursements {
+  summary: ScorecardDisbursementsSummary;
+  businessUnits: ScorecardDisbursementsBuRow[];
+}
+
 export interface ScorecardResponse {
   scope: { yearId: string; quarter: number; allQuarters: boolean; businessUnitId: string | null };
   revenue: ScorecardRevenue;
   rocks: ScorecardRocks;
+  disbursements: ScorecardDisbursements;
+}
+
+// ---------- Disbursements ----------
+// Recorded — not targeted — per Company/Year/Quarter, same hierarchy as
+// Quarter Actuals but with no corresponding Target. All three sub-categories
+// (Advances/Loans/Interests) live on one row per Company/Year/Quarter, each
+// split Internal/External with its own Remarks — see
+// server/src/routes/disbursements.ts.
+export type DisbursementCategory = "ADVANCES" | "LOANS" | "INTERESTS";
+
+export interface DisbursementActual {
+  id: string;
+  companyId: string;
+  yearId: string;
+  quarter: number;
+  advancesInternal: number;
+  advancesExternal: number;
+  loansInternal: number;
+  loansExternal: number;
+  interestsInternal: number;
+  interestsExternal: number;
+  advancesRemarks: string;
+  loansRemarks: string;
+  interestsRemarks: string;
+  updatedAt: string;
+  company: { id: string; name: string; businessUnitId: string };
 }
 
 export interface Rock {

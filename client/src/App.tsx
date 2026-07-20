@@ -8,6 +8,7 @@ import Profile from "./pages/Profile";
 import Scorecard from "./pages/Scorecard";
 import Rocks from "./pages/Rocks";
 import Reports from "./pages/Reports";
+import DisbursementEntry from "./pages/Disbursements";
 import IntegratorPortal from "./pages/IntegratorPortal";
 import TargetConfig from "./pages/TargetConfig";
 import AdminUsers from "./pages/admin/AdminUsers";
@@ -66,6 +67,17 @@ export default function App() {
         <Route path="revenue" element={<Dashboard />} />
         <Route path="rocks" element={<Rocks />} />
         <Route path="reports" element={<Reports />} />
+        {/* Three sub-tabs sharing one parameterized component (see
+            Disbursements.tsx) — no Target Setup counterpart, since
+            Disbursements are recorded, not targeted. The index redirect
+            lets the collapsible sidebar's "Disbursements" parent link land
+            somewhere sensible if clicked directly instead of expanded. */}
+        <Route path="disbursements">
+          <Route index element={<Navigate to="advances" replace />} />
+          <Route path="advances" element={<DisbursementEntry category="ADVANCES" title="Advances" />} />
+          <Route path="loans" element={<DisbursementEntry category="LOANS" title="Loans" />} />
+          <Route path="interests" element={<DisbursementEntry category="INTERESTS" title="Interests" />} />
+        </Route>
         <Route path="data-entry" element={<IntegratorPortal />} />
         <Route path="targets" element={<TargetConfig />} />
         {/* This top-level /audit-log route exists only so a non-superadmin

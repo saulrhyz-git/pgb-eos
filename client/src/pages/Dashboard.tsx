@@ -3,6 +3,7 @@ import { api } from "../api/client";
 import type { DashboardResponse } from "../api/types";
 import FilterBar, { DashboardFilters } from "../components/FilterBar";
 import KpiCards from "../components/KpiCards";
+import DisbursementCards from "../components/DisbursementCards";
 import ProgressChart from "../components/ProgressChart";
 import TargetMatrix from "../components/TargetMatrix";
 import OperationalGrid from "../components/OperationalGrid";
@@ -48,6 +49,7 @@ export default function Dashboard() {
       {data && (
         <>
           <KpiCards kpis={data.kpis} quarter={filters.quarter} />
+          <DisbursementCards kpis={data.kpis} quarter={filters.quarter} />
           <ProgressChart chart={data.chart} />
           <TargetMatrix rows={data.targetMatrix} />
           <OperationalGrid
