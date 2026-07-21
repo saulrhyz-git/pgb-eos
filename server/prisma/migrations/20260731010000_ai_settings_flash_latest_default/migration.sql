@@ -1,0 +1,14 @@
+-- Google retired "gemini-2.5-flash" for new callers, breaking this
+-- column's original default. Switches the column default to
+-- "gemini-flash-latest" — a Google-maintained alias that always resolves
+-- to the current recommended Flash model, so this default doesn't go stale
+-- the same way again.
+--
+-- This ALTER only changes what NEW rows default to; it deliberately does
+-- NOT touch any already-saved AiSettings row's `model` value (an UPDATE
+-- here could silently override a Superadmin's own explicit choice of
+-- model). If your AI Analysis calls are failing with a
+-- "model ... is no longer available" error, go to Admin -> AI Settings and
+-- update/re-save the Model field by hand — see the README entry on this
+-- migration for exact steps.
+ALTER TABLE "AiSettings" ALTER COLUMN "model" SET DEFAULT 'gemini-flash-latest';

@@ -1911,3 +1911,33 @@ that Business Unit's revenue and doesn't reference Rocks/Disbursements
 figures it was never granted; and the Audit Log shows one
 `AI_ANALYSIS_GENERATE` entry per click, with the scope/model in its
 metadata but never the generated text itself.
+
+**Fix: AI Analysis's default Gemini model ("gemini-2.5-flash") was retired
+by Google for new callers.** Google stopped granting new API keys access
+to `gemini-2.5-flash` after this feature shipped, so a freshly-configured
+AI Settings page (or any Superadmin who hadn't yet changed the pre-filled
+default) started failing with "This model models/gemini-2.5-flash is no
+longer available to new users." The default in both
+`server/prisma/schema.prisma` (`AiSettings.model`'s `@default(...)`, via a
+new migration, `20260731010000_ai_settings_flash_latest_default`, that
+`ALTER`s the column default) and `client/src/pages/admin/
+AdminAiSettings.tsx` (`DEFAULT_MODEL`, used both as the input's placeholder
+and its initial pre-fill before anything's been saved) is now
+`gemini-flash-latest` — a Google-maintained alias that always resolves to
+the current recommended Flash model rather than a specific dated release,
+so this exact class of breakage (a pinned model name quietly going stale)
+shouldn't recur for the default itself. This doesn't touch the `model`
+column's *default* on new rows/fresh installs only — an admin can still
+type any specific model name their key has access to, same as before.
+
+**This does NOT automatically fix an installation that already has
+`gemini-2.5-flash` saved** — that's a value sitting in your database's
+`AiSettings` row, not something a code update can reach into and change
+for you (and this migration deliberately avoids overwriting whatever a
+Superadmin explicitly saved, in case it wasn't actually the default). If
+you're hitting this error: pull this update, run `npm run prisma:migrate`
+in `server/`, then log in as Superadmin, go to Admin → AI Settings, clear
+the Model field and either leave it blank-then-retype (or type
+`gemini-flash-latest` directly), and Save — then Test Connection to
+confirm. Worth checking by hand: after re-saving, Test Connection succeeds
+and Generate Analysis on the AI Analysis tab works again.

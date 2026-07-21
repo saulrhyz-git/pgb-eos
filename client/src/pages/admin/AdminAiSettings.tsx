@@ -2,7 +2,13 @@ import { FormEvent, useEffect, useState } from "react";
 import { CheckCircle2, Save, Sparkles } from "lucide-react";
 import { api } from "../../api/client";
 
-const DEFAULT_MODEL = "gemini-2.5-flash";
+// "gemini-flash-latest" is a Google-maintained alias that always resolves
+// to the current recommended Flash model, rather than a pinned dated model
+// name (e.g. "gemini-2.5-flash") that Google can — and did — retire for new
+// callers. Using the alias means this default keeps working without a code
+// change as Google rolls new model generations out; an admin can still
+// override it with any specific model name their API key has access to.
+const DEFAULT_MODEL = "gemini-flash-latest";
 
 export default function AdminAiSettings() {
   const [apiKey, setApiKey] = useState("");
