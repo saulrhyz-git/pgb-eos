@@ -4,6 +4,7 @@ import { z } from "zod";
 import { prisma } from "../lib/prisma";
 import { blockPendingPasswordChange, requireAuth, requireRole } from "../middleware/auth";
 import { logAudit } from "../utils/auditLog";
+import { callGemini } from "../utils/gemini";
 
 // SMTP configuration used to send email notifications, managed by the
 // superadmin. Stored as a single row keyed by a fixed id so GET/PUT always
@@ -94,6 +95,73 @@ router.put("/smtp", async (req, res) => {
     metadata: { host, port, secure, username: username ?? null, fromAddress, fromName: fromName ?? null, passwordChanged: Boolean(password) },
   });
   res.json(serialize(settings));
+});
+
+// ---------- AI Settings (Google Gemini, used by the AI Analysis feature) ----------
+// Same singleton-row pattern as SMTP settings above. The API key is never
+// echoed back to the frontend, only whether one is currently set
+// (hasApiKey) — same treatment as SMTP's password. `model` is a plain
+// free-text field (not an enum) since Gemini's available model names change
+// over time; the frontend pre-fills it with a sensible current default but
+// an admin can type any model string their API key has access to.
+const AI_SETTINGS_ID = "default";
+
+function serializeAi(settings: { apiKey: string | null; model: string; updatedAt: Date } | null) {
+  if (!settings) return null;
+  return {
+    hasApiKey: Boolean(settings.apiKey),
+    model: settings.model,
+    updatedAt: settings.updatedAt,
+  };
+}
+
+router.get("/ai", async (_req, res) => {
+  const settings = await prisma.aiSettings.findUnique({ where: { id: AI_SETTINGS_ID } });
+  res.json(serializeAi(settings));
+});
+
+const aiSettingsSchema = z.object({
+  // Optional: omit or leave blank to keep the currently stored key (e.g.
+  // when changing just the model without re-entering the key).
+  apiKey: z.string().optional(),
+  model: z.string().trim().min(1, "Model name is required"),
+});
+
+router.put("/ai", async (req, res) => {
+  const parsed = aiSettingsSchema.safeParse(req.body);
+  if (!parsed.success) return res.status(400).json({ error: parsed.error.issues[0]?.message || "Invalid AI settings", details: parsed.error.issues });
+
+  const { apiKey, model } = parsed.data;
+  const existing = await prisma.aiSettings.findUnique({ where: { id: AI_SETTINGS_ID } });
+
+  const settings = await prisma.aiSettings.upsert({
+    where: { id: AI_SETTINGS_ID },
+    update: { model, apiKey: apiKey ? apiKey : existing?.apiKey ?? null },
+    create: { id: AI_SETTINGS_ID, model, apiKey: apiKey ?? null },
+  });
+
+  // Never log the API key value itself, just that settings were touched.
+  await logAudit({
+    user: req.user,
+    action: "AI_SETTINGS_UPDATE",
+    entityType: "AiSettings",
+    entityId: settings.id,
+    summary: `Updated AI Analysis settings (model: ${model})`,
+    metadata: { model, apiKeyChanged: Boolean(apiKey) },
+  });
+  res.json(serializeAi(settings));
+});
+
+router.post("/ai/test", async (req, res) => {
+  const settings = await prisma.aiSettings.findUnique({ where: { id: AI_SETTINGS_ID } });
+  if (!settings?.apiKey) return res.status(400).json({ error: "An API key has not been configured yet — save one above first" });
+
+  try {
+    const reply = await callGemini(settings.apiKey, settings.model, 'Reply with exactly the single word "OK" and nothing else.');
+    res.json({ ok: true, reply });
+  } catch (err: any) {
+    res.status(502).json({ error: err.message || "Failed to reach Gemini" });
+  }
 });
 
 const testSchema = z.object({ to: z.string().email() });

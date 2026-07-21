@@ -19,7 +19,8 @@ export type Resource =
   | "AUDIT_LOG"
   | "REPORTS"
   | "DISBURSEMENTS"
-  | "COMPARISON";
+  | "COMPARISON"
+  | "AI_ANALYSIS";
 
 export interface AuthUser {
   id: string;
@@ -86,6 +87,16 @@ export interface SmtpSettings {
   hasPassword: boolean;
   fromAddress: string;
   fromName: string | null;
+  updatedAt: string;
+}
+
+// Google Gemini configuration for the AI Analysis feature — same
+// singleton-row, "never echo the secret back" pattern as SmtpSettings
+// above (hasApiKey mirrors hasPassword). `model` is free text (not an
+// enum) since Gemini's available model names change over time.
+export interface AiSettings {
+  hasApiKey: boolean;
+  model: string;
   updatedAt: string;
 }
 
@@ -411,6 +422,24 @@ export interface ScorecardResponse {
   revenue: ScorecardRevenue;
   rocks: ScorecardRocks;
   disbursements: ScorecardDisbursements;
+}
+
+// AI Analysis — generated fresh on every request (nothing persisted), from
+// the exact same dataset the Executive Scorecard shows. See
+// server/src/routes/aiAnalysis.ts.
+export interface AiAnalysisResult {
+  analysis: string;
+  model: string;
+  generatedAt: string;
+  scope: {
+    yearId: string;
+    quarter: number;
+    allQuarters: boolean;
+    businessUnitId: string | null;
+    yearLabel: string;
+    periodLabel: string;
+    scopeLabel: string;
+  };
 }
 
 // ---------- Disbursements ----------

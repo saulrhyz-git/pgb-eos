@@ -1,6 +1,6 @@
 import { Router } from "express";
 import { prisma } from "../lib/prisma";
-import { blockPendingPasswordChange, loadUserPermissions, requireAuth, scopedBusinessUnitFilter } from "../middleware/auth";
+import { AuthUser, blockPendingPasswordChange, loadUserPermissions, requireAuth, scopedBusinessUnitFilter } from "../middleware/auth";
 import { can, canAnyOf, FINANCIAL_RESOURCES, hasAnyGrant } from "../utils/permissions";
 import {
   addDisbursementFigures,
@@ -44,41 +44,48 @@ router.use(async (req, res, next) => {
   return res.status(403).json({ error: "You don't have access to the Executive Scorecard" });
 });
 
+export interface ScorecardParams {
+  yearId?: string;
+  quarter?: string;
+  businessUnitId?: string;
+}
+
 /**
- * GET /api/scorecard
- * Query params: yearId (required), quarter (1-4, or "all"/omitted for the
- * full year — full year is the default here, since this is a board-level
- * view), businessUnitId (optional drill-down; no Company-level drill-down —
- * this page is intentionally summary-only).
- *
- * Two independent sections, each reusing the exact same figures/scoping the
- * Revenue dashboard and Rocks page already use — this route just re-shapes
- * them into a condensed, BU-level-only summary suited to a C-Level/BOD
- * audience instead of the row-by-row Operational Grid / Rocks table.
+ * Computes the Executive Scorecard's data — the Revenue Performance
+ * Summary, Rocks Performance Summary, and Disbursements Summary sections —
+ * for a given user and scope. Extracted out of the GET / route handler
+ * below so routes/aiAnalysis.ts can build its Gemini prompt from the exact
+ * same numbers the Scorecard page shows, rather than re-deriving them
+ * separately (and risking the two drifting apart). Throws an Error with a
+ * `.status` property (400/403/etc, matching this codebase's usual ad-hoc
+ * error convention — see assertBusinessUnitAccess) on invalid input or an
+ * access violation; callers should catch and respond with
+ * `err.status || 500`, same as every other route in this file.
  */
-router.get("/", async (req, res) => {
-  const user = req.user!;
-  const { yearId, businessUnitId } = req.query as Record<string, string | undefined>;
-  const quarterParam = req.query.quarter as string | undefined;
+export async function computeScorecard(user: AuthUser, params: ScorecardParams) {
+  const { yearId, businessUnitId } = params;
+  const quarterParam = params.quarter;
   const isAllQuarters = quarterParam === "all" || quarterParam === undefined;
   const quarter = isAllQuarters ? 4 : Number(quarterParam);
   const quartersInScope = isAllQuarters ? [1, 2, 3, 4] : [quarter];
 
-  if (!yearId) return res.status(400).json({ error: "yearId is required" });
+  if (!yearId) {
+    const err: any = new Error("yearId is required");
+    err.status = 400;
+    throw err;
+  }
   if (!isAllQuarters && (quarter < 1 || quarter > 4)) {
-    return res.status(400).json({ error: 'quarter must be 1-4 or "all"' });
+    const err: any = new Error('quarter must be 1-4 or "all"');
+    err.status = 400;
+    throw err;
   }
 
   const buWhere: any = {};
   const companyWhere: any = {};
-  try {
-    const buFilter = scopedBusinessUnitFilter(user, businessUnitId);
-    if (buFilter) {
-      buWhere.id = buFilter;
-      companyWhere.businessUnitId = buFilter;
-    }
-  } catch (err: any) {
-    return res.status(err.status || 500).json({ error: err.message });
+  const buFilter = scopedBusinessUnitFilter(user, businessUnitId);
+  if (buFilter) {
+    buWhere.id = buFilter;
+    companyWhere.businessUnitId = buFilter;
   }
 
   const permRows = await loadUserPermissions(user);
@@ -401,12 +408,35 @@ router.get("/", async (req, res) => {
     businessUnits: disbBuRows,
   };
 
-  res.json({
+  return {
     scope: { yearId, quarter, allQuarters: isAllQuarters, businessUnitId: businessUnitId || null },
     revenue,
     rocks: rocksSection,
     disbursements: disbursementsSection,
-  });
+  };
+}
+
+/**
+ * GET /api/scorecard
+ * Query params: yearId (required), quarter (1-4, or "all"/omitted for the
+ * full year — full year is the default here, since this is a board-level
+ * view), businessUnitId (optional drill-down; no Company-level drill-down —
+ * this page is intentionally summary-only).
+ *
+ * Two independent sections, each reusing the exact same figures/scoping the
+ * Revenue dashboard and Rocks page already use — this route just re-shapes
+ * them into a condensed, BU-level-only summary suited to a C-Level/BOD
+ * audience instead of the row-by-row Operational Grid / Rocks table. See
+ * computeScorecard() above for the actual work; this handler is now just
+ * the HTTP wrapper around it.
+ */
+router.get("/", async (req, res) => {
+  try {
+    const result = await computeScorecard(req.user!, req.query as Record<string, string | undefined>);
+    res.json(result);
+  } catch (err: any) {
+    res.status(err.status || 500).json({ error: err.message });
+  }
 });
 
 export default router;

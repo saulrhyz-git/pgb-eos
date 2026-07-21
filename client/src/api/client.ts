@@ -1,6 +1,8 @@
 import type {
   ActualRemarks,
   AdminUser,
+  AiAnalysisResult,
+  AiSettings,
   AuditLogMeta,
   AuditLogPage,
   AuthUser,
@@ -231,6 +233,14 @@ export const api = {
   testSmtpSettings: (to: string) =>
     request<{ ok: true }>("/settings/smtp/test", { method: "POST", body: JSON.stringify({ to }) }),
 
+  // ---------- AI Settings (Superadmin only) ----------
+  // Google Gemini configuration used by the AI Analysis feature — same
+  // singleton-settings pattern as SMTP above.
+  getAiSettings: () => request<AiSettings | null>("/settings/ai"),
+  putAiSettings: (payload: { apiKey?: string; model: string }) =>
+    request<AiSettings>("/settings/ai", { method: "PUT", body: JSON.stringify(payload) }),
+  testAiSettings: () => request<{ ok: true; reply: string }>("/settings/ai/test", { method: "POST" }),
+
   // ---------- Custom Roles (Superadmin only) ----------
   // Named permission profiles assignable to Users as an additional,
   // more granular layer on top of their base Role — see server's
@@ -259,6 +269,18 @@ export const api = {
     const qs = new URLSearchParams({ yearId: params.yearId, quarter: params.quarter === 0 ? "all" : String(params.quarter) });
     if (params.businessUnitId) qs.set("businessUnitId", params.businessUnitId);
     return request<ScorecardResponse>(`/scorecard?${qs.toString()}`);
+  },
+
+  // ---------- AI Analysis ----------
+  // Default access is Superadmin; a non-superadmin needs a Custom Role that
+  // grants AI_ANALYSIS view (403 otherwise). Generated fresh on every call
+  // from the same dataset as the Executive Scorecard — see
+  // server/src/routes/aiAnalysis.ts. Same Year/Quarter/Business-Unit
+  // filter contract as scorecard() above.
+  aiAnalysis: (params: { yearId: string; quarter: number; businessUnitId?: string }) => {
+    const qs = new URLSearchParams({ yearId: params.yearId, quarter: params.quarter === 0 ? "all" : String(params.quarter) });
+    if (params.businessUnitId) qs.set("businessUnitId", params.businessUnitId);
+    return request<AiAnalysisResult>(`/ai-analysis?${qs.toString()}`);
   },
 
   // ---------- Rocks ----------

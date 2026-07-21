@@ -1782,3 +1782,132 @@ typing a value that isn't on the list still works but shows Excel's warning
 triangle rather than being blocked outright; and the template still opens
 and uploads correctly end to end (parsing is unaffected by which library
 generated the file).
+
+**New feature: AI Analysis tab — an AI-generated executive analysis powered
+by Google Gemini.** A new "AI Analysis" nav item (Sparkles icon) opens a
+page with the same Year/Quarter/Business Unit filter row as the Executive
+Scorecard, plus a "Generate Analysis" button. On click, the backend builds
+a plain-text brief from the exact same dataset the Executive Scorecard
+shows — Revenue/Collections/Expenses attainment, Net Income, per-Business-
+Unit breakdowns, Rocks (90-day priority) status and progress, and
+Disbursements — and sends it to Google's Gemini API, which writes a 4-6
+paragraph board-ready narrative covering overall performance, Net Income,
+leading/lagging Business Units, Rocks health, notable Disbursement
+activity, and 2-3 actionable recommendations. Nothing is auto-generated on
+filter change (unlike the Scorecard/Revenue dashboards) since every
+generation is a real call to a paid external API — the user has to
+explicitly click Generate (or Regenerate). Nothing is persisted either:
+each click is a fresh call, nothing is cached or stored server-side beyond
+a summary line in the Audit Log (`AI_ANALYSIS_GENERATE` — records the
+scope and model used, never the generated text itself).
+
+Default access is **Superadmin only** — tighter than the Executive
+Scorecard's default (Superadmin + Group Integrator), since this feature
+calls out to a paid external API on the app's own key. A Superadmin can
+extend access to other users via a new **AI Analysis** entry in the Admin →
+Roles Custom Role matrix (`AI_ANALYSIS` added to the `PermissionResource`
+enum, `resourceEnum`, `ALL_RESOURCES`, and `RESOURCES`/`RESOURCE_LABELS`
+across the usual five files this pattern always touches — schema.prisma,
+`utils/permissions.ts`, `routes/customRoles.ts`, and `AdminRoles.tsx`) —
+same "grant AI_ANALYSIS view" mechanism as the Audit Log, and the exact
+same access-gate code shape (`server/src/routes/aiAnalysis.ts`'s
+`router.use(...)` middleware). Once past that coarse "can they open the
+page" gate, the underlying data is still scoped/masked by the requesting
+user's normal REVENUE/COLLECTIONS/EXPENSES/ROCKS/DISBURSEMENTS grants
+(inherited for free by reusing `computeScorecard()`, see below) — so a
+scoped user's AI Analysis can never describe data they couldn't already
+see on the Scorecard/Revenue/Rocks pages themselves.
+
+**Backend structure:**
+- `schema.prisma`: `AI_ANALYSIS` added to the `PermissionResource` enum
+  (its own migration, `20260724020000_add_ai_analysis_permission_resource`,
+  separate from anything that references the new value, per this project's
+  established Postgres ALTER-TYPE-in-a-transaction rule); a new `AiSettings`
+  singleton-row model (`apiKey String?`, `model String @default("gemini-2.5-
+  flash")`, `updatedAt`) in a second migration,
+  `20260724030000_add_ai_settings`, mirroring `SmtpSettings`'s shape and
+  singleton-id convention exactly.
+- `server/src/utils/gemini.ts` (new): a small `callGemini(apiKey, model,
+  prompt)` wrapper around Gemini's `generateContent` REST endpoint using
+  Node's built-in `fetch` (no `@google/generative-ai` SDK dependency needed
+  — Node 18+, already this project's minimum, ships global `fetch`).
+  Throws a readable Error on a non-2xx response (using Gemini's own
+  `error.message`) or an empty/safety-blocked response.
+- `server/src/routes/settings.ts`: gained `GET /api/settings/ai`, `PUT
+  /api/settings/ai`, and `POST /api/settings/ai/test` — same Superadmin-
+  only gate, same singleton-upsert pattern, and same "never echo the secret
+  back, just a hasApiKey flag" treatment as the existing SMTP endpoints
+  right above them. The test endpoint sends a trivial "reply with the word
+  OK" prompt through `callGemini()` using whatever's currently saved.
+- `server/src/routes/scorecard.ts`: the `GET /` handler's entire body
+  (validation, Business-Unit scoping, the Revenue/Rocks/Disbursements
+  aggregation) was extracted into an exported `computeScorecard(user,
+  params)` function, with the route now just a thin try/catch wrapper
+  around it. This was the key structural move — it means AI Analysis's
+  Gemini prompt is built from *exactly* the same numbers the Scorecard page
+  renders, computed once, rather than a second parallel aggregation that
+  could quietly drift out of sync with it over time.
+- `server/src/routes/aiAnalysis.ts` (new, mounted at `/api/ai-analysis`):
+  the access-gate middleware described above, then `GET /` — calls
+  `computeScorecard()`, loads `AiSettings` (400 with a clear "ask a
+  Superadmin" message if no key is configured yet), builds a labeled
+  plain-text brief via a local `buildPrompt()` (Period / Revenue-Collections-
+  Expenses / Rocks / Disbursements sections, each with instructions to
+  format currency as PHP and stay grounded strictly in the supplied data),
+  calls `callGemini()`, logs an `AI_ANALYSIS_GENERATE` Audit Log summary
+  line, and returns `{ analysis, model, generatedAt, scope }`.
+
+**Frontend structure:**
+- `client/src/pages/AiAnalysis.tsx` (new, top-level `/ai-analysis` route,
+  not nested under `/admin` — this is a working page any authorized user
+  should reach, unlike AI Settings below): Year/Quarter/Business-Unit filter
+  row identical to the Scorecard's, a Generate/Regenerate button, a loading
+  state (Gemini calls can take a few seconds), a distinct amber "not
+  configured yet" message for the 400 case vs. a red error box for other
+  failures, and the same 403 "access required" card pattern as the
+  Executive Scorecard/Audit Log. The rendered analysis is split into
+  paragraphs on blank lines and shown as plain prose, with a Copy-to-
+  clipboard button and a caption line (period, Business Unit scope, model,
+  generated-at timestamp).
+- `client/src/pages/admin/AdminAiSettings.tsx` (new, Superadmin-only,
+  nested at `/admin/ai-settings`, tabbed alongside SMTP Settings in
+  `AdminLayout.tsx`): API key input (password-masked, "leave blank to keep
+  current" once one's saved), a free-text Model field pre-filled with
+  `gemini-2.5-flash`, Save, and a Test Connection button — same structural
+  layout as `AdminSmtp.tsx`.
+- `client/src/components/Layout.tsx`: new "AI Analysis" nav link (Sparkles
+  icon), shown unconditionally to every user the same way Scorecard/
+  Reports/Audit Log are — the backend is the real gate, so a user without
+  access just sees the "access required" card rather than the link being
+  hidden (hiding it client-side would leak nothing extra anyway, since
+  there's no client-side-only secret here, but staying consistent with the
+  rest of the nav's philosophy).
+- `client/src/api/types.ts` / `client.ts`: `AI_ANALYSIS` added to the
+  `Resource` union; new `AiSettings`/`AiAnalysisResult` types; new
+  `getAiSettings`/`putAiSettings`/`testAiSettings`/`aiAnalysis` client
+  functions.
+
+**Setup required before this feature works:** a Superadmin must open
+Admin → AI Settings and paste in a Gemini API key (from Google AI Studio)
+— until then, AI Analysis returns the "hasn't been configured yet" message
+instead of a generated analysis. No new npm dependency was needed on either
+side (`fetch` is built into Node 18+, and the frontend just calls the
+existing REST client).
+
+Worth checking by hand: without an API key configured, clicking Generate
+Analysis shows the amber "not configured" message (not a hard error); after
+a Superadmin saves a real key under Admin → AI Settings and clicks Test
+Connection, it shows Gemini's literal "OK" reply; back on AI Analysis,
+Generate Analysis then produces a multi-paragraph narrative that correctly
+reflects the selected Year/Quarter/Business Unit (spot-check a couple of
+cited figures against the Executive Scorecard for the same scope — they
+should match exactly, since both pull from `computeScorecard()`); a bare
+BU Integrator with no Custom Role sees the "AI Analysis access required"
+card, and gains access the moment a Superadmin grants them a Custom Role
+with AI Analysis view checked (no re-login needed, same as every other
+Custom Role change); a Custom Role scoped to only one Business Unit's
+REVENUE (no ROCKS/DISBURSEMENTS) produces an analysis that only discusses
+that Business Unit's revenue and doesn't reference Rocks/Disbursements
+figures it was never granted; and the Audit Log shows one
+`AI_ANALYSIS_GENERATE` entry per click, with the scope/model in its
+metadata but never the generated text itself.

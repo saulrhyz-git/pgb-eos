@@ -15,6 +15,7 @@ import {
   ScrollText,
   Settings,
   ShieldCheck,
+  Sparkles,
   Sun,
   UserCircle,
   X,
@@ -85,6 +86,14 @@ export default function Layout() {
         <NavLink to="/reports" className={linkClass} onClick={closeMobile} title="Reports">
           <FileSpreadsheet className="h-4 w-4 shrink-0" />
           {showLabels && "Reports"}
+        </NavLink>
+        {/* Default access is Superadmin; shown unconditionally to everyone
+            (same as Scorecard/Reports/Audit Log) since the backend is the
+            real gate — a user without AI_ANALYSIS view just sees the
+            "access required" card. */}
+        <NavLink to="/ai-analysis" className={linkClass} onClick={closeMobile} title="AI Analysis">
+          <Sparkles className="h-4 w-4 shrink-0" />
+          {showLabels && "AI Analysis"}
         </NavLink>
         {/* Superadmins already reach the Audit Log via the Admin tab bar —
             this link is only for non-superadmins who've been granted
