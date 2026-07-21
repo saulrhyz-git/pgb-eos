@@ -2025,3 +2025,32 @@ category that's still referenced by a note is rejected with a message asking
 to deactivate instead; and the Operational Grid, Disbursement Cards,
 Scorecard, and Compare pages all show the single collapsed Expenses/
 Disbursements figure instead of a 3-way breakdown.
+
+**Financials: read-only "notable items" list on the Expenses and
+Disbursements sub-tabs.** A new box — `client/src/components/
+NotableItemsList.tsx` — now sits below the Operational Grid on
+`/revenue/expenses` and below the Disbursement Cards on
+`/revenue/disbursements`, listing every notable line item logged for the
+current Year/Quarter/Business Unit/Company scope (Company, Quarter — only
+shown when "All Quarters" is selected, since a single-quarter scope can't
+span more than one — Category, Amount, Remarks). It's purely a lookup:
+there's no add/edit/delete here, that still only happens on the Data Entry
+page's `NotableItemsCard`; this box just surfaces what's already been
+logged, and reuses the same `api.expenseNotes()`/`api.disbursementNotes()`
+calls. Since the Financials scope can span an entire Business Unit (or "All
+Business Units," for a Group Integrator/Superadmin) rather than always one
+Company, `server/src/routes/notes.ts`'s `GET /expense-notes` and `GET
+/disbursement-notes` now also `include` each note's `company: {id, name,
+businessUnitId}` (previously omitted, since the only existing caller — Data
+Entry's per-Company notes list — already knew which Company it was looking
+at); `NoteEntry` in `client/src/api/types.ts` gained a matching optional
+`company` field (optional because the create-response shape still omits
+it). Worth checking by hand: opening `/revenue/expenses` with a whole
+Business Unit selected (not a single Company) shows a box listing every
+Expense note logged across that BU's Companies, each row naming which
+Company it belongs to; switching the Quarter filter to "All Quarters" adds
+a Quarter column and shows items from every quarter; `/revenue/disbursements`
+shows the equivalent box for Disbursement notes below the Disbursement
+card; a scope with no notable items yet shows "No notable items logged for
+this scope" instead of an empty table; and nothing in this box is
+clickable/editable.

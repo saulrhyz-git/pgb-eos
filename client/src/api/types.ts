@@ -478,6 +478,13 @@ export interface NoteEntry {
   quarter: number;
   categoryId: string;
   category: { id: string; label: string; type: NoteCategoryType };
+  // Only present on the list endpoint (GET /expense-notes, /disbursement-
+  // notes) — omitted from the create response, since the caller there
+  // already knows which Company it just posted for. Lets a scope spanning
+  // multiple Companies (a whole Business Unit, or "All Business Units") say
+  // which Company each note belongs to — see the read-only notable-items
+  // list on the Financials Expenses/Disbursements sub-tabs.
+  company?: { id: string; name: string; businessUnitId: string };
   amount: number;
   remarks: string;
   createdAt: string;

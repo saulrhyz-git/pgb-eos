@@ -81,7 +81,14 @@ function buildNotesRouter(opts: {
 
     const rows = await delegate().findMany({
       where,
-      include: { category: { select: { id: true, label: true, type: true } } },
+      include: {
+        category: { select: { id: true, label: true, type: true } },
+        // Included so a scope spanning multiple Companies (a whole Business
+        // Unit, or "All Business Units") can still say which Company each
+        // note belongs to — see the read-only notable-items list on the
+        // Financials Expenses/Disbursements sub-tabs.
+        company: { select: { id: true, name: true, businessUnitId: true } },
+      },
       orderBy: [{ quarter: "asc" }, { createdAt: "asc" }],
     });
     res.json(rows);
