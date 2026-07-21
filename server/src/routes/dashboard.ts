@@ -10,15 +10,13 @@ import {
 } from "../middleware/auth";
 import {
   addFigures,
-  advancesTotal,
   collectionsTotal,
   DisbursementFigures,
+  disbursementsTotal,
   emptyDisbursementFigures,
   emptyFigures,
   expensesTotal,
   Figures,
-  interestsTotal,
-  loansTotal,
   pct,
   revenueTotal,
   toDisbursementFigures,
@@ -149,15 +147,11 @@ router.get("/", async (req, res) => {
   const disbByCompanyQuarter = new Map<string, DisbursementFigures>();
   for (const d of disbursementActuals) disbByCompanyQuarter.set(`${d.companyId}:${d.quarter}`, toDisbursementFigures(d));
 
-  let quarterAdvancesActualTotal = 0;
-  let quarterLoansActualTotal = 0;
-  let quarterInterestsActualTotal = 0;
+  let quarterDisbursementsActualTotal = 0;
   for (const cid of disbCompanyIds) {
     for (const q of quartersInScope) {
       const d = disbByCompanyQuarter.get(`${cid}:${q}`) || emptyDisbursementFigures();
-      quarterAdvancesActualTotal += advancesTotal(d);
-      quarterLoansActualTotal += loansTotal(d);
-      quarterInterestsActualTotal += interestsTotal(d);
+      quarterDisbursementsActualTotal += disbursementsTotal(d);
     }
   }
 
@@ -180,15 +174,13 @@ router.get("/", async (req, res) => {
         collectionsAttainmentPct: 0,
         quarterExpensesActual: 0,
         expensesAttainmentPct: 0,
-        // Unlike every other figure in this early-return branch, these three
-        // are NOT hardcoded to 0 — Disbursements visibility is independent
+        // Unlike every other figure in this early-return branch, this one
+        // is NOT hardcoded to 0 — Disbursements visibility is independent
         // of the financial narrowing that emptied businessUnitIds above (see
         // disbCompanies/disbCompanyIds above), so a user with real
-        // Disbursements access still sees their real totals even when their
+        // Disbursements access still sees their real total even when their
         // Revenue dashboard scope is otherwise completely empty.
-        quarterAdvancesActual: quarterAdvancesActualTotal,
-        quarterLoansActual: quarterLoansActualTotal,
-        quarterInterestsActual: quarterInterestsActualTotal,
+        quarterDisbursementsActual: quarterDisbursementsActualTotal,
       },
       chart: [],
       targetMatrix: [],
@@ -228,9 +220,7 @@ router.get("/", async (req, res) => {
     collectionsExternalEarnedRemarks: string;
     collectionsExternalUnearnedRemarks: string;
     collectionsExternalOthersRemarks: string;
-    expensesInterestRemarks: string;
-    expensesDepreciationRemarks: string;
-    expensesOtherNonCashRemarks: string;
+    expensesRemarks: string;
   };
   const remarksByCompanyQuarter = new Map<string, ActualRemarks>();
   for (const a of quarterActuals) {
@@ -243,9 +233,7 @@ router.get("/", async (req, res) => {
       collectionsExternalEarnedRemarks: a.collectionsExternalEarnedRemarks,
       collectionsExternalUnearnedRemarks: a.collectionsExternalUnearnedRemarks,
       collectionsExternalOthersRemarks: a.collectionsExternalOthersRemarks,
-      expensesInterestRemarks: a.expensesInterestRemarks,
-      expensesDepreciationRemarks: a.expensesDepreciationRemarks,
-      expensesOtherNonCashRemarks: a.expensesOtherNonCashRemarks,
+      expensesRemarks: a.expensesRemarks,
     });
   }
 
@@ -325,11 +313,10 @@ router.get("/", async (req, res) => {
   let quarterExpensesActualTotal = 0;
   let ytdTargetTotal = 0;
   let ytdActualTotal = 0;
-  // Note: quarterAdvancesActualTotal/quarterLoansActualTotal/
-  // quarterInterestsActualTotal were already computed further up (from
-  // disbCompanies, independently of this financially-narrowed companyIds
-  // loop) — see the comment there for why Disbursements needs its own
-  // separately-scoped company list.
+  // Note: quarterDisbursementsActualTotal was already computed further up
+  // (from disbCompanies, independently of this financially-narrowed
+  // companyIds loop) — see the comment there for why Disbursements needs its
+  // own separately-scoped company list.
 
   for (const cid of companyIds) {
     const annual = annualByCompany.get(cid) || emptyFigures();
@@ -378,9 +365,7 @@ router.get("/", async (req, res) => {
     collectionsAttainmentPct: pct(quarterCollectionsActualTotal, quarterCollectionsTargetTotal),
     quarterExpensesActual: quarterExpensesActualTotal,
     expensesAttainmentPct: pct(quarterExpensesActualTotal, quarterExpensesTargetTotal),
-    quarterAdvancesActual: quarterAdvancesActualTotal,
-    quarterLoansActual: quarterLoansActualTotal,
-    quarterInterestsActual: quarterInterestsActualTotal,
+    quarterDisbursementsActual: quarterDisbursementsActualTotal,
   };
 
   // ---------- Target Distribution Matrix: Q1-Q4 Target per Business Unit, by category, plus their Annual (Q1-Q4) sum ----------
@@ -480,9 +465,7 @@ router.get("/", async (req, res) => {
         collectionsExternalEarnedRemarks: "",
         collectionsExternalUnearnedRemarks: "",
         collectionsExternalOthersRemarks: "",
-        expensesInterestRemarks: "",
-        expensesDepreciationRemarks: "",
-        expensesOtherNonCashRemarks: "",
+        expensesRemarks: "",
       };
       const r = remarks || emptyRemarks;
 
@@ -499,9 +482,7 @@ router.get("/", async (req, res) => {
           collectionsExternalEarned: collectionsOk ? qa.collectionsExternalEarned : 0,
           collectionsExternalUnearned: collectionsOk ? qa.collectionsExternalUnearned : 0,
           collectionsExternalOthers: collectionsOk ? qa.collectionsExternalOthers : 0,
-          expensesInterest: expensesOk ? qa.expensesInterest : 0,
-          expensesDepreciation: expensesOk ? qa.expensesDepreciation : 0,
-          expensesOtherNonCash: expensesOk ? qa.expensesOtherNonCash : 0,
+          expenses: expensesOk ? qa.expenses : 0,
         },
         ytdActual: revenueOk ? revenueTotal(ytdActualCompany) : 0,
         // Remarks are logged per single quarter, so they're only meaningful
@@ -515,9 +496,7 @@ router.get("/", async (req, res) => {
         collectionsExternalEarnedRemarks: collectionsOk && remarks ? r.collectionsExternalEarnedRemarks : "",
         collectionsExternalUnearnedRemarks: collectionsOk && remarks ? r.collectionsExternalUnearnedRemarks : "",
         collectionsExternalOthersRemarks: collectionsOk && remarks ? r.collectionsExternalOthersRemarks : "",
-        expensesInterestRemarks: expensesOk && remarks ? r.expensesInterestRemarks : "",
-        expensesDepreciationRemarks: expensesOk && remarks ? r.expensesDepreciationRemarks : "",
-        expensesOtherNonCashRemarks: expensesOk && remarks ? r.expensesOtherNonCashRemarks : "",
+        expensesRemarks: expensesOk && remarks ? r.expensesRemarks : "",
       };
     });
 

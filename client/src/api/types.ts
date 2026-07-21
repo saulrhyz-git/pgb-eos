@@ -131,8 +131,10 @@ export interface Company {
 
 // Revenue stays a plain Internal/External pair. Collections is Internal/
 // External, each broken into three recognition types (Earned/Unearned/
-// Others). Expenses has no Internal/External split at all — just three
-// single-value breakdowns (Interest/Depreciation/Other Non-Cash).
+// Others). Expenses is a single plain amount — it used to be three
+// single-value breakdowns (Interest/Depreciation/Other Non-Cash), collapsed
+// to one number; see ExpenseNote for the growable, informational-only
+// record-keeping facility that replaced that breakdown.
 export interface Figures {
   revenueInternal: number;
   revenueExternal: number;
@@ -142,9 +144,7 @@ export interface Figures {
   collectionsExternalEarned: number;
   collectionsExternalUnearned: number;
   collectionsExternalOthers: number;
-  expensesInterest: number;
-  expensesDepreciation: number;
-  expensesOtherNonCash: number;
+  expenses: number;
 }
 
 // Result of a bulk CSV/Excel target upload (POST /targets/quarter/bulk) —
@@ -177,9 +177,7 @@ export interface ActualRemarks {
   collectionsExternalEarnedRemarks: string;
   collectionsExternalUnearnedRemarks: string;
   collectionsExternalOthersRemarks: string;
-  expensesInterestRemarks: string;
-  expensesDepreciationRemarks: string;
-  expensesOtherNonCashRemarks: string;
+  expensesRemarks: string;
 }
 
 export interface Kpis {
@@ -206,11 +204,9 @@ export interface Kpis {
   quarterExpensesActual: number;
   expensesAttainmentPct: number;
   // Disbursements: recorded (not targeted), so — unlike the pairs above —
-  // each of these is just one running actual total for the selected period
-  // (respects the Quarter filter, same "All Quarters = sum of Q1-Q4" rule).
-  quarterAdvancesActual: number;
-  quarterLoansActual: number;
-  quarterInterestsActual: number;
+  // this is just one running actual total for the selected period (respects
+  // the Quarter filter, same "All Quarters = sum of Q1-Q4" rule).
+  quarterDisbursementsActual: number;
 }
 
 export interface ChartPoint {
@@ -247,9 +243,7 @@ export interface OperationalGridCompanyRow {
     collectionsExternalEarned: number;
     collectionsExternalUnearned: number;
     collectionsExternalOthers: number;
-    expensesInterest: number;
-    expensesDepreciation: number;
-    expensesOtherNonCash: number;
+    expenses: number;
   };
   ytdActual: number;
   revenueRemarks: string;
@@ -259,9 +253,7 @@ export interface OperationalGridCompanyRow {
   collectionsExternalEarnedRemarks: string;
   collectionsExternalUnearnedRemarks: string;
   collectionsExternalOthersRemarks: string;
-  expensesInterestRemarks: string;
-  expensesDepreciationRemarks: string;
-  expensesOtherNonCashRemarks: string;
+  expensesRemarks: string;
 }
 
 // A Business Unit's target (the sum of its Companies' own targets) vs its
@@ -402,9 +394,7 @@ export interface ScorecardRocks {
 }
 
 export interface ScorecardDisbursementsSummary {
-  advancesActual: number;
-  loansActual: number;
-  interestsActual: number;
+  disbursementsActual: number;
 }
 
 export interface ScorecardDisbursementsBuRow extends ScorecardDisbursementsSummary {
@@ -444,28 +434,54 @@ export interface AiAnalysisResult {
 
 // ---------- Disbursements ----------
 // Recorded — not targeted — per Company/Year/Quarter, same hierarchy as
-// Quarter Actuals but with no corresponding Target. All three sub-categories
-// (Advances/Loans/Interests) live on one row per Company/Year/Quarter, each
-// split Internal/External with its own Remarks — see
-// server/src/routes/disbursements.ts.
-export type DisbursementCategory = "ADVANCES" | "LOANS" | "INTERESTS";
-
+// Quarter Actuals but with no corresponding Target. A single plain amount +
+// Remarks per Company/Year/Quarter — used to be three sub-categories
+// (Advances/Loans/Interests) each split Internal/External, collapsed down
+// the same way Expenses was; see DisbursementNote for the growable,
+// informational-only record-keeping facility that replaced that breakdown —
+// see server/src/routes/disbursements.ts.
 export interface DisbursementActual {
   id: string;
   companyId: string;
   yearId: string;
   quarter: number;
-  advancesInternal: number;
-  advancesExternal: number;
-  loansInternal: number;
-  loansExternal: number;
-  interestsInternal: number;
-  interestsExternal: number;
-  advancesRemarks: string;
-  loansRemarks: string;
-  interestsRemarks: string;
+  amount: number;
+  remarks: string;
   updatedAt: string;
   company: { id: string; name: string; businessUnitId: string };
+}
+
+// ---------- Notable line items (Expenses/Disbursements record-keeping) ----------
+// A superadmin-managed catalog of selectable categories (e.g. "Interest",
+// "Cost of Sales" for Expenses; "Advances", "Loans" for Disbursements),
+// freely editable at Admin -> Note Categories — see
+// server/src/routes/noteCategories.ts.
+export type NoteCategoryType = "EXPENSE" | "DISBURSEMENT";
+
+export interface NoteCategory {
+  id: string;
+  type: NoteCategoryType;
+  label: string;
+  sortOrder: number;
+  active: boolean;
+  createdAt: string;
+}
+
+// A single growable, informational-only "notable item" logged against a
+// Company/Year/Quarter — never rolled into any total/calculation. Expense
+// and Disbursement notes share this exact shape; only the endpoint and the
+// category's `type` differ — see server/src/routes/notes.ts.
+export interface NoteEntry {
+  id: string;
+  companyId: string;
+  yearId: string;
+  quarter: number;
+  categoryId: string;
+  category: { id: string; label: string; type: NoteCategoryType };
+  amount: number;
+  remarks: string;
+  createdAt: string;
+  updatedAt: string;
 }
 
 export interface Rock {
@@ -524,9 +540,7 @@ export interface ComparisonSnapshot {
   rocksAtRisk: number;
   rocksPending: number;
   rocksAvgProgressPct: number;
-  advancesActual: number;
-  loansActual: number;
-  interestsActual: number;
+  disbursementsActual: number;
 }
 
 // ---------- Audit Log ----------

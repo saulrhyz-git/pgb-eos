@@ -14,8 +14,10 @@ import type {
   CustomRole,
   DashboardResponse,
   DisbursementActual,
-  DisbursementCategory,
   Figures,
+  NoteCategory,
+  NoteCategoryType,
+  NoteEntry,
   Rock,
   RockStatus,
   Role,
@@ -417,19 +419,9 @@ export const api = {
     if (params.companyId) qs.set("companyId", params.companyId);
     return request<DisbursementActual[]>(`/disbursements?${qs.toString()}`);
   },
-  // Upserts just ONE sub-category (Advances/Loans/Interests) for a Company/
-  // Year/Quarter, leaving the other two categories' figures on the same row
-  // untouched — each of the three Disbursements sub-tab pages submits only
-  // its own category.
-  putDisbursement: (payload: {
-    companyId: string;
-    yearId: string;
-    quarter: number;
-    category: DisbursementCategory;
-    internal: number;
-    external: number;
-    remarks?: string;
-  }) => request<DisbursementActual>("/disbursements", { method: "PUT", body: JSON.stringify(payload) }),
+  // Upserts a Company/Year/Quarter's single Disbursements amount + Remarks.
+  putDisbursement: (payload: { companyId: string; yearId: string; quarter: number; amount: number; remarks?: string }) =>
+    request<DisbursementActual>("/disbursements", { method: "PUT", body: JSON.stringify(payload) }),
 
   // ---------- Comparison ----------
   // Default access is Superadmin + Group Integrator; a BU Integrator (or
@@ -444,4 +436,42 @@ export const api = {
     if (params.companyId) qs.set("companyId", params.companyId);
     return request<ComparisonSnapshot>(`/comparison/snapshot?${qs.toString()}`);
   },
+
+  // ---------- Note Categories (Superadmin only) ----------
+  // The master catalog backing the Expenses/Disbursements "notable line
+  // items" facility below — see server/src/routes/noteCategories.ts.
+  noteCategories: (type?: NoteCategoryType) =>
+    request<NoteCategory[]>("/note-categories").then((rows) => (type ? rows.filter((r) => r.type === type) : rows)),
+  createNoteCategory: (payload: { type: NoteCategoryType; label: string; sortOrder?: number }) =>
+    request<NoteCategory>("/note-categories", { method: "POST", body: JSON.stringify(payload) }),
+  updateNoteCategory: (id: string, payload: Partial<{ label: string; sortOrder: number; active: boolean }>) =>
+    request<NoteCategory>(`/note-categories/${id}`, { method: "PUT", body: JSON.stringify(payload) }),
+  deleteNoteCategory: (id: string) => request<void>(`/note-categories/${id}`, { method: "DELETE" }),
+
+  // ---------- Notable Expense / Disbursement line items ----------
+  // Growable, informational-only record-keeping facility — never rolled into
+  // any total/calculation. Gated by the same EXPENSES/DISBURSEMENTS Custom
+  // Role resource as the parent actual, not a resource of their own — see
+  // server/src/routes/notes.ts.
+  expenseNotes: (params: { yearId: string; quarter?: number; businessUnitId?: string; companyId?: string }) => {
+    const qs = new URLSearchParams({ yearId: params.yearId });
+    if (params.quarter) qs.set("quarter", String(params.quarter));
+    if (params.businessUnitId) qs.set("businessUnitId", params.businessUnitId);
+    if (params.companyId) qs.set("companyId", params.companyId);
+    return request<NoteEntry[]>(`/expense-notes?${qs.toString()}`);
+  },
+  createExpenseNote: (payload: { companyId: string; yearId: string; quarter: number; categoryId: string; amount: number; remarks?: string }) =>
+    request<NoteEntry>("/expense-notes", { method: "POST", body: JSON.stringify(payload) }),
+  deleteExpenseNote: (id: string) => request<void>(`/expense-notes/${id}`, { method: "DELETE" }),
+
+  disbursementNotes: (params: { yearId: string; quarter?: number; businessUnitId?: string; companyId?: string }) => {
+    const qs = new URLSearchParams({ yearId: params.yearId });
+    if (params.quarter) qs.set("quarter", String(params.quarter));
+    if (params.businessUnitId) qs.set("businessUnitId", params.businessUnitId);
+    if (params.companyId) qs.set("companyId", params.companyId);
+    return request<NoteEntry[]>(`/disbursement-notes?${qs.toString()}`);
+  },
+  createDisbursementNote: (payload: { companyId: string; yearId: string; quarter: number; categoryId: string; amount: number; remarks?: string }) =>
+    request<NoteEntry>("/disbursement-notes", { method: "POST", body: JSON.stringify(payload) }),
+  deleteDisbursementNote: (id: string) => request<void>(`/disbursement-notes/${id}`, { method: "DELETE" }),
 };

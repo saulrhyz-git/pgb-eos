@@ -10,8 +10,11 @@ export function n(value: Prisma.Decimal | number | null | undefined): number {
 // Revenue stays a plain Internal/External pair. Collections is Internal/
 // External, each broken into three recognition types (Earned/Unearned/
 // Others) — see schema.prisma's QuarterTarget/QuarterActual comment. Expenses
-// has no Internal/External split at all, just three single-value breakdowns
-// (Interest/Depreciation/Other Non-Cash).
+// is a single plain amount — it used to be three single-value breakdowns
+// (Interest/Depreciation/Other Non-Cash), collapsed to one number; see
+// ExpenseNote for the growable, informational-only record-keeping facility
+// that replaced that breakdown (never included in this Figures shape, since
+// it has no bearing on any total/calculation).
 export interface Figures {
   revenueInternal: number;
   revenueExternal: number;
@@ -21,9 +24,7 @@ export interface Figures {
   collectionsExternalEarned: number;
   collectionsExternalUnearned: number;
   collectionsExternalOthers: number;
-  expensesInterest: number;
-  expensesDepreciation: number;
-  expensesOtherNonCash: number;
+  expenses: number;
 }
 
 export const emptyFigures = (): Figures => ({
@@ -35,9 +36,7 @@ export const emptyFigures = (): Figures => ({
   collectionsExternalEarned: 0,
   collectionsExternalUnearned: 0,
   collectionsExternalOthers: 0,
-  expensesInterest: 0,
-  expensesDepreciation: 0,
-  expensesOtherNonCash: 0,
+  expenses: 0,
 });
 
 export function toFigures(row: any): Figures {
@@ -50,9 +49,7 @@ export function toFigures(row: any): Figures {
     collectionsExternalEarned: n(row?.collectionsExternalEarned),
     collectionsExternalUnearned: n(row?.collectionsExternalUnearned),
     collectionsExternalOthers: n(row?.collectionsExternalOthers),
-    expensesInterest: n(row?.expensesInterest),
-    expensesDepreciation: n(row?.expensesDepreciation),
-    expensesOtherNonCash: n(row?.expensesOtherNonCash),
+    expenses: n(row?.expenses),
   };
 }
 
@@ -66,9 +63,7 @@ export function addFigures(a: Figures, b: Figures): Figures {
     collectionsExternalEarned: a.collectionsExternalEarned + b.collectionsExternalEarned,
     collectionsExternalUnearned: a.collectionsExternalUnearned + b.collectionsExternalUnearned,
     collectionsExternalOthers: a.collectionsExternalOthers + b.collectionsExternalOthers,
-    expensesInterest: a.expensesInterest + b.expensesInterest,
-    expensesDepreciation: a.expensesDepreciation + b.expensesDepreciation,
-    expensesOtherNonCash: a.expensesOtherNonCash + b.expensesOtherNonCash,
+    expenses: a.expenses + b.expenses,
   };
 }
 
@@ -88,8 +83,11 @@ export function collectionsTotal(f: Figures): number {
   return collectionsInternalTotal(f) + collectionsExternalTotal(f);
 }
 
+// Kept as a named function (rather than inlining `f.expenses` at every call
+// site) purely to minimize the diff across dashboard.ts/scorecard.ts/
+// comparison.ts/reports.ts, all of which already call `expensesTotal(...)`.
 export function expensesTotal(f: Figures): number {
-  return f.expensesInterest + f.expensesDepreciation + f.expensesOtherNonCash;
+  return f.expenses;
 }
 
 export function pct(actual: number, target: number): number {
@@ -99,54 +97,33 @@ export function pct(actual: number, target: number): number {
 
 // Disbursements: recorded — not targeted — so there's no Target-side
 // equivalent of Figures/emptyFigures above, just this one Actual-shaped set.
+// Used to be three sub-categories (Advances/Loans/Interests) each split
+// Internal/External — collapsed to a single plain amount, same
+// simplification as Expenses above; see DisbursementNote for the growable,
+// informational-only record-keeping facility that replaced that breakdown.
 export interface DisbursementFigures {
-  advancesInternal: number;
-  advancesExternal: number;
-  loansInternal: number;
-  loansExternal: number;
-  interestsInternal: number;
-  interestsExternal: number;
+  amount: number;
 }
 
 export const emptyDisbursementFigures = (): DisbursementFigures => ({
-  advancesInternal: 0,
-  advancesExternal: 0,
-  loansInternal: 0,
-  loansExternal: 0,
-  interestsInternal: 0,
-  interestsExternal: 0,
+  amount: 0,
 });
 
 export function toDisbursementFigures(row: any): DisbursementFigures {
   return {
-    advancesInternal: n(row?.advancesInternal),
-    advancesExternal: n(row?.advancesExternal),
-    loansInternal: n(row?.loansInternal),
-    loansExternal: n(row?.loansExternal),
-    interestsInternal: n(row?.interestsInternal),
-    interestsExternal: n(row?.interestsExternal),
+    amount: n(row?.amount),
   };
 }
 
 export function addDisbursementFigures(a: DisbursementFigures, b: DisbursementFigures): DisbursementFigures {
   return {
-    advancesInternal: a.advancesInternal + b.advancesInternal,
-    advancesExternal: a.advancesExternal + b.advancesExternal,
-    loansInternal: a.loansInternal + b.loansInternal,
-    loansExternal: a.loansExternal + b.loansExternal,
-    interestsInternal: a.interestsInternal + b.interestsInternal,
-    interestsExternal: a.interestsExternal + b.interestsExternal,
+    amount: a.amount + b.amount,
   };
 }
 
-export function advancesTotal(f: DisbursementFigures): number {
-  return f.advancesInternal + f.advancesExternal;
-}
-
-export function loansTotal(f: DisbursementFigures): number {
-  return f.loansInternal + f.loansExternal;
-}
-
-export function interestsTotal(f: DisbursementFigures): number {
-  return f.interestsInternal + f.interestsExternal;
+// Kept as a named function for the same minimal-diff reason as
+// expensesTotal() above — replaces the old advancesTotal/loansTotal/
+// interestsTotal trio now that Disbursements is a single amount.
+export function disbursementsTotal(f: DisbursementFigures): number {
+  return f.amount;
 }

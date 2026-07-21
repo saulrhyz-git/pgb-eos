@@ -31,9 +31,7 @@ const FIGURE_FIELDS: { key: keyof Figures; label: string }[] = [
   { key: "collectionsExternalEarned", label: "Collections External - Earned" },
   { key: "collectionsExternalUnearned", label: "Collections External - Unearned" },
   { key: "collectionsExternalOthers", label: "Collections External - Others" },
-  { key: "expensesInterest", label: "Expenses - Interest" },
-  { key: "expensesDepreciation", label: "Expenses - Depreciation" },
-  { key: "expensesOtherNonCash", label: "Expenses - Other Non-Cash" },
+  { key: "expenses", label: "Expenses" },
 ];
 
 // Strips everything but letters/digits and lowercases — lets "Revenue -
@@ -51,9 +49,6 @@ const HEADER_MAP: Record<string, CanonicalField> = {
   companyname: "companyName",
   quarter: "quarter",
   q: "quarter",
-  // A couple of shorthand aliases in addition to the label/key-derived ones added below.
-  expensesother: "expensesOtherNonCash",
-  expensesothernoncashexpenses: "expensesOtherNonCash",
 };
 for (const f of FIGURE_FIELDS) {
   HEADER_MAP[normalizeHeader(f.label)] = f.key;

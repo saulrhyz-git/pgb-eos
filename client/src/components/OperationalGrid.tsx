@@ -30,7 +30,13 @@ type CollectionsRemarksField =
   | "collectionsExternalEarnedRemarks"
   | "collectionsExternalUnearnedRemarks"
   | "collectionsExternalOthersRemarks";
-type ExpensesRemarksField = "expensesInterestRemarks" | "expensesDepreciationRemarks" | "expensesOtherNonCashRemarks";
+// Expenses collapsed to a single amount + one Remarks field (same shape as
+// Revenue) — it used to be a 3-way breakdown (Interest/Depreciation/Other
+// Non-Cash), each with its own Remarks. Any significant breakdown items are
+// now logged separately via the growable "notable line items" facility on
+// the Data Entry page (ExpenseNote), which is purely informational and
+// doesn't surface here.
+type ExpensesRemarksField = "expensesRemarks";
 type RemarksField = RevenueRemarksField | CollectionsRemarksField | ExpensesRemarksField;
 
 const COLLECTIONS_BREAKDOWN: { title: string; value: keyof OperationalGridCompanyRow["quarterActual"]; remarksField: CollectionsRemarksField; label: string }[] = [
@@ -40,12 +46,6 @@ const COLLECTIONS_BREAKDOWN: { title: string; value: keyof OperationalGridCompan
   { title: "External", value: "collectionsExternalEarned", remarksField: "collectionsExternalEarnedRemarks", label: "Revenue - Earned" },
   { title: "External", value: "collectionsExternalUnearned", remarksField: "collectionsExternalUnearnedRemarks", label: "Advance Payments - Unearned" },
   { title: "External", value: "collectionsExternalOthers", remarksField: "collectionsExternalOthersRemarks", label: "Others" },
-];
-
-const EXPENSES_BREAKDOWN: { value: keyof OperationalGridCompanyRow["quarterActual"]; remarksField: ExpensesRemarksField; label: string }[] = [
-  { value: "expensesInterest", remarksField: "expensesInterestRemarks", label: "Interest" },
-  { value: "expensesDepreciation", remarksField: "expensesDepreciationRemarks", label: "Depreciation" },
-  { value: "expensesOtherNonCash", remarksField: "expensesOtherNonCashRemarks", label: "Other Non-Cash Expenses" },
 ];
 
 export default function OperationalGrid({ rows, yearId, quarter, onRemarksSaved, category = "REVENUE" }: Props) {
@@ -118,7 +118,7 @@ export default function OperationalGrid({ rows, yearId, quarter, onRemarksSaved,
           c.collectionsExternalUnearnedRemarks ||
           c.collectionsExternalOthersRemarks
       );
-    return row.companies.some((c) => c.expensesInterestRemarks || c.expensesDepreciationRemarks || c.expensesOtherNonCashRemarks);
+    return row.companies.some((c) => c.expensesRemarks);
   }
 
   const title =
@@ -260,24 +260,17 @@ export default function OperationalGrid({ rows, yearId, quarter, onRemarksSaved,
 
                               {category === "EXPENSES" && (
                                 <div className="rounded-md border border-amber-100 dark:border-amber-800 bg-amber-50/40 dark:bg-amber-950/30 p-3">
-                                  <div className="mb-2 text-xs font-semibold uppercase tracking-wide text-amber-700 dark:text-amber-300">Expenses</div>
-                                  <div className="grid grid-cols-1 gap-x-6 divide-y divide-amber-100 dark:divide-amber-800 sm:grid-cols-3 sm:divide-y-0">
-                                    {EXPENSES_BREAKDOWN.map((b) => (
-                                      <div key={b.value} className="flex flex-col gap-1.5 py-2 first:pt-0 last:pb-0 sm:py-0">
-                                        <div className="flex items-baseline justify-between gap-2 sm:flex-col sm:items-start sm:gap-1">
-                                          <span className="text-xs text-slate-600 dark:text-slate-300">{b.label}</span>
-                                          <span className="whitespace-nowrap text-sm font-semibold text-slate-800 dark:text-slate-100">
-                                            {formatCurrency(c.quarterActual[b.value] as number)}
-                                          </span>
-                                        </div>
-                                        {isAllQuarters ? (
-                                          <p className="text-[11px] italic text-slate-400 dark:text-slate-500">Select a quarter to view/edit Remarks.</p>
-                                        ) : (
-                                          <RemarksInput row={c} field={b.remarksField} />
-                                        )}
-                                      </div>
-                                    ))}
+                                  <div className="mb-2 flex items-baseline justify-between gap-2">
+                                    <span className="text-xs font-semibold uppercase tracking-wide text-amber-700 dark:text-amber-300">Expenses</span>
+                                    <span className="whitespace-nowrap text-sm font-semibold text-slate-800 dark:text-slate-100">
+                                      {formatCurrency(c.quarterActual.expenses)}
+                                    </span>
                                   </div>
+                                  {isAllQuarters ? (
+                                    <p className="text-[11px] italic text-slate-400 dark:text-slate-500">Select a quarter to view/edit Remarks.</p>
+                                  ) : (
+                                    <RemarksInput row={c} field="expensesRemarks" />
+                                  )}
                                 </div>
                               )}
                             </div>

@@ -1,7 +1,7 @@
 import { FormEvent, useEffect, useState } from "react";
-import { CheckCircle2, Save } from "lucide-react";
+import { CheckCircle2, Plus, Save, Trash2 } from "lucide-react";
 import { api } from "../api/client";
-import type { BusinessUnit, Company, DisbursementCategory, Year } from "../api/types";
+import type { BusinessUnit, Company, NoteCategory, NoteEntry, Year } from "../api/types";
 import { useAuth } from "../contexts/AuthContext";
 
 type FigureKey =
@@ -13,9 +13,7 @@ type FigureKey =
   | "collectionsExternalEarned"
   | "collectionsExternalUnearned"
   | "collectionsExternalOthers"
-  | "expensesInterest"
-  | "expensesDepreciation"
-  | "expensesOtherNonCash";
+  | "expenses";
 
 type RemarksKey =
   | "revenueRemarks"
@@ -25,19 +23,22 @@ type RemarksKey =
   | "collectionsExternalEarnedRemarks"
   | "collectionsExternalUnearnedRemarks"
   | "collectionsExternalOthersRemarks"
-  | "expensesInterestRemarks"
-  | "expensesDepreciationRemarks"
-  | "expensesOtherNonCashRemarks";
+  | "expensesRemarks";
 
-// Revenue is the only category still shaped as a plain Internal/External
-// pair with one Remarks field — Collections and Expenses each have their own
-// dedicated layout below instead of reusing this group shape (see
-// COLLECTIONS_GROUPS/EXPENSES_FIELDS).
-const REVENUE_GROUP = { title: "Revenue", internal: "revenueInternal" as FigureKey, external: "revenueExternal" as FigureKey, remarks: "revenueRemarks" as RemarksKey };
+// Revenue and Expenses are both a single amount + one Remarks field —
+// Collections is the only category with its own dedicated multi-breakdown
+// layout below (see COLLECTIONS_GROUPS). Expenses used to have a 3-way
+// breakdown (Interest/Depreciation/Other Non-Cash) here too; that's been
+// collapsed to one plain amount, with any significant breakdown items now
+// logged separately via the growable "notable line items" list further down
+// (see NOTE_CATEGORY_TYPE usage / ExpenseNote), which is purely
+// informational and never rolled into this figure.
+const REVENUE_GROUP = { title: "Revenue", value: "revenueInternal" as FigureKey, remarks: "revenueRemarks" as RemarksKey };
+const EXPENSES_GROUP = { title: "Expenses", value: "expenses" as FigureKey, remarks: "expensesRemarks" as RemarksKey };
 
 // Collections is Internal/External, each broken into three recognition
 // types (Earned/Unearned/Others) — one Remarks field per breakdown, same
-// granularity as Disbursements' per-category Remarks.
+// granularity as Disbursements' per-category Remarks used to be.
 const COLLECTIONS_GROUPS: { title: string; fields: { key: FigureKey; remarksKey: RemarksKey; label: string }[] }[] = [
   {
     title: "Internal",
@@ -57,14 +58,6 @@ const COLLECTIONS_GROUPS: { title: string; fields: { key: FigureKey; remarksKey:
   },
 ];
 
-// Expenses has no Internal/External split at all — three single-value
-// breakdowns instead, each with its own Remarks field.
-const EXPENSES_FIELDS: { key: FigureKey; remarksKey: RemarksKey; label: string }[] = [
-  { key: "expensesInterest", remarksKey: "expensesInterestRemarks", label: "Interest" },
-  { key: "expensesDepreciation", remarksKey: "expensesDepreciationRemarks", label: "Depreciation" },
-  { key: "expensesOtherNonCash", remarksKey: "expensesOtherNonCashRemarks", label: "Other Non-Cash Expenses" },
-];
-
 const emptyForm: Record<FigureKey, string> = {
   revenueInternal: "",
   revenueExternal: "",
@@ -74,9 +67,7 @@ const emptyForm: Record<FigureKey, string> = {
   collectionsExternalEarned: "",
   collectionsExternalUnearned: "",
   collectionsExternalOthers: "",
-  expensesInterest: "",
-  expensesDepreciation: "",
-  expensesOtherNonCash: "",
+  expenses: "",
 };
 
 const emptyRemarks: Record<RemarksKey, string> = {
@@ -87,41 +78,23 @@ const emptyRemarks: Record<RemarksKey, string> = {
   collectionsExternalEarnedRemarks: "",
   collectionsExternalUnearnedRemarks: "",
   collectionsExternalOthersRemarks: "",
-  expensesInterestRemarks: "",
-  expensesDepreciationRemarks: "",
-  expensesOtherNonCashRemarks: "",
+  expensesRemarks: "",
 };
 
-// Disbursements (Advances/Loan Repayments/Interests) live on their own
-// DisbursementActual row (see server/src/routes/disbursements.ts) — recorded,
-// not targeted, so there's no Target-side counterpart to enter alongside
-// them. They used to be their own top-level "Disbursements" nav tab with
-// three sub-pages; they're now folded into this single Data Entry page as
-// three more field groups sharing the same Year/Quarter/Business Unit/
-// Company scope picker as Revenue/Collections/Expenses above, so an
-// integrator only has one tab and one scope selection to work with instead
-// of switching pages per category.
-const DISBURSEMENT_GROUPS: { title: string; category: DisbursementCategory }[] = [
-  { title: "Advances", category: "ADVANCES" },
-  { title: "Loan Repayments", category: "LOANS" },
-  { title: "Interests", category: "INTERESTS" },
-];
-
+// Disbursements now live on the same single-amount-plus-Remarks shape as
+// Expenses — used to be three sub-categories (Advances/Loan Repayments/
+// Interests) each split Internal/External; collapsed the same way, with any
+// significant items now logged via the growable notable line items list
+// below instead. Recorded — not targeted — so there's no Target-side
+// counterpart to enter alongside it.
 interface DisbFields {
-  internal: string;
-  external: string;
+  amount: string;
   remarks: string;
 }
-
-const emptyDisbFields: DisbFields = { internal: "", external: "", remarks: "" };
-const emptyDisbForm: Record<DisbursementCategory, DisbFields> = {
-  ADVANCES: emptyDisbFields,
-  LOANS: emptyDisbFields,
-  INTERESTS: emptyDisbFields,
-};
+const emptyDisbForm: DisbFields = { amount: "", remarks: "" };
 
 // One numeric field + its own Remarks input, stacked — the shape reused for
-// every Collections breakdown (6) and Expenses breakdown (3) below.
+// every Collections breakdown (6) below.
 function BreakdownField({
   label,
   value,
@@ -158,6 +131,189 @@ function BreakdownField({
   );
 }
 
+// A single amount + Remarks group, shared by Revenue and Expenses above —
+// both are now the same shape.
+function AmountRemarksGroup({
+  title,
+  value,
+  remarks,
+  onValueChange,
+  onRemarksChange,
+  helperText,
+}: {
+  title: string;
+  value: string;
+  remarks: string;
+  onValueChange: (v: string) => void;
+  onRemarksChange: (v: string) => void;
+  helperText?: string;
+}) {
+  return (
+    <div className="rounded-md border border-slate-100 dark:border-slate-800 bg-slate-50/60 dark:bg-slate-950/60 p-3 sm:p-4">
+      <div className="mb-2 text-sm font-semibold text-slate-700 dark:text-slate-200">{title}</div>
+      <div className="flex flex-col gap-1 sm:max-w-xs">
+        <label className="text-xs font-medium text-slate-500 dark:text-slate-400">Amount</label>
+        <input
+          type="number"
+          min={0}
+          step="0.01"
+          className="rounded-md border border-slate-300 dark:border-slate-600 dark:bg-slate-800 dark:text-slate-100 px-3 py-2 text-sm"
+          value={value}
+          onChange={(e) => onValueChange(e.target.value)}
+        />
+      </div>
+      <div className="mt-3 flex flex-col gap-1">
+        <label className="text-xs font-medium text-slate-500 dark:text-slate-400">{title} Remarks</label>
+        <textarea
+          className="min-h-[60px] rounded-md border border-slate-300 dark:border-slate-600 dark:bg-slate-800 dark:text-slate-100 px-3 py-2 text-sm"
+          value={remarks}
+          onChange={(e) => onRemarksChange(e.target.value)}
+          placeholder={`Notes on this quarter's ${title.toLowerCase()}...`}
+        />
+      </div>
+      {helperText && <p className="mt-2 text-[11px] text-slate-400 dark:text-slate-500">{helperText}</p>}
+    </div>
+  );
+}
+
+// Growable, informational-only "notable line items" list — shared shape for
+// both Expenses and Disbursements. Never rolled into any total: purely a
+// place to log significant Interest/Depreciation/Other-Non-Cash/Cost-of-
+// Sales/OPEX (or Advances/Loans/Interest, for Disbursements) items with
+// their own remarks, for record-keeping. Categories come from the
+// superadmin-managed catalog (Admin -> Note Categories).
+function NotableItemsCard({
+  title,
+  categories,
+  notes,
+  loading,
+  onAdd,
+  onDelete,
+  adding,
+  deletingId,
+}: {
+  title: string;
+  categories: NoteCategory[];
+  notes: NoteEntry[];
+  loading: boolean;
+  onAdd: (categoryId: string, amount: number, remarks: string) => Promise<void>;
+  onDelete: (id: string) => Promise<void>;
+  adding: boolean;
+  deletingId: string | null;
+}) {
+  const activeCategories = categories.filter((c) => c.active);
+  const [categoryId, setCategoryId] = useState("");
+  const [amount, setAmount] = useState("");
+  const [remarks, setRemarks] = useState("");
+  const [error, setError] = useState("");
+
+  useEffect(() => {
+    if (!categoryId && activeCategories.length) setCategoryId(activeCategories[0].id);
+    // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, [activeCategories.length]);
+
+  async function handleAdd() {
+    setError("");
+    if (!categoryId) {
+      setError("Pick a category first");
+      return;
+    }
+    try {
+      await onAdd(categoryId, Number(amount) || 0, remarks);
+      setAmount("");
+      setRemarks("");
+    } catch (err: any) {
+      setError(err.message || "Failed to add item");
+    }
+  }
+
+  return (
+    <div className="rounded-md border border-slate-100 dark:border-slate-800 bg-slate-50/60 dark:bg-slate-950/60 p-3 sm:p-4">
+      <div className="mb-1 text-sm font-semibold text-slate-700 dark:text-slate-200">{title}</div>
+      <p className="mb-3 text-[11px] text-slate-400 dark:text-slate-500">
+        Informational only — for record-keeping. These items are never added to the figure above or to any dashboard
+        total.
+      </p>
+
+      {!loading && notes.length > 0 && (
+        <div className="mb-3 flex flex-col divide-y divide-slate-200 dark:divide-slate-800 rounded-md border border-slate-200 dark:border-slate-700 bg-white dark:bg-slate-900">
+          {notes.map((n) => (
+            <div key={n.id} className="flex items-start justify-between gap-3 px-3 py-2">
+              <div className="min-w-0">
+                <div className="text-xs font-semibold text-slate-700 dark:text-slate-200">
+                  {n.category.label} — {Number(n.amount).toLocaleString("en-PH", { style: "currency", currency: "PHP" })}
+                </div>
+                {n.remarks && <div className="text-[11px] text-slate-500 dark:text-slate-400">{n.remarks}</div>}
+              </div>
+              <button
+                type="button"
+                onClick={() => onDelete(n.id)}
+                disabled={deletingId === n.id}
+                className="shrink-0 rounded-md p-1 text-slate-400 hover:bg-red-50 hover:text-red-600 disabled:opacity-50 dark:hover:bg-red-950/40 dark:hover:text-red-400"
+                title="Remove"
+              >
+                <Trash2 className="h-3.5 w-3.5" />
+              </button>
+            </div>
+          ))}
+        </div>
+      )}
+
+      {activeCategories.length === 0 ? (
+        <p className="text-xs text-slate-400 dark:text-slate-500">
+          No categories configured yet — ask a Superadmin to add some under Admin -&gt; Note Categories.
+        </p>
+      ) : (
+        <div className="grid grid-cols-1 gap-2 sm:grid-cols-[1fr_1fr_2fr_auto] sm:items-end">
+          <div className="flex flex-col gap-1">
+            <label className="text-[11px] font-medium text-slate-500 dark:text-slate-400">Category</label>
+            <select
+              className="rounded-md border border-slate-300 dark:border-slate-600 dark:bg-slate-800 dark:text-slate-100 px-2 py-1.5 text-xs"
+              value={categoryId}
+              onChange={(e) => setCategoryId(e.target.value)}
+            >
+              {activeCategories.map((c) => (
+                <option key={c.id} value={c.id}>
+                  {c.label}
+                </option>
+              ))}
+            </select>
+          </div>
+          <div className="flex flex-col gap-1">
+            <label className="text-[11px] font-medium text-slate-500 dark:text-slate-400">Amount</label>
+            <input
+              type="number"
+              min={0}
+              step="0.01"
+              className="rounded-md border border-slate-300 dark:border-slate-600 dark:bg-slate-800 dark:text-slate-100 px-2 py-1.5 text-xs"
+              value={amount}
+              onChange={(e) => setAmount(e.target.value)}
+            />
+          </div>
+          <div className="flex flex-col gap-1">
+            <label className="text-[11px] font-medium text-slate-500 dark:text-slate-400">Remarks</label>
+            <input
+              className="rounded-md border border-slate-300 dark:border-slate-600 dark:bg-slate-800 dark:text-slate-100 px-2 py-1.5 text-xs"
+              placeholder="Optional notes..."
+              value={remarks}
+              onChange={(e) => setRemarks(e.target.value)}
+            />
+          </div>
+          <button
+            type="button"
+            onClick={handleAdd}
+            disabled={adding}
+            className="flex items-center justify-center gap-1 rounded-md bg-slate-700 dark:bg-slate-600 px-2.5 py-1.5 text-xs font-medium text-white hover:bg-slate-800 dark:hover:bg-slate-500 disabled:opacity-50"
+          >
+            <Plus className="h-3.5 w-3.5" /> {adding ? "Adding..." : "Add"}
+          </button>
+        </div>
+      )}
+      {error && <div className="mt-2 text-[11px] text-red-600 dark:text-red-400">{error}</div>}
+    </div>
+  );
+}
+
 export default function IntegratorPortal() {
   const { user } = useAuth();
   const [years, setYears] = useState<Year[]>([]);
@@ -170,11 +326,23 @@ export default function IntegratorPortal() {
   const [companyId, setCompanyId] = useState("");
   const [form, setForm] = useState(emptyForm);
   const [remarks, setRemarks] = useState(emptyRemarks);
-  const [disbForm, setDisbForm] = useState(emptyDisbForm);
+  const [disbForm, setDisbForm] = useState<DisbFields>(emptyDisbForm);
 
   const [saving, setSaving] = useState(false);
   const [saved, setSaved] = useState(false);
   const [error, setError] = useState("");
+
+  // Notable line items — the growable, informational-only record-keeping
+  // facility for Expenses and Disbursements (see NotableItemsCard above).
+  const [expenseCategories, setExpenseCategories] = useState<NoteCategory[]>([]);
+  const [disbursementCategories, setDisbursementCategories] = useState<NoteCategory[]>([]);
+  const [expenseNotes, setExpenseNotes] = useState<NoteEntry[]>([]);
+  const [disbursementNotes, setDisbursementNotes] = useState<NoteEntry[]>([]);
+  const [notesLoading, setNotesLoading] = useState(false);
+  const [addingExpenseNote, setAddingExpenseNote] = useState(false);
+  const [addingDisbursementNote, setAddingDisbursementNote] = useState(false);
+  const [deletingExpenseNoteId, setDeletingExpenseNoteId] = useState<string | null>(null);
+  const [deletingDisbursementNoteId, setDeletingDisbursementNoteId] = useState<string | null>(null);
 
   useEffect(() => {
     // Default to the real current calendar quarter (server clock) when
@@ -195,6 +363,10 @@ export default function IntegratorPortal() {
       setBusinessUnits(bus);
       if (bus.length) setBusinessUnitId(bus[0].id);
     });
+    // The Note Category catalogs rarely change — loaded once, not
+    // re-fetched every time the scope changes.
+    api.noteCategories("EXPENSE").then(setExpenseCategories).catch(() => setExpenseCategories([]));
+    api.noteCategories("DISBURSEMENT").then(setDisbursementCategories).catch(() => setDisbursementCategories([]));
   }, []);
 
   useEffect(() => {
@@ -205,17 +377,19 @@ export default function IntegratorPortal() {
     });
   }, [businessUnitId]);
 
-  // Pre-fill both the actuals form and the disbursements form with any
-  // existing figures for the selected scope, so the integrator is editing,
-  // not blindly overwriting — fetched together since they now share one
-  // scope picker.
+  // Pre-fill the actuals form, the disbursements form, and both notable
+  // line items lists with whatever already exists for the selected scope —
+  // fetched together since they all share one scope picker.
   useEffect(() => {
     if (!yearId || !companyId) return;
     setSaved(false);
+    setNotesLoading(true);
     Promise.all([
       api.actuals({ yearId, quarter, companyId }).catch(() => []),
       api.disbursements({ yearId, quarter, companyId }).catch(() => []),
-    ]).then(([actualRows, disbRows]) => {
+      api.expenseNotes({ yearId, quarter, companyId }).catch(() => []),
+      api.disbursementNotes({ yearId, quarter, companyId }).catch(() => []),
+    ]).then(([actualRows, disbRows, expNotes, disbNotes]) => {
       const existing = actualRows[0] || null;
       if (existing) {
         setForm({
@@ -227,9 +401,7 @@ export default function IntegratorPortal() {
           collectionsExternalEarned: String(existing.collectionsExternalEarned ?? ""),
           collectionsExternalUnearned: String(existing.collectionsExternalUnearned ?? ""),
           collectionsExternalOthers: String(existing.collectionsExternalOthers ?? ""),
-          expensesInterest: String(existing.expensesInterest ?? ""),
-          expensesDepreciation: String(existing.expensesDepreciation ?? ""),
-          expensesOtherNonCash: String(existing.expensesOtherNonCash ?? ""),
+          expenses: String(existing.expenses ?? ""),
         });
         setRemarks({
           revenueRemarks: existing.revenueRemarks || "",
@@ -239,9 +411,7 @@ export default function IntegratorPortal() {
           collectionsExternalEarnedRemarks: existing.collectionsExternalEarnedRemarks || "",
           collectionsExternalUnearnedRemarks: existing.collectionsExternalUnearnedRemarks || "",
           collectionsExternalOthersRemarks: existing.collectionsExternalOthersRemarks || "",
-          expensesInterestRemarks: existing.expensesInterestRemarks || "",
-          expensesDepreciationRemarks: existing.expensesDepreciationRemarks || "",
-          expensesOtherNonCashRemarks: existing.expensesOtherNonCashRemarks || "",
+          expensesRemarks: existing.expensesRemarks || "",
         });
       } else {
         setForm(emptyForm);
@@ -249,29 +419,64 @@ export default function IntegratorPortal() {
       }
 
       const existingDisb = disbRows[0] || null;
-      setDisbForm({
-        ADVANCES: existingDisb
-          ? { internal: String(existingDisb.advancesInternal ?? ""), external: String(existingDisb.advancesExternal ?? ""), remarks: existingDisb.advancesRemarks || "" }
-          : emptyDisbFields,
-        LOANS: existingDisb
-          ? { internal: String(existingDisb.loansInternal ?? ""), external: String(existingDisb.loansExternal ?? ""), remarks: existingDisb.loansRemarks || "" }
-          : emptyDisbFields,
-        INTERESTS: existingDisb
-          ? { internal: String(existingDisb.interestsInternal ?? ""), external: String(existingDisb.interestsExternal ?? ""), remarks: existingDisb.interestsRemarks || "" }
-          : emptyDisbFields,
-      });
+      setDisbForm(
+        existingDisb
+          ? { amount: String(existingDisb.amount ?? ""), remarks: existingDisb.remarks || "" }
+          : emptyDisbForm
+      );
+
+      setExpenseNotes(expNotes);
+      setDisbursementNotes(disbNotes);
+      setNotesLoading(false);
     });
   }, [yearId, quarter, companyId, businessUnitId]);
 
-  // Saves everything on the page in one go: the combined Revenue/
-  // Collections/Expenses actual (one PUT, as before) plus each of the three
-  // Disbursement categories (one PUT per category — the backend only ever
-  // accepts one category at a time, see routes/disbursements.ts). Uses
-  // allSettled rather than all/Promise.race so that, if the user's role has
-  // edit access to some categories but not others (REVENUE/COLLECTIONS/
-  // EXPENSES and DISBURSEMENTS are independently gate-able Custom Role
-  // resources), the categories they ARE allowed to edit still save
-  // successfully instead of one 403 aborting everything else.
+  async function handleAddExpenseNote(categoryId: string, amount: number, remarksText: string) {
+    setAddingExpenseNote(true);
+    try {
+      const row = await api.createExpenseNote({ companyId, yearId, quarter, categoryId, amount, remarks: remarksText });
+      setExpenseNotes((prev) => [...prev, row]);
+    } finally {
+      setAddingExpenseNote(false);
+    }
+  }
+  async function handleDeleteExpenseNote(id: string) {
+    setDeletingExpenseNoteId(id);
+    try {
+      await api.deleteExpenseNote(id);
+      setExpenseNotes((prev) => prev.filter((n) => n.id !== id));
+    } finally {
+      setDeletingExpenseNoteId(null);
+    }
+  }
+  async function handleAddDisbursementNote(categoryId: string, amount: number, remarksText: string) {
+    setAddingDisbursementNote(true);
+    try {
+      const row = await api.createDisbursementNote({ companyId, yearId, quarter, categoryId, amount, remarks: remarksText });
+      setDisbursementNotes((prev) => [...prev, row]);
+    } finally {
+      setAddingDisbursementNote(false);
+    }
+  }
+  async function handleDeleteDisbursementNote(id: string) {
+    setDeletingDisbursementNoteId(id);
+    try {
+      await api.deleteDisbursementNote(id);
+      setDisbursementNotes((prev) => prev.filter((n) => n.id !== id));
+    } finally {
+      setDeletingDisbursementNoteId(null);
+    }
+  }
+
+  // Saves the combined Revenue/Collections/Expenses actual (one PUT) plus
+  // the single Disbursements amount (one PUT). Uses allSettled rather than
+  // all/Promise.race so that, if the user's role has edit access to one but
+  // not the other (REVENUE/COLLECTIONS/EXPENSES and DISBURSEMENTS are
+  // independently gate-able Custom Role resources), the one they ARE
+  // allowed to edit still saves successfully instead of one 403 aborting
+  // everything else. The notable line items lists save independently as
+  // each row is added/removed (see handleAdd/DeleteExpenseNote above) —
+  // they're not part of this submit.
   async function handleSubmit(e: FormEvent) {
     e.preventDefault();
     setError("");
@@ -291,27 +496,21 @@ export default function IntegratorPortal() {
         collectionsExternalEarned: Number(form.collectionsExternalEarned) || 0,
         collectionsExternalUnearned: Number(form.collectionsExternalUnearned) || 0,
         collectionsExternalOthers: Number(form.collectionsExternalOthers) || 0,
-        expensesInterest: Number(form.expensesInterest) || 0,
-        expensesDepreciation: Number(form.expensesDepreciation) || 0,
-        expensesOtherNonCash: Number(form.expensesOtherNonCash) || 0,
+        expenses: Number(form.expenses) || 0,
       };
 
       const results = await Promise.allSettled([
         api.putActual(actualPayload),
-        ...DISBURSEMENT_GROUPS.map((g) =>
-          api.putDisbursement({
-            companyId,
-            yearId,
-            quarter,
-            category: g.category,
-            internal: Number(disbForm[g.category].internal) || 0,
-            external: Number(disbForm[g.category].external) || 0,
-            remarks: disbForm[g.category].remarks,
-          })
-        ),
+        api.putDisbursement({
+          companyId,
+          yearId,
+          quarter,
+          amount: Number(disbForm.amount) || 0,
+          remarks: disbForm.remarks,
+        }),
       ]);
 
-      const labels = ["Revenue/Collections/Expenses", ...DISBURSEMENT_GROUPS.map((g) => g.title)];
+      const labels = ["Revenue/Collections/Expenses", "Disbursements"];
       const failures = results
         .map((r, i) => (r.status === "rejected" ? `${labels[i]}: ${(r.reason as any)?.message || "failed"}` : null))
         .filter((x): x is string => Boolean(x));
@@ -401,8 +600,8 @@ export default function IntegratorPortal() {
                   min={0}
                   step="0.01"
                   className="rounded-md border border-slate-300 dark:border-slate-600 dark:bg-slate-800 dark:text-slate-100 px-3 py-2 text-sm"
-                  value={form[REVENUE_GROUP.internal]}
-                  onChange={(e) => setForm((f) => ({ ...f, [REVENUE_GROUP.internal]: e.target.value }))}
+                  value={form.revenueInternal}
+                  onChange={(e) => setForm((f) => ({ ...f, revenueInternal: e.target.value }))}
                 />
               </div>
               <div className="flex flex-col gap-1">
@@ -412,8 +611,8 @@ export default function IntegratorPortal() {
                   min={0}
                   step="0.01"
                   className="rounded-md border border-slate-300 dark:border-slate-600 dark:bg-slate-800 dark:text-slate-100 px-3 py-2 text-sm"
-                  value={form[REVENUE_GROUP.external]}
-                  onChange={(e) => setForm((f) => ({ ...f, [REVENUE_GROUP.external]: e.target.value }))}
+                  value={form.revenueExternal}
+                  onChange={(e) => setForm((f) => ({ ...f, revenueExternal: e.target.value }))}
                 />
               </div>
             </div>
@@ -454,69 +653,45 @@ export default function IntegratorPortal() {
         {/* ---------- Expenses ---------- */}
         <div className="grid grid-cols-1 gap-4">
           <h3 className="-mb-2 text-xs font-semibold uppercase tracking-wide text-slate-400 dark:text-slate-500">Expenses</h3>
-          <div className="rounded-md border border-slate-100 dark:border-slate-800 bg-slate-50/60 dark:bg-slate-950/60 p-3 sm:p-4">
-            <div className="grid grid-cols-1 gap-4 sm:grid-cols-3">
-              {EXPENSES_FIELDS.map((f) => (
-                <BreakdownField
-                  key={f.key}
-                  label={f.label}
-                  value={form[f.key]}
-                  remarks={remarks[f.remarksKey]}
-                  onValueChange={(v) => setForm((prev) => ({ ...prev, [f.key]: v }))}
-                  onRemarksChange={(v) => setRemarks((prev) => ({ ...prev, [f.remarksKey]: v }))}
-                />
-              ))}
-            </div>
-          </div>
+          <AmountRemarksGroup
+            title="Expenses"
+            value={form.expenses}
+            remarks={remarks.expensesRemarks}
+            onValueChange={(v) => setForm((f) => ({ ...f, expenses: v }))}
+            onRemarksChange={(v) => setRemarks((r) => ({ ...r, expensesRemarks: v }))}
+          />
+          <NotableItemsCard
+            title="Notable Expense Items"
+            categories={expenseCategories}
+            notes={expenseNotes}
+            loading={notesLoading}
+            onAdd={handleAddExpenseNote}
+            onDelete={handleDeleteExpenseNote}
+            adding={addingExpenseNote}
+            deletingId={deletingExpenseNoteId}
+          />
         </div>
 
         {/* ---------- Disbursements ---------- */}
         <div className="grid grid-cols-1 gap-4">
           <h3 className="-mb-2 text-xs font-semibold uppercase tracking-wide text-slate-400 dark:text-slate-500">Disbursements</h3>
-          {DISBURSEMENT_GROUPS.map((group) => (
-            <div key={group.title} className="rounded-md border border-slate-100 dark:border-slate-800 bg-slate-50/60 dark:bg-slate-950/60 p-3 sm:p-4">
-              <div className="mb-2 text-sm font-semibold text-slate-700 dark:text-slate-200">{group.title}</div>
-              <div className="grid grid-cols-1 gap-4 xs:grid-cols-2">
-                <div className="flex flex-col gap-1">
-                  <label className="text-xs font-medium text-slate-500 dark:text-slate-400">Internal</label>
-                  <input
-                    type="number"
-                    min={0}
-                    step="0.01"
-                    className="rounded-md border border-slate-300 dark:border-slate-600 dark:bg-slate-800 dark:text-slate-100 px-3 py-2 text-sm"
-                    value={disbForm[group.category].internal}
-                    onChange={(e) =>
-                      setDisbForm((f) => ({ ...f, [group.category]: { ...f[group.category], internal: e.target.value } }))
-                    }
-                  />
-                </div>
-                <div className="flex flex-col gap-1">
-                  <label className="text-xs font-medium text-slate-500 dark:text-slate-400">External</label>
-                  <input
-                    type="number"
-                    min={0}
-                    step="0.01"
-                    className="rounded-md border border-slate-300 dark:border-slate-600 dark:bg-slate-800 dark:text-slate-100 px-3 py-2 text-sm"
-                    value={disbForm[group.category].external}
-                    onChange={(e) =>
-                      setDisbForm((f) => ({ ...f, [group.category]: { ...f[group.category], external: e.target.value } }))
-                    }
-                  />
-                </div>
-              </div>
-              <div className="mt-3 flex flex-col gap-1">
-                <label className="text-xs font-medium text-slate-500 dark:text-slate-400">{group.title} Remarks</label>
-                <textarea
-                  className="min-h-[60px] rounded-md border border-slate-300 dark:border-slate-600 dark:bg-slate-800 dark:text-slate-100 px-3 py-2 text-sm"
-                  value={disbForm[group.category].remarks}
-                  onChange={(e) =>
-                    setDisbForm((f) => ({ ...f, [group.category]: { ...f[group.category], remarks: e.target.value } }))
-                  }
-                  placeholder={`Notes on this quarter's ${group.title.toLowerCase()}...`}
-                />
-              </div>
-            </div>
-          ))}
+          <AmountRemarksGroup
+            title="Disbursements"
+            value={disbForm.amount}
+            remarks={disbForm.remarks}
+            onValueChange={(v) => setDisbForm((f) => ({ ...f, amount: v }))}
+            onRemarksChange={(v) => setDisbForm((f) => ({ ...f, remarks: v }))}
+          />
+          <NotableItemsCard
+            title="Notable Disbursement Items"
+            categories={disbursementCategories}
+            notes={disbursementNotes}
+            loading={notesLoading}
+            onAdd={handleAddDisbursementNote}
+            onDelete={handleDeleteDisbursementNote}
+            adding={addingDisbursementNote}
+            deletingId={deletingDisbursementNoteId}
+          />
         </div>
 
         {error && <div className="rounded-md bg-red-50 dark:bg-red-950/40 px-3 py-2 text-sm text-red-600 dark:text-red-400">{error}</div>}

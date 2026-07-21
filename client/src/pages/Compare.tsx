@@ -23,9 +23,7 @@ type MetricKey =
   | "rocksAtRisk"
   | "rocksPending"
   | "rocksAvgProgressPct"
-  | "advancesActual"
-  | "loansActual"
-  | "interestsActual";
+  | "disbursementsActual";
 
 interface MetricDef {
   key: MetricKey;
@@ -74,11 +72,7 @@ const SECTIONS: { title: string; metrics: MetricDef[] }[] = [
   },
   {
     title: "Disbursements",
-    metrics: [
-      { key: "advancesActual", label: "Advances", type: "currency" },
-      { key: "loansActual", label: "Loan Repayments", type: "currency" },
-      { key: "interestsActual", label: "Interests", type: "currency" },
-    ],
+    metrics: [{ key: "disbursementsActual", label: "Disbursements", type: "currency" }],
   },
 ];
 

@@ -1941,3 +1941,87 @@ the Model field and either leave it blank-then-retype (or type
 `gemini-flash-latest` directly), and Save — then Test Connection to
 confirm. Worth checking by hand: after re-saving, Test Connection succeeds
 and Generate Analysis on the AI Analysis tab works again.
+
+**Expenses and Disbursements collapsed to a single amount each, plus a new
+growable "notable line items" record-keeping facility.** Both figures used
+to be a fixed breakdown — Expenses was Interest/Depreciation/Other Non-Cash,
+Disbursements was Advances/Loan Repayments/Interests — each sub-value with
+its own Remarks field. Both are now just one plain amount (with one Remarks
+field), matching Revenue's shape. In their place, a Business Unit can now
+log any number of significant line items against either figure — e.g. "this
+quarter's Expenses included ₱50,000 of Depreciation" — purely for
+record-keeping. These notes are never rolled into Expenses/Disbursements
+themselves or into any KPI, attainment, or AI Analysis figure; they exist
+only to be looked up later.
+
+This is a **destructive** migration
+(`server/prisma/migrations/20260801010000_simplify_expenses_disbursements_add_notes/migration.sql`)
+— the old per-sub-category Expenses/Disbursements figures (and their
+Remarks) cannot be principled-ly collapsed into one number, so existing
+values in those columns are dropped, not summed or migrated. Every Company's
+Expenses/Disbursements actual and target starts at 0 after this migration.
+
+*Schema/backend:* `QuarterTarget`/`QuarterActual` in `schema.prisma` lost
+their `expensesInterest`/`expensesDepreciation`/`expensesOtherNonCash` (and
+matching Remarks) columns in favor of one `expenses Decimal` +
+`expensesRemarks String`; `DisbursementActual` lost its `category` field
+entirely in favor of one row per Company/Year/Quarter with `amount` +
+`remarks`. Two new models back the notable-line-items facility: `NoteCategory`
+(a superadmin-managed catalog — `type` is `EXPENSE` or `DISBURSEMENT`,
+plus `label`/`sortOrder`/`active`; seeded with 8 defaults: Interest,
+Depreciation, Other Non-Cash, Cost of Sales, and OPEX for Expenses; Advances,
+Loan Repayments, and Interests for Disbursements) and `ExpenseNote`/
+`DisbursementNote` (one row per logged item — `companyId`/`yearId`/`quarter`/
+`categoryId`/`amount`/`remarks`, `category` on `onDelete: Restrict` so a
+category still referenced by a note can't be hard-deleted, only deactivated).
+`server/src/utils/aggregate.ts`'s `Figures`/`DisbursementFigures` interfaces
+and every helper (`expensesTotal`, `disbursementsTotal`) were updated to the
+single-field shape — kept as named passthrough functions rather than inlined
+everywhere, so `dashboard.ts`/`scorecard.ts`/`comparison.ts`/`reports.ts`
+call sites needed little to no change beyond their disbursement-specific
+3-way-total spots (`reports.ts` needed none at all). `targets.ts`/
+`actuals.ts`/`disbursements.ts` had their zod schemas and field-permission
+maps collapsed to match. Two new route files: `server/src/routes/
+noteCategories.ts` (Superadmin-only CRUD for the catalog, same pattern as
+`SmtpSettings`/`AiSettings` — not gated by a Custom Role resource) and
+`server/src/routes/notes.ts` (a `buildNotesRouter()` factory building two
+structurally-identical CRUD routers for `ExpenseNote`/`DisbursementNote`,
+mounted at `/api/expense-notes` and `/api/disbursement-notes` — gated by the
+existing `EXPENSES`/`DISBURSEMENTS` Custom Role resources, no new resource
+needed).
+
+*Frontend:* `TargetConfig.tsx` (Target Setup) dropped the Combined-vs-Split
+toggle for Expenses entirely (nothing left to split) in favor of one plain
+amount field. `IntegratorPortal.tsx` (Data Entry) got the same simplification
+for both Expenses and Disbursements, plus a new `NotableItemsCard` component
+under each — a live list of logged items with a delete button, and an
+add-row form (category dropdown sourced from `api.noteCategories("EXPENSE"
+| "DISBURSEMENT")`, amount, remarks) that saves immediately via
+`api.createExpenseNote()`/`createDisbursementNote()` rather than being part
+of the page's "Save All Figures" submit. `OperationalGrid.tsx`'s Expenses
+detail row and `DisbursementCards.tsx`/`Scorecard.tsx`/`Compare.tsx`'s
+Disbursements sections all collapsed from 3 values to 1 the same way. A new
+Admin page, `client/src/pages/admin/AdminNoteCategories.tsx` (nested at
+`/admin/note-categories`, Superadmin-only, tabbed alongside AI Settings in
+`AdminLayout.tsx`), manages the two category catalogs — add, rename,
+activate/deactivate, delete (blocked with a friendly message if a category
+is still referenced by a note). `BulkTargetUpload.tsx`'s template lost its 3
+Expenses columns in favor of one.
+
+Worth checking by hand, given the destructive nature of this change: after a
+fresh migrate, every Company's Expenses/Disbursements actual and target
+reads 0; Target Setup's Expenses field is a single amount with no
+split/toggle; Data Entry's Expenses and Disbursements sections each show one
+amount + Remarks field, followed by a "Notable ... Items" list where adding
+an item (pick a category, enter an amount, optional remarks, Add) shows up
+immediately without needing to click "Save All Figures," and deleting one
+removes it immediately too; logging a large Expense note does **not** change
+the Expenses amount, KPI cards, attainment percentages, or the Executive
+Scorecard/AI Analysis figures anywhere; Admin → Note Categories lets a
+Superadmin add a new category (it shows up in Data Entry's dropdown right
+away), deactivate one (it disappears from the add-row dropdown but
+already-logged notes using it still display normally), and deleting a
+category that's still referenced by a note is rejected with a message asking
+to deactivate instead; and the Operational Grid, Disbursement Cards,
+Scorecard, and Compare pages all show the single collapsed Expenses/
+Disbursements figure instead of a 3-way breakdown.

@@ -22,6 +22,7 @@ import AdminCompanies from "./pages/admin/AdminCompanies";
 import AdminBusinessUnits from "./pages/admin/AdminBusinessUnits";
 import AdminSmtp from "./pages/admin/AdminSmtp";
 import AdminAiSettings from "./pages/admin/AdminAiSettings";
+import AdminNoteCategories from "./pages/admin/AdminNoteCategories";
 import AdminAuditLog from "./pages/admin/AdminAuditLog";
 import AdminLayout from "./pages/admin/AdminLayout";
 
@@ -125,6 +126,7 @@ export default function App() {
           <Route path="business-units" element={<AdminBusinessUnits />} />
           <Route path="smtp" element={<AdminSmtp />} />
           <Route path="ai-settings" element={<AdminAiSettings />} />
+          <Route path="note-categories" element={<AdminNoteCategories />} />
           {/* Nested (unlike the top-level /audit-log above) so the tab bar
               in AdminLayout stays mounted/visible while a Superadmin is on
               this page, exactly like every other Admin tab. */}

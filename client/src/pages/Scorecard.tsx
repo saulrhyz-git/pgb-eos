@@ -6,10 +6,8 @@ import {
   CheckCircle2,
   Gauge,
   HandCoins,
-  Landmark,
   ListChecks,
   Mountain,
-  Percent,
   PhilippinePeso,
   Scale,
   ShieldAlert,
@@ -182,7 +180,7 @@ function SummaryStat({
 
 type RevSortKey = "businessUnitName" | "quarterAttainmentPct" | "ytdVsAnnualPct" | "annualTarget" | "ytdActual";
 type RockSortKey = "businessUnitName" | "total" | "avgProgressPct" | "atRisk";
-type DisbSortKey = "businessUnitName" | "advancesActual" | "loansActual" | "interestsActual";
+type DisbSortKey = "businessUnitName" | "disbursementsActual";
 
 function SortHeader<T extends string>({
   label,
@@ -457,28 +455,18 @@ export default function Scorecard() {
               />
             </div>
 
-            {/* Disbursements cards — recorded, not targeted, so no Target/
+            {/* Disbursements card — recorded, not targeted, so no Target/
                 Attainment framing like the cards above, just this period's
-                running total per sub-category. Placed here (above Revenue
-                Trend) rather than in their own section further down. */}
+                running total. Used to be 3 sub-category cards (Advances/
+                Loan Repayments/Interests); collapsed to one, the same way
+                the underlying figure was. Placed here (above Revenue Trend)
+                rather than in its own section further down. */}
             <div className="grid grid-cols-1 gap-4 sm:grid-cols-3">
               <SummaryStat
                 icon={<HandCoins className="h-4 w-4" />}
-                label={`${periodLabel} Advances`}
-                value={formatCurrencyShort(data.disbursements.summary.advancesActual)}
-                fullValue={formatCurrency(data.disbursements.summary.advancesActual)}
-              />
-              <SummaryStat
-                icon={<Landmark className="h-4 w-4" />}
-                label={`${periodLabel} Loan Repayments`}
-                value={formatCurrencyShort(data.disbursements.summary.loansActual)}
-                fullValue={formatCurrency(data.disbursements.summary.loansActual)}
-              />
-              <SummaryStat
-                icon={<Percent className="h-4 w-4" />}
-                label={`${periodLabel} Interests`}
-                value={formatCurrencyShort(data.disbursements.summary.interestsActual)}
-                fullValue={formatCurrency(data.disbursements.summary.interestsActual)}
+                label={`${periodLabel} Disbursements`}
+                value={formatCurrencyShort(data.disbursements.summary.disbursementsActual)}
+                fullValue={formatCurrency(data.disbursements.summary.disbursementsActual)}
               />
             </div>
 
@@ -543,7 +531,7 @@ export default function Scorecard() {
           </section>
 
           {/* ---------- Disbursements by Business Unit ---------- */}
-          {/* The 3 summary cards for this section now live above, right
+          {/* The summary card for this section now lives above, right
               before the Revenue Trend chart — this keeps just the
               per-Business-Unit breakdown table. */}
           <section className="flex flex-col gap-4">
@@ -552,27 +540,19 @@ export default function Scorecard() {
             {data.disbursements.businessUnits.length > 0 && (
               <div className="overflow-hidden rounded-lg border border-slate-200 dark:border-slate-700 bg-white dark:bg-slate-900 shadow-sm">
                 <div className="overflow-x-auto">
-                  <table className="w-full min-w-[560px] text-sm">
+                  <table className="w-full min-w-[360px] text-sm">
                     <thead className="bg-slate-50 dark:bg-slate-950 text-left text-xs font-semibold uppercase text-slate-500 dark:text-slate-400">
                       <tr>
                         <SortHeader label="Business Unit" sortKey="businessUnitName" active={disbSort.key} dir={disbSort.dir} onClick={toggleDisbSort} />
-                        <SortHeader label="Advances" sortKey="advancesActual" active={disbSort.key} dir={disbSort.dir} onClick={toggleDisbSort} />
-                        <SortHeader label="Loan Repayments" sortKey="loansActual" active={disbSort.key} dir={disbSort.dir} onClick={toggleDisbSort} />
-                        <SortHeader label="Interests" sortKey="interestsActual" active={disbSort.key} dir={disbSort.dir} onClick={toggleDisbSort} />
+                        <SortHeader label="Disbursements" sortKey="disbursementsActual" active={disbSort.key} dir={disbSort.dir} onClick={toggleDisbSort} />
                       </tr>
                     </thead>
                     <tbody className="divide-y divide-slate-100 dark:divide-slate-800">
                       {sortedDisbRows.map((bu) => (
                         <tr key={bu.businessUnitId}>
                           <td className="px-4 py-3 font-medium text-slate-800 dark:text-slate-100">{bu.businessUnitName}</td>
-                          <td className="px-4 py-3 text-slate-600 dark:text-slate-300" title={formatCurrency(bu.advancesActual)}>
-                            {formatCurrencyShort(bu.advancesActual)}
-                          </td>
-                          <td className="px-4 py-3 text-slate-600 dark:text-slate-300" title={formatCurrency(bu.loansActual)}>
-                            {formatCurrencyShort(bu.loansActual)}
-                          </td>
-                          <td className="px-4 py-3 text-slate-600 dark:text-slate-300" title={formatCurrency(bu.interestsActual)}>
-                            {formatCurrencyShort(bu.interestsActual)}
+                          <td className="px-4 py-3 text-slate-600 dark:text-slate-300" title={formatCurrency(bu.disbursementsActual)}>
+                            {formatCurrencyShort(bu.disbursementsActual)}
                           </td>
                         </tr>
                       ))}

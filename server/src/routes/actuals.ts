@@ -25,12 +25,10 @@ const figuresSchema = z.object({
   collectionsExternalEarned: z.number().min(0).default(0),
   collectionsExternalUnearned: z.number().min(0).default(0),
   collectionsExternalOthers: z.number().min(0).default(0),
-  expensesInterest: z.number().min(0).default(0),
-  expensesDepreciation: z.number().min(0).default(0),
-  expensesOtherNonCash: z.number().min(0).default(0),
+  expenses: z.number().min(0).default(0),
   // Split per breakdown rather than one shared note per parent category —
-  // one Remarks field per Collections breakdown (6) and per Expenses
-  // breakdown (3), plus Revenue's single field, same granularity Disbursements uses.
+  // one Remarks field per Collections breakdown (6), plus Revenue's and
+  // Expenses' single fields, same granularity Disbursements uses.
   revenueRemarks: z.string().max(2000).optional().default(""),
   collectionsInternalEarnedRemarks: z.string().max(2000).optional().default(""),
   collectionsInternalUnearnedRemarks: z.string().max(2000).optional().default(""),
@@ -38,9 +36,7 @@ const figuresSchema = z.object({
   collectionsExternalEarnedRemarks: z.string().max(2000).optional().default(""),
   collectionsExternalUnearnedRemarks: z.string().max(2000).optional().default(""),
   collectionsExternalOthersRemarks: z.string().max(2000).optional().default(""),
-  expensesInterestRemarks: z.string().max(2000).optional().default(""),
-  expensesDepreciationRemarks: z.string().max(2000).optional().default(""),
-  expensesOtherNonCashRemarks: z.string().max(2000).optional().default(""),
+  expensesRemarks: z.string().max(2000).optional().default(""),
 });
 
 router.get("/", async (req, res) => {
@@ -151,9 +147,7 @@ const remarksPatchSchema = z
     collectionsExternalEarnedRemarks: z.string().max(2000),
     collectionsExternalUnearnedRemarks: z.string().max(2000),
     collectionsExternalOthersRemarks: z.string().max(2000),
-    expensesInterestRemarks: z.string().max(2000),
-    expensesDepreciationRemarks: z.string().max(2000),
-    expensesOtherNonCashRemarks: z.string().max(2000),
+    expensesRemarks: z.string().max(2000),
   })
   .partial()
   .refine((v) => Object.keys(v).length > 0, { message: "At least one remarks field is required" });
@@ -186,9 +180,7 @@ router.patch("/:companyId/:yearId/:quarter/remarks", async (req, res) => {
         collectionsExternalEarnedRemarks: "COLLECTIONS",
         collectionsExternalUnearnedRemarks: "COLLECTIONS",
         collectionsExternalOthersRemarks: "COLLECTIONS",
-        expensesInterestRemarks: "EXPENSES",
-        expensesDepreciationRemarks: "EXPENSES",
-        expensesOtherNonCashRemarks: "EXPENSES",
+        expensesRemarks: "EXPENSES",
       };
       for (const field of Object.keys(remarksParsed.data)) {
         const resource = fieldResource[field];

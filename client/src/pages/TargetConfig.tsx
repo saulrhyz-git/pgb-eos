@@ -14,9 +14,7 @@ type FigureKey =
   | "collectionsExternalEarned"
   | "collectionsExternalUnearned"
   | "collectionsExternalOthers"
-  | "expensesInterest"
-  | "expensesDepreciation"
-  | "expensesOtherNonCash";
+  | "expenses";
 
 const emptyForm: Record<FigureKey, string> = {
   revenueInternal: "",
@@ -27,9 +25,7 @@ const emptyForm: Record<FigureKey, string> = {
   collectionsExternalEarned: "",
   collectionsExternalUnearned: "",
   collectionsExternalOthers: "",
-  expensesInterest: "",
-  expensesDepreciation: "",
-  expensesOtherNonCash: "",
+  expenses: "",
 };
 
 // Revenue is the only category that still has a plain Internal/External
@@ -51,15 +47,13 @@ const COLLECTIONS_GROUPS: { title: string; earned: FigureKey; unearned: FigureKe
   { title: "External", earned: "collectionsExternalEarned", unearned: "collectionsExternalUnearned", others: "collectionsExternalOthers" },
 ];
 
-// Expenses has no Internal/External split at all — three single-value
-// breakdowns instead, each treated as one group for the same
-// Combined-vs-Split even-split behavior as Collections above.
-const EXPENSES_FIELDS: { key: FigureKey; label: string }[] = [
-  { key: "expensesInterest", label: "Interest" },
-  { key: "expensesDepreciation", label: "Depreciation" },
-  { key: "expensesOtherNonCash", label: "Other Non-Cash Expenses" },
-];
-const EXPENSES_GROUP = { title: "Expenses", a: "expensesInterest" as FigureKey, b: "expensesDepreciation" as FigureKey, c: "expensesOtherNonCash" as FigureKey };
+// Expenses is a single plain amount — no Internal/External split, no
+// breakdown, and (unlike Revenue/Collections above) no Combined-vs-Split
+// toggle either, since there's nothing left to split it into. A Business
+// Unit can still log significant Interest/Depreciation/Other-Non-Cash/Cost-
+// of-Sales/OPEX items at Actuals time via the notable-line-items facility on
+// the Data Entry page — purely for record-keeping, never part of this
+// number.
 
 // Splits a total evenly across 3 fields so they sum back to exactly the
 // original total (unlike a plain total/3, which can lose or gain a cent to
@@ -71,11 +65,11 @@ function splitEvenlyThree(total: number): [number, number, number] {
   return [share, share, remainder];
 }
 
-// Combined-vs-Split defaults/inference for Collections' two sides and
-// Expenses' one group — "Combined" is inferred whenever the 3 underlying
-// values are exactly equal (which is what entering a Combined total always
-// produces, including the all-zero/blank starting state).
-const emptyThreeWayFieldModes: Record<string, FieldMode> = { Internal: "combined", External: "combined", Expenses: "combined" };
+// Combined-vs-Split defaults/inference for Collections' two sides —
+// "Combined" is inferred whenever the 3 underlying values are exactly equal
+// (which is what entering a Combined total always produces, including the
+// all-zero/blank starting state).
+const emptyThreeWayFieldModes: Record<string, FieldMode> = { Internal: "combined", External: "combined" };
 
 function threeWayFieldModesFrom(existing: Record<string, any>, groups: { title: string; a: FigureKey; b: FigureKey; c: FigureKey }[]): Record<string, FieldMode> {
   const modes: Record<string, FieldMode> = {};
@@ -107,9 +101,9 @@ function fieldModesFrom(existing: Record<string, any>): Record<string, FieldMode
 
 // One group's worth of UI: a "One Total" / "Split" toggle, then either a
 // single Total input (whose value is split evenly across the 3 underlying
-// fields on every keystroke) or the 3 individual breakdown inputs. Shared by
-// both CollectionsFieldsEditor (called once per side) and
-// ExpensesFieldsEditor (called once, since Expenses has only one group).
+// fields on every keystroke) or the 3 individual breakdown inputs. Used by
+// CollectionsFieldsEditor (called once per side) — Expenses no longer has a
+// 3-way breakdown to toggle (see ExpensesFieldEditor below).
 function ThreeWayFieldGroup({
   title,
   modeKey,
@@ -254,30 +248,39 @@ function CollectionsFieldsEditor({
   );
 }
 
-function ExpensesFieldsEditor({
+// A single plain Expenses amount input — no toggle, no breakdown (see the
+// comment above COLLECTIONS_THREEWAY_GROUPS for why). Shared by both the
+// per-Quarter form and the Annual Target form below, same as the other
+// editors here.
+function ExpensesFieldEditor({
   form,
   setForm,
-  fieldModes,
-  setFieldModes,
   disabled,
 }: {
   form: Record<FigureKey, string>;
   setForm: Dispatch<SetStateAction<Record<FigureKey, string>>>;
-  fieldModes: Record<string, FieldMode>;
-  setFieldModes: Dispatch<SetStateAction<Record<string, FieldMode>>>;
   disabled?: boolean;
 }) {
   return (
-    <ThreeWayFieldGroup
-      title="Expenses"
-      modeKey="Expenses"
-      fields={EXPENSES_FIELDS}
-      form={form}
-      setForm={setForm}
-      fieldModes={fieldModes}
-      setFieldModes={setFieldModes}
-      disabled={disabled}
-    />
+    <div className="rounded-md border border-slate-100 dark:border-slate-800 bg-slate-50/60 dark:bg-slate-950/60 p-3 sm:p-4">
+      <div className="mb-2 text-sm font-semibold text-slate-700 dark:text-slate-200">Expenses</div>
+      <div className="flex flex-col gap-1">
+        <label className="text-xs font-medium text-slate-500 dark:text-slate-400">Amount</label>
+        <input
+          type="number"
+          min={0}
+          step="0.01"
+          disabled={disabled}
+          className="rounded-md border border-slate-300 dark:border-slate-600 dark:bg-slate-800 dark:text-slate-100 px-3 py-2 text-sm disabled:bg-slate-100 disabled:text-slate-400 sm:max-w-xs"
+          value={form.expenses}
+          onChange={(e) => setForm((f) => ({ ...f, expenses: e.target.value }))}
+        />
+      </div>
+      <p className="mt-2 text-[11px] text-slate-400 dark:text-slate-500">
+        Need to note significant Interest, Depreciation, Other Non-Cash, Cost of Sales, or OPEX items? Log them on the
+        Data Entry page's notable line items list — informational only, not part of this target.
+      </p>
+    </div>
   );
 }
 
@@ -412,16 +415,15 @@ export default function TargetConfig() {
   const [companyId, setCompanyId] = useState("");
   const [form, setForm] = useState(emptyForm);
   const [fieldModes, setFieldModes] = useState<Record<string, FieldMode>>(emptyFieldModes);
-  // Collections' two sides (Internal/External) and Expenses' one group each
-  // get their own independent Combined-vs-Split mode — "Internal"/"External"/
-  // "Expenses" keys, shared by CollectionsFieldsEditor/ExpensesFieldsEditor.
+  // Collections' two sides (Internal/External) each get their own
+  // independent Combined-vs-Split mode — "Internal"/"External" keys, shared
+  // by CollectionsFieldsEditor. Expenses has no such toggle anymore (see
+  // ExpensesFieldEditor above).
   const [collectionsFieldModes, setCollectionsFieldModes] = useState<Record<string, FieldMode>>(emptyThreeWayFieldModes);
-  const [expensesFieldModes, setExpensesFieldModes] = useState<Record<string, FieldMode>>(emptyThreeWayFieldModes);
 
   const [annualForm, setAnnualForm] = useState(emptyForm);
   const [annualFieldModes, setAnnualFieldModes] = useState<Record<string, FieldMode>>(emptyFieldModes);
   const [annualCollectionsFieldModes, setAnnualCollectionsFieldModes] = useState<Record<string, FieldMode>>(emptyThreeWayFieldModes);
-  const [annualExpensesFieldModes, setAnnualExpensesFieldModes] = useState<Record<string, FieldMode>>(emptyThreeWayFieldModes);
 
   // The real calendar quarter "right now" (server clock) — used only to
   // default the initial Year/Quarter selection to the current one. It has
@@ -583,21 +585,17 @@ export default function TargetConfig() {
           collectionsExternalEarned: String(existing.collectionsExternalEarned ?? ""),
           collectionsExternalUnearned: String(existing.collectionsExternalUnearned ?? ""),
           collectionsExternalOthers: String(existing.collectionsExternalOthers ?? ""),
-          expensesInterest: String(existing.expensesInterest ?? ""),
-          expensesDepreciation: String(existing.expensesDepreciation ?? ""),
-          expensesOtherNonCash: String(existing.expensesOtherNonCash ?? ""),
+          expenses: String(existing.expenses ?? ""),
         });
         // Infer how this was originally entered: a nonzero External means it
         // was (or should be treated as) split; otherwise default to the
         // simpler single-total view.
         setFieldModes(fieldModesFrom(existing));
         setCollectionsFieldModes(threeWayFieldModesFrom(existing, COLLECTIONS_THREEWAY_GROUPS));
-        setExpensesFieldModes(threeWayFieldModesFrom(existing, [EXPENSES_GROUP]));
       } else {
         setForm(emptyForm);
         setFieldModes(emptyFieldModes);
         setCollectionsFieldModes(emptyThreeWayFieldModes);
-        setExpensesFieldModes(emptyThreeWayFieldModes);
       }
     });
   }
@@ -626,9 +624,7 @@ export default function TargetConfig() {
         collectionsExternalEarned: 0,
         collectionsExternalUnearned: 0,
         collectionsExternalOthers: 0,
-        expensesInterest: 0,
-        expensesDepreciation: 0,
-        expensesOtherNonCash: 0,
+        expenses: 0,
       };
       for (const r of rows) {
         (Object.keys(totals) as FigureKey[]).forEach((k) => {
@@ -641,7 +637,6 @@ export default function TargetConfig() {
       setAnnualForm(asStrings);
       setAnnualFieldModes(fieldModesFrom(totals));
       setAnnualCollectionsFieldModes(threeWayFieldModesFrom(totals, COLLECTIONS_THREEWAY_GROUPS));
-      setAnnualExpensesFieldModes(threeWayFieldModesFrom(totals, [EXPENSES_GROUP]));
     });
   }
 
@@ -668,9 +663,7 @@ export default function TargetConfig() {
         collectionsExternalEarned: Number(form.collectionsExternalEarned) || 0,
         collectionsExternalUnearned: Number(form.collectionsExternalUnearned) || 0,
         collectionsExternalOthers: Number(form.collectionsExternalOthers) || 0,
-        expensesInterest: Number(form.expensesInterest) || 0,
-        expensesDepreciation: Number(form.expensesDepreciation) || 0,
-        expensesOtherNonCash: Number(form.expensesOtherNonCash) || 0,
+        expenses: Number(form.expenses) || 0,
       };
       await api.putQuarterTarget({ companyId, yearId, quarter, ...figures });
       setSaved(true);
@@ -696,9 +689,7 @@ export default function TargetConfig() {
         collectionsExternalEarned: Number(annualForm.collectionsExternalEarned) || 0,
         collectionsExternalUnearned: Number(annualForm.collectionsExternalUnearned) || 0,
         collectionsExternalOthers: Number(annualForm.collectionsExternalOthers) || 0,
-        expensesInterest: Number(annualForm.expensesInterest) || 0,
-        expensesDepreciation: Number(annualForm.expensesDepreciation) || 0,
-        expensesOtherNonCash: Number(annualForm.expensesOtherNonCash) || 0,
+        expenses: Number(annualForm.expenses) || 0,
       };
       const result = await api.putAnnualTarget({ companyId, yearId, ...figures });
       setAnnualSaved(true);
@@ -962,13 +953,7 @@ export default function TargetConfig() {
               setFieldModes={setCollectionsFieldModes}
               disabled={quarterLocked}
             />
-            <ExpensesFieldsEditor
-              form={form}
-              setForm={setForm}
-              fieldModes={expensesFieldModes}
-              setFieldModes={setExpensesFieldModes}
-              disabled={quarterLocked}
-            />
+            <ExpensesFieldEditor form={form} setForm={setForm} disabled={quarterLocked} />
 
             {error && <div className="rounded-md bg-red-50 dark:bg-red-950/40 px-3 py-2 text-sm text-red-600 dark:text-red-400">{error}</div>}
 
@@ -1019,13 +1004,7 @@ export default function TargetConfig() {
               setFieldModes={setAnnualCollectionsFieldModes}
               disabled={allQuartersLocked}
             />
-            <ExpensesFieldsEditor
-              form={annualForm}
-              setForm={setAnnualForm}
-              fieldModes={annualExpensesFieldModes}
-              setFieldModes={setAnnualExpensesFieldModes}
-              disabled={allQuartersLocked}
-            />
+            <ExpensesFieldEditor form={annualForm} setForm={setAnnualForm} disabled={allQuartersLocked} />
 
             {annualError && <div className="rounded-md bg-red-50 dark:bg-red-950/40 px-3 py-2 text-sm text-red-600 dark:text-red-400">{annualError}</div>}
             {annualSaved && (

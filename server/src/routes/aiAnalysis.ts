@@ -113,17 +113,11 @@ function buildPrompt(data: Awaited<ReturnType<typeof computeScorecard>>, yearLab
   lines.push("");
 
   lines.push("=== DISBURSEMENTS ===");
-  lines.push(
-    `Advances: ${formatMoney(disbursements.summary.advancesActual)}, Loans: ${formatMoney(disbursements.summary.loansActual)}, Interests: ${formatMoney(
-      disbursements.summary.interestsActual
-    )}`
-  );
+  lines.push(`Total Disbursements: ${formatMoney(disbursements.summary.disbursementsActual)}`);
   if (disbursements.businessUnits.length) {
     lines.push("Per-Business-Unit Disbursements:");
     for (const bu of disbursements.businessUnits) {
-      lines.push(
-        `- ${bu.businessUnitName}: Advances ${formatMoney(bu.advancesActual)}, Loans ${formatMoney(bu.loansActual)}, Interests ${formatMoney(bu.interestsActual)}`
-      );
+      lines.push(`- ${bu.businessUnitName}: ${formatMoney(bu.disbursementsActual)}`);
     }
   }
   lines.push("");

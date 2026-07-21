@@ -254,6 +254,8 @@ model Company {
   quarterTargets      QuarterTarget[]
   quarterActuals      QuarterActual[]
   disbursementActuals DisbursementActual[]
+  expenseNotes        ExpenseNote[]
+  disbursementNotes   DisbursementNote[]
   rocks               Rock[]
   rolePermissions     RolePermission[]
 
@@ -269,6 +271,8 @@ model Year {
   quarterTargets      QuarterTarget[]
   quarterActuals      QuarterActual[]
   disbursementActuals DisbursementActual[]
+  expenseNotes        ExpenseNote[]
+  disbursementNotes   DisbursementNote[]
   rocks               Rock[]
   targetLocks         TargetLock[]
 }
@@ -310,10 +314,12 @@ model TargetLock {
 // way BU-level actuals are a rollup of each Company's QuarterActual.
 // Revenue stays a plain Internal/External pair. Collections is Internal and
 // External, each broken into three recognition types (Earned/Unearned/
-// Others). Expenses dropped the Internal/External split entirely — it's a
-// single value per breakdown (Interest/Depreciation/Other Non-Cash) instead,
-// since expenses aren't meaningfully "internal vs external" the way revenue
-// and collections are.
+// Others). Expenses is a single plain amount — it used to be a fixed 3-way
+// breakdown (Interest/Depreciation/Other Non-Cash), but that was collapsed
+// to one number since Target-setting doesn't need that level of detail; a
+// Business Unit can still log significant Interest/Depreciation/Other-
+// Non-Cash/Cost-of-Sales/OPEX items at Actuals time via ExpenseNote below,
+// purely for record-keeping (never rolled into this figure).
 model QuarterTarget {
   id        String @id @default(uuid())
   companyId String
@@ -330,9 +336,7 @@ model QuarterTarget {
   collectionsExternalUnearned Decimal @default(0) @db.Decimal(14, 2)
   collectionsExternalOthers   Decimal @default(0) @db.Decimal(14, 2)
 
-  expensesInterest     Decimal @default(0) @db.Decimal(14, 2)
-  expensesDepreciation Decimal @default(0) @db.Decimal(14, 2)
-  expensesOtherNonCash Decimal @default(0) @db.Decimal(14, 2)
+  expenses Decimal @default(0) @db.Decimal(14, 2)
 
   updatedAt DateTime @updatedAt
 
@@ -345,10 +349,10 @@ model QuarterTarget {
 
 // Quarter actual: entered by the BU Integrator (or overridden by Group Integrator).
 // Same figure shape as QuarterTarget above, plus one Remarks field per
-// breakdown (not one per parent category) — e.g. Collections gets six
-// Remarks fields (Internal/External x Earned/Unearned/Others), Expenses
-// gets three (Interest/Depreciation/Other Non-Cash), mirroring the
-// per-category Remarks pattern already used for Disbursements.
+// category (Collections still gets six, one per breakdown; Expenses is now
+// a single plain amount with a single Remarks field, same granularity as
+// Revenue — see the QuarterTarget comment above for why the old 3-way
+// Expenses breakdown was collapsed).
 model QuarterActual {
   id        String @id @default(uuid())
   companyId String
@@ -365,9 +369,7 @@ model QuarterActual {
   collectionsExternalUnearned Decimal @default(0) @db.Decimal(14, 2)
   collectionsExternalOthers   Decimal @default(0) @db.Decimal(14, 2)
 
-  expensesInterest     Decimal @default(0) @db.Decimal(14, 2)
-  expensesDepreciation Decimal @default(0) @db.Decimal(14, 2)
-  expensesOtherNonCash Decimal @default(0) @db.Decimal(14, 2)
+  expenses Decimal @default(0) @db.Decimal(14, 2)
 
   revenueRemarks String @default("")
 
@@ -378,9 +380,7 @@ model QuarterActual {
   collectionsExternalUnearnedRemarks String @default("")
   collectionsExternalOthersRemarks   String @default("")
 
-  expensesInterestRemarks     String @default("")
-  expensesDepreciationRemarks String @default("")
-  expensesOtherNonCashRemarks String @default("")
+  expensesRemarks String @default("")
 
   updatedById String?
   updatedAt   DateTime @updatedAt
@@ -398,27 +398,21 @@ model QuarterActual {
 // hierarchy as Quarter Actuals but with no corresponding Target model. Feeds
 // the KPI cards on the Revenue dashboard and Executive Scorecard today, and
 // is intended as a building block toward a later consolidated financial
-// pane of glass. All three sub-categories (Advances/Loans/Interests) live on
-// one row per Company/Year/Quarter (mirroring QuarterActual's Revenue/
-// Collections/Expenses), each split Internal/External with its own Remarks,
-// gated by a single combined DISBURSEMENTS Custom Role resource (not three
-// separate ones) — see routes/disbursements.ts.
+// pane of glass. Used to be three sub-categories (Advances/Loans/Interests)
+// each split Internal/External with their own Remarks — collapsed to a
+// single plain amount + one Remarks field, same simplification as Expenses
+// above; a Business Unit can still log significant disbursement items via
+// DisbursementNote below, purely for record-keeping (never rolled into this
+// figure). Still gated by the single combined DISBURSEMENTS Custom Role
+// resource — see routes/disbursements.ts.
 model DisbursementActual {
   id        String @id @default(uuid())
   companyId String
   yearId    String
   quarter   Int // 1-4
 
-  advancesInternal  Decimal @default(0) @db.Decimal(14, 2)
-  advancesExternal  Decimal @default(0) @db.Decimal(14, 2)
-  loansInternal     Decimal @default(0) @db.Decimal(14, 2)
-  loansExternal     Decimal @default(0) @db.Decimal(14, 2)
-  interestsInternal Decimal @default(0) @db.Decimal(14, 2)
-  interestsExternal Decimal @default(0) @db.Decimal(14, 2)
-
-  advancesRemarks  String @default("")
-  loansRemarks     String @default("")
-  interestsRemarks String @default("")
+  amount  Decimal @default(0) @db.Decimal(14, 2)
+  remarks String  @default("")
 
   updatedById String?
   updatedAt   DateTime @updatedAt
@@ -430,6 +424,88 @@ model DisbursementActual {
   @@unique([companyId, yearId, quarter])
   @@index([yearId, quarter])
   @@index([companyId])
+}
+
+// The type of thing a NoteCategory applies to — kept as its own enum
+// (rather than reusing PermissionResource) since this is purely a display/
+// grouping concern, unrelated to access control.
+enum NoteCategoryType {
+  EXPENSE
+  DISBURSEMENT
+}
+
+// Superadmin-managed catalog of selectable categories for the "notable line
+// items" record-keeping facility on Expenses and Disbursements (see
+// ExpenseNote/DisbursementNote below) — e.g. "Interest", "Depreciation",
+// "Other Non-Cash", "Cost of Sales", "OPEX" for Expenses; "Advances",
+// "Loans", "Interest" for Disbursements, seeded as defaults by migration but
+// freely editable afterward at Admin -> Note Categories. Purely a label
+// picklist with no bearing on any total/calculation. `active` lets a
+// category be retired without breaking historical notes that still
+// reference it (existing notes keep their categoryId; the picker in
+// new-entry UI just hides inactive ones going forward).
+model NoteCategory {
+  id        String           @id @default(uuid())
+  type      NoteCategoryType
+  label     String
+  sortOrder Int              @default(0)
+  active    Boolean          @default(true)
+  createdAt DateTime         @default(now())
+
+  expenseNotes      ExpenseNote[]
+  disbursementNotes DisbursementNote[]
+
+  @@unique([type, label])
+  @@index([type])
+}
+
+// One "notable expense item" logged for a Company/Year/Quarter — e.g.
+// "Interest, PHP 120,000, remarks: refinanced Q2 loan". Purely informational
+// record-keeping: never summed into the Expenses actual, KPI cards,
+// attainment %, or AI Analysis figures (see aggregate.ts/computeScorecard,
+// neither of which reads this table). Growable — a Company/Quarter can have
+// any number of these, freely added/removed, replacing the old fixed
+// 3-field expensesInterest/Depreciation/OtherNonCash breakdown. Gated by the
+// same EXPENSES Custom Role resource as the Expenses actual itself (no
+// separate resource) — see routes/notes.ts.
+model ExpenseNote {
+  id         String   @id @default(uuid())
+  companyId  String
+  yearId     String
+  quarter    Int // 1-4
+  categoryId String
+  amount     Decimal  @default(0) @db.Decimal(14, 2)
+  remarks    String   @default("")
+  createdAt  DateTime @default(now())
+  updatedAt  DateTime @updatedAt
+
+  company  Company      @relation(fields: [companyId], references: [id], onDelete: Cascade)
+  year     Year         @relation(fields: [yearId], references: [id], onDelete: Cascade)
+  category NoteCategory @relation(fields: [categoryId], references: [id], onDelete: Restrict)
+
+  @@index([companyId, yearId, quarter])
+  @@index([categoryId])
+}
+
+// Same idea as ExpenseNote, for Disbursements — gated by the DISBURSEMENTS
+// Custom Role resource instead.
+model DisbursementNote {
+  id         String   @id @default(uuid())
+  companyId  String
+  yearId     String
+  quarter    Int // 1-4
+  categoryId String
+  amount     Decimal  @default(0) @db.Decimal(14, 2)
+  remarks    String   @default("")
+  createdAt  DateTime @default(now())
+  updatedAt  DateTime @updatedAt
+
+  company  Company      @relation(fields: [companyId], references: [id], onDelete: Cascade)
+  year     Year         @relation(fields: [yearId], references: [id], onDelete: Cascade)
+  category NoteCategory @relation(fields: [categoryId], references: [id], onDelete: Restrict)
+
+  @@index([companyId, yearId, quarter])
+  @@index([categoryId])
 }
 
 enum RockStatus {

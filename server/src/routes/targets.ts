@@ -26,15 +26,13 @@ const figuresSchema = z.object({
   collectionsExternalEarned: z.number().min(0).default(0),
   collectionsExternalUnearned: z.number().min(0).default(0),
   collectionsExternalOthers: z.number().min(0).default(0),
-  expensesInterest: z.number().min(0).default(0),
-  expensesDepreciation: z.number().min(0).default(0),
-  expensesOtherNonCash: z.number().min(0).default(0),
+  expenses: z.number().min(0).default(0),
 });
 
-// Generic across all 11 figure fields — the cascade/delta-redistribution
+// Generic across all 9 figure fields — the cascade/delta-redistribution
 // logic below loops over this list without caring what each key represents,
-// so Collections' six breakdowns and Expenses' three both get the same
-// "keep the Company's Q1-Q4 sum unchanged" treatment as Revenue.
+// so Collections' six breakdowns and Expenses' single amount both get the
+// same "keep the Company's Q1-Q4 sum unchanged" treatment as Revenue.
 const FIGURE_KEYS = [
   "revenueInternal",
   "revenueExternal",
@@ -44,9 +42,7 @@ const FIGURE_KEYS = [
   "collectionsExternalEarned",
   "collectionsExternalUnearned",
   "collectionsExternalOthers",
-  "expensesInterest",
-  "expensesDepreciation",
-  "expensesOtherNonCash",
+  "expenses",
 ] as const;
 type FigureKey = (typeof FIGURE_KEYS)[number];
 type Figures = Record<FigureKey, number>;

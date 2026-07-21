@@ -12,15 +12,13 @@ import { can, canAnyOf, FINANCIAL_RESOURCES, hasAnyGrant } from "../utils/permis
 import {
   addDisbursementFigures,
   addFigures,
-  advancesTotal,
   collectionsTotal,
   DisbursementFigures,
+  disbursementsTotal,
   emptyDisbursementFigures,
   emptyFigures,
   expensesTotal,
   Figures,
-  interestsTotal,
-  loansTotal,
   pct,
   revenueTotal,
   toDisbursementFigures,
@@ -209,17 +207,13 @@ router.get("/snapshot", async (req, res) => {
   const disbByCq = new Map<string, DisbursementFigures>();
   for (const d of disbursementActuals) disbByCq.set(`${d.companyId}:${d.quarter}`, toDisbursementFigures(d));
 
-  let advancesActualTotal = 0;
-  let loansActualTotal = 0;
-  let interestsActualTotal = 0;
+  let disbursementsActualTotal = 0;
   for (const cid of disbCompanyIds) {
     let agg = emptyDisbursementFigures();
     for (const q of quartersInScope) {
       agg = addDisbursementFigures(agg, disbByCq.get(`${cid}:${q}`) || emptyDisbursementFigures());
     }
-    advancesActualTotal += advancesTotal(agg);
-    loansActualTotal += loansTotal(agg);
-    interestsActualTotal += interestsTotal(agg);
+    disbursementsActualTotal += disbursementsTotal(agg);
   }
 
   res.json({
@@ -248,9 +242,7 @@ router.get("/snapshot", async (req, res) => {
     rocksAtRisk,
     rocksPending,
     rocksAvgProgressPct,
-    advancesActual: advancesActualTotal,
-    loansActual: loansActualTotal,
-    interestsActual: interestsActualTotal,
+    disbursementsActual: disbursementsActualTotal,
   });
 });
 

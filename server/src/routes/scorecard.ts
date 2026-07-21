@@ -5,15 +5,13 @@ import { can, canAnyOf, FINANCIAL_RESOURCES, hasAnyGrant } from "../utils/permis
 import {
   addDisbursementFigures,
   addFigures,
-  advancesTotal,
   collectionsTotal,
   DisbursementFigures,
+  disbursementsTotal,
   emptyDisbursementFigures,
   emptyFigures,
   expensesTotal,
   Figures,
-  interestsTotal,
-  loansTotal,
   pct,
   revenueTotal,
   toDisbursementFigures,
@@ -365,9 +363,9 @@ export async function computeScorecard(user: AuthUser, params: ScorecardParams) 
   };
 
   // ---------- Disbursements Summary ----------
-  // Recorded (not targeted), same period scope as Revenue above — one
-  // running total per sub-category (Advances/Loans/Interests), summed for
-  // whichever quarter(s) are in scope, plus a per-Business-Unit breakdown.
+  // Recorded (not targeted), same period scope as Revenue above — a single
+  // running amount total, summed for whichever quarter(s) are in scope, plus
+  // a per-Business-Unit breakdown.
   const disbCompanyIds = disbCompanies.map((c) => c.id);
   const disbursementActuals = disbCompanyIds.length
     ? await prisma.disbursementActual.findMany({ where: { yearId, companyId: { in: disbCompanyIds } } })
@@ -382,9 +380,7 @@ export async function computeScorecard(user: AuthUser, params: ScorecardParams) 
     disbCompaniesByBu.set(c.businessUnitId, list);
   }
 
-  let advancesActualTotal = 0;
-  let loansActualTotal = 0;
-  let interestsActualTotal = 0;
+  let disbursementsActualTotal = 0;
 
   const disbBuRows = disbBusinessUnits.map((bu) => {
     const buCompanies = disbCompaniesByBu.get(bu.id) || [];
@@ -394,17 +390,13 @@ export async function computeScorecard(user: AuthUser, params: ScorecardParams) 
         agg = addDisbursementFigures(agg, disbByCompanyQuarter.get(`${c.id}:${q}`) || emptyDisbursementFigures());
       }
     }
-    const advances = advancesTotal(agg);
-    const loans = loansTotal(agg);
-    const interests = interestsTotal(agg);
-    advancesActualTotal += advances;
-    loansActualTotal += loans;
-    interestsActualTotal += interests;
-    return { businessUnitId: bu.id, businessUnitName: bu.name, advancesActual: advances, loansActual: loans, interestsActual: interests };
+    const disbursements = disbursementsTotal(agg);
+    disbursementsActualTotal += disbursements;
+    return { businessUnitId: bu.id, businessUnitName: bu.name, disbursementsActual: disbursements };
   });
 
   const disbursementsSection = {
-    summary: { advancesActual: advancesActualTotal, loansActual: loansActualTotal, interestsActual: interestsActualTotal },
+    summary: { disbursementsActual: disbursementsActualTotal },
     businessUnits: disbBuRows,
   };
 

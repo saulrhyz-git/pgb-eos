@@ -14,30 +14,20 @@ import { logAudit } from "../utils/auditLog";
 
 // Disbursements: recorded — not targeted — per Company/Year/Quarter, same
 // hierarchy as Quarter Actuals but with no corresponding Target endpoint.
-// Unlike Revenue/Collections/Expenses (each independently gate-able), all
-// three sub-categories here (Advances/Loans/Interests) share a single
-// combined DISBURSEMENTS Custom Role resource — see utils/permissions.ts.
-// Intended as a building block toward a later consolidated financial pane
-// of glass; today it feeds the Disbursement cards on the Revenue dashboard
-// and Executive Scorecard, and its three categories are entered as extra
-// field groups on the Data Entry page (client/src/pages/IntegratorPortal.tsx)
-// alongside Revenue/Collections/Expenses, rather than on separate pages.
+// A single plain amount + Remarks per Company/Year/Quarter (used to be three
+// sub-categories — Advances/Loans/Interests, each split Internal/External —
+// collapsed down the same way Expenses was; see DisbursementNote for the
+// growable, informational-only record-keeping facility that replaced that
+// breakdown). Gated by the single combined DISBURSEMENTS Custom Role
+// resource — see utils/permissions.ts. Intended as a building block toward a
+// later consolidated financial pane of glass; today it feeds the
+// Disbursement card on the Revenue dashboard and Executive Scorecard, and is
+// entered as an extra field group on the Data Entry page
+// (client/src/pages/IntegratorPortal.tsx) alongside Revenue/Collections/
+// Expenses, rather than on a separate page.
 const router = Router();
 router.use(requireAuth);
 router.use(blockPendingPasswordChange);
-
-export const DISBURSEMENT_CATEGORIES = ["ADVANCES", "LOANS", "INTERESTS"] as const;
-export type DisbursementCategory = (typeof DISBURSEMENT_CATEGORIES)[number];
-
-// Maps each sub-category to the three columns on the shared DisbursementActual
-// row it owns — every PUT only ever touches its own three columns (one
-// category per call), leaving the other two categories' figures on the same
-// row untouched.
-const CATEGORY_FIELDS: Record<DisbursementCategory, { internal: string; external: string; remarks: string }> = {
-  ADVANCES: { internal: "advancesInternal", external: "advancesExternal", remarks: "advancesRemarks" },
-  LOANS: { internal: "loansInternal", external: "loansExternal", remarks: "loansRemarks" },
-  INTERESTS: { internal: "interestsInternal", external: "interestsExternal", remarks: "interestsRemarks" },
-};
 
 router.get("/", async (req, res) => {
   const { yearId, quarter, businessUnitId, companyId } = req.query as Record<string, string | undefined>;
@@ -92,16 +82,12 @@ router.get("/", async (req, res) => {
   res.json(rows);
 });
 
-// Upsert one Disbursement sub-category (Advances/Loans/Interests) for a
-// Company/Year/Quarter — the Data Entry page submits one PUT per category
-// (three calls per save), leaving the other two untouched on the shared row.
+// Upsert a Company/Year/Quarter's single Disbursements amount + Remarks.
 const putSchema = z.object({
   companyId: z.string().uuid(),
   yearId: z.string().uuid(),
   quarter: z.number().int().min(1).max(4),
-  category: z.enum(DISBURSEMENT_CATEGORIES),
-  internal: z.number().min(0).default(0),
-  external: z.number().min(0).default(0),
+  amount: z.number().min(0).default(0),
   remarks: z.string().max(2000).optional().default(""),
 });
 
@@ -109,7 +95,7 @@ router.put("/", async (req, res) => {
   const parsed = putSchema.safeParse(req.body);
   if (!parsed.success) return res.status(400).json({ error: parsed.error.issues[0]?.message || "Invalid disbursement payload" });
 
-  const { companyId, yearId, quarter, category, internal, external, remarks } = parsed.data;
+  const { companyId, yearId, quarter, amount, remarks } = parsed.data;
 
   try {
     const businessUnitId = await resolveCompanyBusinessUnit(companyId);
@@ -122,13 +108,7 @@ router.put("/", async (req, res) => {
     return res.status(err.status || 500).json({ error: err.message });
   }
 
-  const fields = CATEGORY_FIELDS[category];
-  const data: Record<string, any> = {
-    [fields.internal]: internal,
-    [fields.external]: external,
-    [fields.remarks]: remarks,
-    updatedById: req.user!.id,
-  };
+  const data = { amount, remarks, updatedById: req.user!.id };
 
   const row = await prisma.disbursementActual.upsert({
     where: { companyId_yearId_quarter: { companyId, yearId, quarter } },
@@ -140,8 +120,8 @@ router.put("/", async (req, res) => {
     action: "DISBURSEMENT_UPDATE",
     entityType: "DisbursementActual",
     entityId: row.id,
-    summary: `Updated Q${quarter} ${category.toLowerCase()} for Company ${companyId}`,
-    metadata: { companyId, yearId, quarter, category, internal, external },
+    summary: `Updated Q${quarter} disbursements for Company ${companyId}`,
+    metadata: { companyId, yearId, quarter, amount },
   });
   res.json(row);
 });
