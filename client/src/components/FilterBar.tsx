@@ -12,7 +12,13 @@ export interface DashboardFilters {
 
 interface Props {
   filters: DashboardFilters;
-  onChange: (filters: DashboardFilters) => void;
+  // Accepts a plain value OR a React-style functional updater — every real
+  // caller passes a useState setter (which supports both), and the mount
+  // effect below relies on the functional form so its two independent
+  // auto-default branches (Year/Quarter, and BU Integrator's default
+  // Business Unit) merge against each other's result instead of each
+  // clobbering the other via a stale closure over the original `filters`.
+  onChange: (filters: DashboardFilters | ((prev: DashboardFilters) => DashboardFilters)) => void;
 }
 
 export default function FilterBar({ filters, onChange }: Props) {
@@ -26,25 +32,39 @@ export default function FilterBar({ filters, onChange }: Props) {
     // server clock) when possible, so the dashboard opens already lined up
     // with "today" instead of an arbitrary first-in-list year. Falls back to
     // the first available Year if today's Year hasn't been created yet.
+    //
+    // This and the BU Integrator default below are two independent async
+    // effects that can resolve in either order. Both use the functional
+    // updater form (onChange(prev => ...)) rather than closing over the
+    // `filters` prop from this render — otherwise, whichever one resolved
+    // second would spread the OTHER one's stale pre-update `filters` and
+    // silently wipe out what the first one had just set (e.g. Year getting
+    // filled in, then immediately clobbered back to blank by the Business
+    // Unit default resolving a moment later, or vice versa) — which is
+    // exactly what happened before this fix: for a BU Integrator, one of
+    // Year or Business Unit would win at random and the other would revert
+    // to blank, silently breaking the page's initial data fetch (it never
+    // fires while yearId is blank).
     Promise.all([api.years(), api.currentQuarter().catch(() => null)]).then(([ys, current]) => {
       setYears(ys);
-      if (!filters.yearId && ys.length > 0) {
+      if (ys.length === 0) return;
+      onChange((prev) => {
+        if (prev.yearId) return prev;
         if (current?.yearId && ys.some((y) => y.id === current.yearId)) {
-          onChange({ ...filters, yearId: current.yearId, quarter: current.quarter });
-        } else {
-          // Today's real Year hasn't been created yet — fall back to the
-          // first available Year, but still default to the real current
-          // quarter number rather than leaving whatever quarter happened to
-          // be in the initial state.
-          onChange({ ...filters, yearId: ys[0].id, quarter: current?.quarter ?? filters.quarter });
+          return { ...prev, yearId: current.yearId, quarter: current.quarter };
         }
-      }
+        // Today's real Year hasn't been created yet — fall back to the
+        // first available Year, but still default to the real current
+        // quarter number rather than leaving whatever quarter happened to
+        // be in the initial state.
+        return { ...prev, yearId: ys[0].id, quarter: current?.quarter ?? prev.quarter };
+      });
     });
     api.businessUnits().then((bus) => {
       setBusinessUnits(bus);
       // BU Integrators are scoped to their own units; default to the first assigned BU.
-      if (user?.role === "BU_INTEGRATOR" && !filters.businessUnitId && bus.length > 0) {
-        onChange({ ...filters, businessUnitId: bus[0].id });
+      if (user?.role === "BU_INTEGRATOR" && bus.length > 0) {
+        onChange((prev) => (prev.businessUnitId ? prev : { ...prev, businessUnitId: bus[0].id }));
       }
     });
     // eslint-disable-next-line react-hooks/exhaustive-deps

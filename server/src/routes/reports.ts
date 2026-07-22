@@ -8,7 +8,7 @@ import {
   resolveCompanyBusinessUnit,
   scopedBusinessUnitFilter,
 } from "../middleware/auth";
-import { assertPermission, can, canAnyOf, FINANCIAL_RESOURCES, hasAnyGrant } from "../utils/permissions";
+import { assertPermission, can, canAnyOf, FINANCIAL_RESOURCES, narrowingApplies } from "../utils/permissions";
 import { addFigures, emptyFigures, Figures, expensesTotal, collectionsTotal, revenueTotal, pct, toFigures } from "../utils/aggregate";
 import { escalateStaleRocks } from "../utils/rockAutoStatus";
 
@@ -112,7 +112,7 @@ router.get("/financial", async (req, res) => {
   }
 
   const permRows = await loadUserPermissions(user);
-  const financialRoleActive = hasAnyGrant(permRows, FINANCIAL_RESOURCES);
+  const financialRoleActive = narrowingApplies(Boolean(user.role), permRows, FINANCIAL_RESOURCES);
 
   let companies = await prisma.company.findMany({
     where: companyWhere,
@@ -230,7 +230,7 @@ router.get("/rocks", async (req, res) => {
     if (companyId) {
       const buId = await resolveCompanyBusinessUnit(companyId);
       assertBusinessUnitAccess(user, buId);
-      if (hasAnyGrant(permRows, ["ROCKS"])) assertPermission(permRows, "view", "ROCKS", { businessUnitId: buId, companyId });
+      if (narrowingApplies(Boolean(user.role), permRows, ["ROCKS"])) assertPermission(permRows, "view", "ROCKS", { businessUnitId: buId, companyId });
     }
   } catch (err: any) {
     return res.status(err.status || 500).json({ error: err.message });
@@ -251,7 +251,7 @@ router.get("/rocks", async (req, res) => {
       return res.status(err.status || 500).json({ error: err.message });
     }
 
-    if (hasAnyGrant(permRows, ["ROCKS"])) {
+    if (narrowingApplies(Boolean(user.role), permRows, ["ROCKS"])) {
       const companyWhere: any = {};
       if (buFilter) companyWhere.businessUnitId = buFilter;
       const candidates = await prisma.company.findMany({ where: companyWhere, select: { id: true, businessUnitId: true } });
@@ -351,8 +351,8 @@ router.get("/executive-summary", async (req, res) => {
   }
 
   const permRows = await loadUserPermissions(user);
-  const financialRoleActive = hasAnyGrant(permRows, FINANCIAL_RESOURCES);
-  const rocksRoleActive = hasAnyGrant(permRows, ["ROCKS"]);
+  const financialRoleActive = narrowingApplies(Boolean(user.role), permRows, FINANCIAL_RESOURCES);
+  const rocksRoleActive = narrowingApplies(Boolean(user.role), permRows, ["ROCKS"]);
 
   let businessUnits = await prisma.businessUnit.findMany({ where: buWhere, orderBy: { name: "asc" } });
   const companies = await prisma.company.findMany({ where: companyWhere, orderBy: { name: "asc" } });

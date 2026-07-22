@@ -9,7 +9,7 @@ import {
   resolveCompanyBusinessUnit,
   scopedBusinessUnitFilter,
 } from "../middleware/auth";
-import { can, canAnyOf, FINANCIAL_RESOURCES, hasAnyGrant, PermissionError } from "../utils/permissions";
+import { can, canAnyOf, FINANCIAL_RESOURCES, narrowingApplies, PermissionError } from "../utils/permissions";
 import { logAudit } from "../utils/auditLog";
 
 const router = Router();
@@ -50,7 +50,7 @@ router.get("/", async (req, res) => {
     if (companyId) {
       const buId = await resolveCompanyBusinessUnit(companyId);
       assertBusinessUnitAccess(user, buId);
-      if (hasAnyGrant(permRows, FINANCIAL_RESOURCES) && !canAnyOf(permRows, "view", FINANCIAL_RESOURCES, { businessUnitId: buId, companyId })) {
+      if (narrowingApplies(Boolean(user.role), permRows, FINANCIAL_RESOURCES) && !canAnyOf(permRows, "view", FINANCIAL_RESOURCES, { businessUnitId: buId, companyId })) {
         throw new PermissionError("Your assigned role does not grant view access to any financial category here");
       }
     }
@@ -71,7 +71,7 @@ router.get("/", async (req, res) => {
       return res.status(err.status || 500).json({ error: err.message });
     }
 
-    if (hasAnyGrant(permRows, FINANCIAL_RESOURCES)) {
+    if (narrowingApplies(Boolean(user.role), permRows, FINANCIAL_RESOURCES)) {
       const companyWhere: any = {};
       if (buFilter) companyWhere.businessUnitId = buFilter;
       const candidates = await prisma.company.findMany({ where: companyWhere, select: { id: true, businessUnitId: true } });
@@ -111,7 +111,7 @@ router.put("/", async (req, res) => {
     // just the one category a role isn't supposed to touch within the same
     // submission (see the per-category PATCH remarks endpoint below for a
     // fully granular example).
-    if (hasAnyGrant(permRows, FINANCIAL_RESOURCES) && !canAnyOf(permRows, "edit", FINANCIAL_RESOURCES, { businessUnitId, companyId: parsed.data.companyId })) {
+    if (narrowingApplies(Boolean(req.user!.role), permRows, FINANCIAL_RESOURCES) && !canAnyOf(permRows, "edit", FINANCIAL_RESOURCES, { businessUnitId, companyId: parsed.data.companyId })) {
       throw new PermissionError("Your assigned role does not grant edit access to any financial category here");
     }
   } catch (err: any) {
@@ -165,7 +165,7 @@ router.patch("/:companyId/:yearId/:quarter/remarks", async (req, res) => {
     const businessUnitId = await resolveCompanyBusinessUnit(companyId);
     assertBusinessUnitAccess(req.user!, businessUnitId);
     const permRows = await loadUserPermissions(req.user!);
-    if (hasAnyGrant(permRows, FINANCIAL_RESOURCES)) {
+    if (narrowingApplies(Boolean(req.user!.role), permRows, FINANCIAL_RESOURCES)) {
       // Unlike the combined figures PUT above, remarks are submitted one
       // field at a time, so this can enforce edit access per exact
       // underlying category resource instead of "any one of the three" —

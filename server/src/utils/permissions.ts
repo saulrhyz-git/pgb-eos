@@ -171,6 +171,33 @@ export function hasAnyGrant(rows: PermissionRow[], resources: Resource[]): boole
   return rows.some((r) => resources.includes(r.resource));
 }
 
+/**
+ * Should Custom-Role narrowing actually engage for `resources` — i.e. should
+ * the caller require an explicit grant instead of quietly falling back to
+ * the user's base role? True if `hasAnyGrant` is true (some assigned Custom
+ * Role addresses one of `resources`), OR if `hasBaseRole` is false.
+ *
+ * The `hasAnyGrant`-only check (see above) assumes there's always a base
+ * role's own default permissions to fall back on when a narrowly-scoped
+ * Custom Role doesn't mention a resource — true for BU_INTEGRATOR/
+ * GROUP_INTEGRATOR/SUPERADMIN, but not for a user with no base role at all
+ * (role === null). For those users, access comes entirely from their
+ * assigned Custom Roles, so "none of my roles ever mention this resource"
+ * must mean zero access to it, not "skip the check and allow everything."
+ * Without this, a blank-role user assigned only a narrow, all-View-only
+ * Custom Role (e.g. one that only grants Scorecard view) would get silent,
+ * unrestricted Edit/Delete on every OTHER resource — Targets, Revenue,
+ * Rocks, Disbursements, etc. — for every Business Unit/Company, simply
+ * because no role they hold ever bothered to address those resources.
+ *
+ * Every `hasAnyGrant(...)` call that gates whether a permission check runs
+ * (as opposed to a `hasAnyGrant` call used for something else, like deciding
+ * whether to bother filtering a list at all) should be replaced with this.
+ */
+export function narrowingApplies(hasBaseRole: boolean, rows: PermissionRow[], resources: Resource[]): boolean {
+  return !hasBaseRole || hasAnyGrant(rows, resources);
+}
+
 export class PermissionError extends Error {
   status = 403;
   constructor(message = "You don't have permission to do this") {

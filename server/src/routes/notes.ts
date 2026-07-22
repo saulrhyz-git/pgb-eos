@@ -9,7 +9,7 @@ import {
   resolveCompanyBusinessUnit,
   scopedBusinessUnitFilter,
 } from "../middleware/auth";
-import { can, hasAnyGrant, PermissionError, Resource } from "../utils/permissions";
+import { can, narrowingApplies, PermissionError, Resource } from "../utils/permissions";
 import { logAudit } from "../utils/auditLog";
 
 // Shared implementation for the "notable line items" record-keeping facility
@@ -45,7 +45,7 @@ function buildNotesRouter(opts: {
       if (companyId) {
         const buId = await resolveCompanyBusinessUnit(companyId);
         assertBusinessUnitAccess(user, buId);
-        if (hasAnyGrant(permRows, [opts.resource]) && !can(permRows, "view", opts.resource, { businessUnitId: buId, companyId })) {
+        if (narrowingApplies(Boolean(user.role), permRows, [opts.resource]) && !can(permRows, "view", opts.resource, { businessUnitId: buId, companyId })) {
           throw new PermissionError(`Your assigned role does not grant view access to ${opts.resource.toLowerCase()} here`);
         }
       }
@@ -66,7 +66,7 @@ function buildNotesRouter(opts: {
         return res.status(err.status || 500).json({ error: err.message });
       }
 
-      if (hasAnyGrant(permRows, [opts.resource])) {
+      if (narrowingApplies(Boolean(user.role), permRows, [opts.resource])) {
         const companyWhere: any = {};
         if (buFilter) companyWhere.businessUnitId = buFilter;
         const candidates = await prisma.company.findMany({ where: companyWhere, select: { id: true, businessUnitId: true } });
@@ -114,7 +114,7 @@ function buildNotesRouter(opts: {
       businessUnitId = await resolveCompanyBusinessUnit(companyId);
       assertBusinessUnitAccess(req.user!, businessUnitId);
       const permRows = await loadUserPermissions(req.user!);
-      if (hasAnyGrant(permRows, [opts.resource]) && !can(permRows, "edit", opts.resource, { businessUnitId, companyId })) {
+      if (narrowingApplies(Boolean(req.user!.role), permRows, [opts.resource]) && !can(permRows, "edit", opts.resource, { businessUnitId, companyId })) {
         throw new PermissionError(`Your assigned role does not grant edit access to ${opts.resource.toLowerCase()} here`);
       }
     } catch (err: any) {
@@ -149,7 +149,7 @@ function buildNotesRouter(opts: {
       const businessUnitId = await resolveCompanyBusinessUnit(existing.companyId);
       assertBusinessUnitAccess(req.user!, businessUnitId);
       const permRows = await loadUserPermissions(req.user!);
-      if (hasAnyGrant(permRows, [opts.resource]) && !can(permRows, "delete", opts.resource, { businessUnitId, companyId: existing.companyId })) {
+      if (narrowingApplies(Boolean(req.user!.role), permRows, [opts.resource]) && !can(permRows, "delete", opts.resource, { businessUnitId, companyId: existing.companyId })) {
         throw new PermissionError(`Your assigned role does not grant delete access to ${opts.resource.toLowerCase()} here`);
       }
     } catch (err: any) {

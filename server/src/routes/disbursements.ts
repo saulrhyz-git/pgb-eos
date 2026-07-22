@@ -9,7 +9,7 @@ import {
   resolveCompanyBusinessUnit,
   scopedBusinessUnitFilter,
 } from "../middleware/auth";
-import { can, hasAnyGrant, PermissionError } from "../utils/permissions";
+import { can, narrowingApplies, PermissionError } from "../utils/permissions";
 import { logAudit } from "../utils/auditLog";
 
 // Disbursements: recorded — not targeted — per Company/Year/Quarter, same
@@ -40,7 +40,7 @@ router.get("/", async (req, res) => {
     if (companyId) {
       const buId = await resolveCompanyBusinessUnit(companyId);
       assertBusinessUnitAccess(user, buId);
-      if (hasAnyGrant(permRows, ["DISBURSEMENTS"]) && !can(permRows, "view", "DISBURSEMENTS", { businessUnitId: buId, companyId })) {
+      if (narrowingApplies(Boolean(user.role), permRows, ["DISBURSEMENTS"]) && !can(permRows, "view", "DISBURSEMENTS", { businessUnitId: buId, companyId })) {
         throw new PermissionError("Your assigned role does not grant view access to disbursements here");
       }
     }
@@ -61,7 +61,7 @@ router.get("/", async (req, res) => {
       return res.status(err.status || 500).json({ error: err.message });
     }
 
-    if (hasAnyGrant(permRows, ["DISBURSEMENTS"])) {
+    if (narrowingApplies(Boolean(user.role), permRows, ["DISBURSEMENTS"])) {
       const companyWhere: any = {};
       if (buFilter) companyWhere.businessUnitId = buFilter;
       const candidates = await prisma.company.findMany({ where: companyWhere, select: { id: true, businessUnitId: true } });
@@ -101,7 +101,7 @@ router.put("/", async (req, res) => {
     const businessUnitId = await resolveCompanyBusinessUnit(companyId);
     assertBusinessUnitAccess(req.user!, businessUnitId);
     const permRows = await loadUserPermissions(req.user!);
-    if (hasAnyGrant(permRows, ["DISBURSEMENTS"]) && !can(permRows, "edit", "DISBURSEMENTS", { businessUnitId, companyId })) {
+    if (narrowingApplies(Boolean(req.user!.role), permRows, ["DISBURSEMENTS"]) && !can(permRows, "edit", "DISBURSEMENTS", { businessUnitId, companyId })) {
       throw new PermissionError("Your assigned role does not grant edit access to disbursements here");
     }
   } catch (err: any) {

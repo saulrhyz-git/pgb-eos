@@ -1,7 +1,7 @@
 import { Router } from "express";
 import { prisma } from "../lib/prisma";
 import { AuthUser, blockPendingPasswordChange, loadUserPermissions, requireAuth, scopedBusinessUnitFilter } from "../middleware/auth";
-import { can, canAnyOf, FINANCIAL_RESOURCES, hasAnyGrant } from "../utils/permissions";
+import { can, canAnyOf, FINANCIAL_RESOURCES, narrowingApplies } from "../utils/permissions";
 import {
   addDisbursementFigures,
   addFigures,
@@ -107,9 +107,9 @@ export async function computeScorecard(user: AuthUser, params: ScorecardParams) 
   let disbCompanies = companies;
   let disbBusinessUnits = businessUnits;
 
-  const financialRoleActive = hasAnyGrant(permRows, FINANCIAL_RESOURCES);
-  const rocksRoleActive = hasAnyGrant(permRows, ["ROCKS"]);
-  const disbursementsRoleActive = hasAnyGrant(permRows, ["DISBURSEMENTS"]);
+  const financialRoleActive = narrowingApplies(Boolean(user.role), permRows, FINANCIAL_RESOURCES);
+  const rocksRoleActive = narrowingApplies(Boolean(user.role), permRows, ["ROCKS"]);
+  const disbursementsRoleActive = narrowingApplies(Boolean(user.role), permRows, ["DISBURSEMENTS"]);
 
   if (financialRoleActive) {
     revenueCompanies = companies.filter((c) =>

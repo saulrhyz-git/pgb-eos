@@ -8,7 +8,7 @@ import {
   resolveCompanyBusinessUnit,
   scopedBusinessUnitFilter,
 } from "../middleware/auth";
-import { can, canAnyOf, FINANCIAL_RESOURCES, hasAnyGrant } from "../utils/permissions";
+import { can, canAnyOf, FINANCIAL_RESOURCES, narrowingApplies } from "../utils/permissions";
 import {
   addDisbursementFigures,
   addFigures,
@@ -114,9 +114,9 @@ router.get("/snapshot", async (req, res) => {
   }
 
   const permRows = await loadUserPermissions(user);
-  const financialRoleActive = hasAnyGrant(permRows, FINANCIAL_RESOURCES);
-  const rocksRoleActive = hasAnyGrant(permRows, ["ROCKS"]);
-  const disbursementsRoleActive = hasAnyGrant(permRows, ["DISBURSEMENTS"]);
+  const financialRoleActive = narrowingApplies(Boolean(user.role), permRows, FINANCIAL_RESOURCES);
+  const rocksRoleActive = narrowingApplies(Boolean(user.role), permRows, ["ROCKS"]);
+  const disbursementsRoleActive = narrowingApplies(Boolean(user.role), permRows, ["DISBURSEMENTS"]);
 
   // Per-category financial masking (Revenue/Collections/Expenses are each
   // independently gate-able — see FINANCIAL_RESOURCES) applied while

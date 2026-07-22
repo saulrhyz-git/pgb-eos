@@ -22,7 +22,7 @@ import {
   toDisbursementFigures,
   toFigures,
 } from "../utils/aggregate";
-import { can, canAnyOf, FINANCIAL_RESOURCES, hasAnyGrant, Resource } from "../utils/permissions";
+import { can, canAnyOf, FINANCIAL_RESOURCES, narrowingApplies, Resource } from "../utils/permissions";
 
 const router = Router();
 router.use(requireAuth);
@@ -98,10 +98,10 @@ router.get("/", async (req, res) => {
   // user's base-role financial visibility completely untouched, rather than
   // collapsing it to nothing just because `permRows` is non-empty for some
   // unrelated resource. See hasAnyGrant() in utils/permissions.ts.
-  const financialRoleActive = hasAnyGrant(permRows, FINANCIAL_RESOURCES);
+  const financialRoleActive = narrowingApplies(Boolean(user.role), permRows, FINANCIAL_RESOURCES);
   // Disbursements is gated by its own single combined resource (unlike
   // Revenue/Collections/Expenses, which are each independently gate-able).
-  const disbursementsRoleActive = hasAnyGrant(permRows, ["DISBURSEMENTS"]);
+  const disbursementsRoleActive = narrowingApplies(Boolean(user.role), permRows, ["DISBURSEMENTS"]);
 
   const businessUnitsRaw = await prisma.businessUnit.findMany({ where: buWhere, orderBy: { name: "asc" } });
   const companiesRaw = await prisma.company.findMany({ where: companyWhere, orderBy: { name: "asc" } });
