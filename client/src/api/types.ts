@@ -166,6 +166,27 @@ export interface BulkTargetUploadResult {
   results: BulkTargetRowResult[];
 }
 
+// Result of a bulk CSV/Excel Data Entry upload (POST /bulk-data-entry,
+// Superadmin only) — same per-row, best-effort shape as
+// BulkTargetRowResult/BulkTargetUploadResult above, but each row here
+// upserts BOTH a QuarterActual (Revenue/Collections/Expenses + remarks) and
+// a DisbursementActual (amount + remarks) together, so a row's status only
+// reads "ok" if both saved.
+export interface BulkDataEntryRowResult {
+  row: number;
+  companyName: string;
+  businessUnitName?: string;
+  quarter: number;
+  status: "ok" | "error";
+  error?: string;
+}
+
+export interface BulkDataEntryUploadResult {
+  successCount: number;
+  errorCount: number;
+  results: BulkDataEntryRowResult[];
+}
+
 // One Remarks field per breakdown (not one per parent category) — mirrors
 // the per-category Remarks pattern used for Disbursements. Only present on
 // QuarterActual (Targets have no Remarks).

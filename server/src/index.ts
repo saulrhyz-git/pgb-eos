@@ -28,6 +28,7 @@ import comparisonRoutes from "./routes/comparison";
 import aiAnalysisRoutes from "./routes/aiAnalysis";
 import noteCategoriesRoutes from "./routes/noteCategories";
 import { expenseNotesRouter, disbursementNotesRouter } from "./routes/notes";
+import bulkDataEntryRoutes from "./routes/bulkDataEntry";
 
 const app = express();
 app.use(cors({ origin: process.env.CLIENT_ORIGIN || "*" }));
@@ -54,6 +55,7 @@ app.use("/api/ai-analysis", aiAnalysisRoutes);
 app.use("/api/note-categories", noteCategoriesRoutes);
 app.use("/api/expense-notes", expenseNotesRouter);
 app.use("/api/disbursement-notes", disbursementNotesRouter);
+app.use("/api/bulk-data-entry", bulkDataEntryRoutes);
 
 // Generic error handler as a safety net for anything thrown above.
 app.use((err: any, _req: express.Request, res: express.Response, _next: express.NextFunction) => {

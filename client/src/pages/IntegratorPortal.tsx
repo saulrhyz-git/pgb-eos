@@ -1,8 +1,9 @@
 import { FormEvent, useEffect, useState } from "react";
-import { CheckCircle2, Plus, Save, Trash2 } from "lucide-react";
+import { CheckCircle2, Plus, Save, Trash2, Upload } from "lucide-react";
 import { api } from "../api/client";
 import type { BusinessUnit, Company, NoteCategory, NoteEntry, Year } from "../api/types";
 import { useAuth } from "../contexts/AuthContext";
+import BulkDataEntryUpload from "../components/BulkDataEntryUpload";
 
 type FigureKey =
   | "revenueInternal"
@@ -332,6 +333,12 @@ export default function IntegratorPortal() {
   const [saved, setSaved] = useState(false);
   const [error, setError] = useState("");
 
+  // Bulk Upload (Superadmin only) — see BulkDataEntryUpload.tsx / the
+  // POST /bulk-data-entry route, gated purely on role === "SUPERADMIN"
+  // rather than the Custom Role permission system.
+  const [showBulkUpload, setShowBulkUpload] = useState(false);
+  const [reloadKey, setReloadKey] = useState(0);
+
   // Notable line items — the growable, informational-only record-keeping
   // facility for Expenses and Disbursements (see NotableItemsCard above).
   const [expenseCategories, setExpenseCategories] = useState<NoteCategory[]>([]);
@@ -429,7 +436,7 @@ export default function IntegratorPortal() {
       setDisbursementNotes(disbNotes);
       setNotesLoading(false);
     });
-  }, [yearId, quarter, companyId, businessUnitId]);
+  }, [yearId, quarter, companyId, businessUnitId, reloadKey]);
 
   async function handleAddExpenseNote(categoryId: string, amount: number, remarksText: string) {
     setAddingExpenseNote(true);
@@ -530,9 +537,23 @@ export default function IntegratorPortal() {
     }
   }
 
+  const currentYear = years.find((y) => y.id === yearId);
+
   return (
     <div className="mx-auto max-w-3xl">
-      <h2 className="mb-1 text-lg font-semibold text-slate-800 dark:text-slate-100">Quarterly Data Entry</h2>
+      <div className="mb-1 flex flex-wrap items-start justify-between gap-3">
+        <h2 className="text-lg font-semibold text-slate-800 dark:text-slate-100">Quarterly Data Entry</h2>
+        {user?.role === "SUPERADMIN" && (
+          <button
+            type="button"
+            disabled={!yearId}
+            onClick={() => setShowBulkUpload(true)}
+            className="flex items-center gap-2 rounded-md border border-slate-300 dark:border-slate-600 px-3 py-1.5 text-sm font-medium text-slate-600 dark:text-slate-300 hover:bg-slate-50 dark:hover:bg-slate-800 disabled:opacity-50"
+          >
+            <Upload className="h-4 w-4" /> Bulk Upload (CSV/Excel)
+          </button>
+        )}
+      </div>
       <p className="mb-6 text-sm text-slate-500 dark:text-slate-400">
         {user?.role === "BU_INTEGRATOR"
           ? "Submit Revenue, Collections, Expenses, and Disbursements for the companies in your assigned Business Unit(s)."
@@ -705,6 +726,15 @@ export default function IntegratorPortal() {
           {saving ? "Saving..." : saved ? "Saved" : "Save All Figures"}
         </button>
       </form>
+
+      {showBulkUpload && yearId && (
+        <BulkDataEntryUpload
+          yearId={yearId}
+          yearLabel={currentYear ? String(currentYear.year) : ""}
+          onClose={() => setShowBulkUpload(false)}
+          onUploaded={() => setReloadKey((k) => k + 1)}
+        />
+      )}
     </div>
   );
 }

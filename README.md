@@ -2071,3 +2071,49 @@ expanded and collapsed/icon-only, where the new labels only show as hover
 tooltips) and the mobile drawer both show the 9 tabs in the order above; and
 clicking each still lands on its unchanged route (`/`, `/rocks`, `/revenue`,
 `/data-entry`, `/targets`, `/compare`, `/reports`, `/ai-analysis`).
+
+**Financials Data Entry: bulk upload from a CSV/Excel file, Superadmin
+only.** A new "Bulk Upload (CSV/Excel)" button next to the "Quarterly Data
+Entry" heading in `client/src/pages/IntegratorPortal.tsx` — visible only
+when `user.role === "SUPERADMIN"` — opens a new
+`client/src/components/BulkDataEntryUpload.tsx` modal, the same
+parse-in-the-browser/post-JSON approach as `BulkTargetUpload.tsx` (see the
+Target Setup bulk upload entry above), but for actuals instead of targets:
+each row can carry Revenue (Internal/External + one shared Remarks),
+Collections Internal/External (3 breakdowns each, its own Remarks per
+breakdown), Expenses (amount + Remarks), and Disbursements (amount +
+Remarks) — the same two things ("Save All Figures") the single-entry form
+saves together for one Company/Quarter at a time, just for many rows in one
+file. A "Download Template" button generates a starter `.xlsx` with Business
+Unit/Company/Quarter dropdowns (sourced from current names, same as the
+Target Setup template) plus all 19 figure/remarks columns and two example
+rows; column headers match flexibly (e.g. "Revenue - Internal" and
+`revenueInternal` both resolve to the same field).
+
+On the server, a new dedicated router — `server/src/routes/bulkDataEntry.ts`,
+mounted at `POST /api/bulk-data-entry` in `server/src/index.ts` — handles the
+upload rather than extending `actuals.ts`/`disbursements.ts`, since each row
+spans both the `QuarterActual` and `DisbursementActual` models (upserted
+together in one `prisma.$transaction` per row, so a row's Actuals and
+Disbursements are never left half-saved). Rows are matched to a Company by
+name (optionally narrowed by a Business Unit name column, same disambiguation
+rule as the Target bulk upload) and processed one at a time — a bad row
+doesn't block the rows around it, and the response's per-row `results`
+(`row`, `status`, `error`) drive the modal's Status column, same UX as the
+existing Target bulk upload's results table. Deliberately different from
+every other write path in the app: this endpoint is gated purely by
+`requireRole("SUPERADMIN")` on the whole router, not by the Custom Role
+permission system (`utils/permissions.ts`) at all — a Group Integrator, a BU
+Integrator, or even a blank-role user holding a Custom Role that grants every
+possible Edit permission still gets a 403 here. A new
+`BULK_DATA_ENTRY_UPLOAD` Audit Log entry is written per upload with the
+Year, row counts, and success/error counts (not one entry per row). Worth
+checking by hand: the Bulk Upload button is absent from Data Entry for
+Group Integrator and BU Integrator accounts (`tracey`/`jessiec`) and present
+for the Superadmin (`saulrhyz`); downloading the template and filling in a
+Company/Quarter that already has data, then uploading, updates both the
+Financials Dashboard's actuals and the Disbursement card for that
+Company/Quarter; a row naming a nonexistent Company shows "Company not
+found" in the Status column while the other rows in the same file still
+save; and calling `POST /api/bulk-data-entry` directly as a non-superadmin
+(e.g. with `tracey`'s token) returns a 403.

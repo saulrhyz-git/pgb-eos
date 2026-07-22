@@ -6,6 +6,7 @@ import type {
   AuditLogMeta,
   AuditLogPage,
   AuthUser,
+  BulkDataEntryUploadResult,
   BulkTargetUploadResult,
   BusinessGoal,
   BusinessUnit,
@@ -177,6 +178,28 @@ export const api = {
   patchRemarks: (companyId: string, yearId: string, quarter: number, payload: Partial<ActualRemarks>) =>
     request<any>(`/actuals/${companyId}/${yearId}/${quarter}/remarks`, {
       method: "PATCH",
+      body: JSON.stringify(payload),
+    }),
+
+  // ---------- Bulk Data Entry (Superadmin only) ----------
+  // The file itself is parsed client-side (see BulkDataEntryUpload.tsx),
+  // this just posts the resulting rows. Each row identifies its Company by
+  // name (optionally + Business Unit name to disambiguate), same convention
+  // as bulkUploadQuarterTargets above, and upserts BOTH that Company/Year/
+  // Quarter's actuals (Revenue/Collections/Expenses + remarks) AND its
+  // Disbursements (amount + remarks) together — see
+  // server/src/routes/bulkDataEntry.ts. Unlike every other write in the app,
+  // this endpoint is gated purely by req.user.role === "SUPERADMIN", not by
+  // the Custom Role permission system.
+  bulkUploadDataEntry: (payload: {
+    yearId: string;
+    rows: Array<
+      { sourceRow?: number; businessUnitName?: string; companyName: string; quarter: number } & Partial<Figures> &
+        Partial<ActualRemarks> & { disbursementAmount?: number; disbursementRemarks?: string }
+    >;
+  }) =>
+    request<BulkDataEntryUploadResult>("/bulk-data-entry", {
+      method: "POST",
       body: JSON.stringify(payload),
     }),
 
