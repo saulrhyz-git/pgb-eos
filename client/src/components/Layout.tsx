@@ -59,29 +59,32 @@ export default function Layout() {
           <Gauge className="h-4 w-4 shrink-0" />
           {showLabels && "Scorecard"}
         </NavLink>
-        {/* Label-only rename to "Financials" — the route itself stays
-            /revenue (see FinancialsLayout in App.tsx) since nothing else
-            about the URL needed to change. */}
-        <NavLink to="/revenue" className={linkClass} onClick={closeMobile} title="Financials">
-          <LayoutDashboard className="h-4 w-4 shrink-0" />
-          {showLabels && "Financials"}
-        </NavLink>
         <NavLink to="/rocks" className={linkClass} onClick={closeMobile} title="Rocks">
           <Mountain className="h-4 w-4 shrink-0" />
           {showLabels && "Rocks"}
         </NavLink>
+        {/* Label-only rename to "Financials Dashboard" — the route itself
+            stays /revenue (see FinancialsLayout in App.tsx) since nothing
+            else about the URL needed to change. */}
+        <NavLink to="/revenue" className={linkClass} onClick={closeMobile} title="Financials Dashboard">
+          <LayoutDashboard className="h-4 w-4 shrink-0" />
+          {showLabels && "Financials Dashboard"}
+        </NavLink>
+        {/* Label-only rename to "Financials Data Entry" — route stays
+            /data-entry. */}
+        <NavLink to="/data-entry" className={linkClass} onClick={closeMobile} title="Financials Data Entry">
+          <ClipboardEdit className="h-4 w-4 shrink-0" />
+          {showLabels && "Financials Data Entry"}
+        </NavLink>
+        {/* Label-only rename to "Financials Target Setup" — route stays
+            /targets. */}
+        <NavLink to="/targets" className={linkClass} onClick={closeMobile} title="Financials Target Setup">
+          <Settings className="h-4 w-4 shrink-0" />
+          {showLabels && "Financials Target Setup"}
+        </NavLink>
         <NavLink to="/compare" className={linkClass} onClick={closeMobile} title="Compare">
           <GitCompare className="h-4 w-4 shrink-0" />
           {showLabels && "Compare"}
-        </NavLink>
-
-        <NavLink to="/data-entry" className={linkClass} onClick={closeMobile} title="Data Entry">
-          <ClipboardEdit className="h-4 w-4 shrink-0" />
-          {showLabels && "Data Entry"}
-        </NavLink>
-        <NavLink to="/targets" className={linkClass} onClick={closeMobile} title="Target Setup">
-          <Settings className="h-4 w-4 shrink-0" />
-          {showLabels && "Target Setup"}
         </NavLink>
         <NavLink to="/reports" className={linkClass} onClick={closeMobile} title="Reports">
           <FileSpreadsheet className="h-4 w-4 shrink-0" />

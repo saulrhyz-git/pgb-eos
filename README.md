@@ -2054,3 +2054,20 @@ shows the equivalent box for Disbursement notes below the Disbursement
 card; a scope with no notable items yet shows "No notable items logged for
 this scope" instead of an empty table; and nothing in this box is
 clickable/editable.
+
+**Sidebar: three nav labels renamed, tab order rearranged.** In
+`client/src/components/Layout.tsx`'s `NavContent` (routes unchanged
+throughout — label-only renames, same pattern as the earlier Revenue →
+Financials rename): "Data Entry" → "Financials Data Entry" (still
+`/data-entry`), "Target Setup" → "Financials Target Setup" (still
+`/targets`), and "Financials" → "Financials Dashboard" (still `/revenue`) —
+so all three Financials-related tabs now share the same "Financials ..."
+prefix. The sidebar (and mobile drawer, which renders from the same
+`NavContent`) now lists tabs in this order: Scorecard, Rocks, Financials
+Dashboard, Financials Data Entry, Financials Target Setup, Compare, Reports,
+AI Analysis, then Audit Log (non-superadmins only) / Admin (superadmins
+only) at the end, same as before. Worth checking by hand: the sidebar (both
+expanded and collapsed/icon-only, where the new labels only show as hover
+tooltips) and the mobile drawer both show the 9 tabs in the order above; and
+clicking each still lands on its unchanged route (`/`, `/rocks`, `/revenue`,
+`/data-entry`, `/targets`, `/compare`, `/reports`, `/ai-analysis`).
