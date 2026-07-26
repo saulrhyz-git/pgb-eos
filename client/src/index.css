@@ -2,8 +2,17 @@
 @tailwind components;
 @tailwind utilities;
 
+html,
 body {
   font-family: -apple-system, BlinkMacSystemFont, "Segoe UI", Roboto, Helvetica, Arial, sans-serif;
+  /* Matches the light-mode root container's bg-slate-50 (client's <div
+     className="flex min-h-screen bg-slate-50 ..."> in Layout.tsx). Without
+     this, <html>/<body> keep the browser's default white background, which
+     shows through at the right/bottom edges during overscroll/rubber-band
+     scrolling (or on any viewport area the app's own containers don't
+     stretch to cover) — most noticeable in dark mode, where that white
+     sliver stands out against everything else. */
+  background-color: #f8fafc;
 }
 
 /* Tells the browser to render its own native chrome — scrollbars, date/time
@@ -13,4 +22,16 @@ body {
    stuck looking like light mode. */
 .dark {
   color-scheme: dark;
+}
+
+html.dark,
+.dark body,
+body.dark {
+  /* Matches the dark-mode root container's bg-slate-950, same rationale as
+     the light-mode rule above. "html.dark" covers <html> itself, since
+     that's where ThemeContext.tsx actually toggles the class; ".dark body"
+     covers <body> as its descendant; "body.dark" is a harmless
+     belt-and-suspenders in case any future markup change puts the class on
+     <body> directly instead. */
+  background-color: #020617;
 }
