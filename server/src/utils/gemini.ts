@@ -14,6 +14,40 @@
 // Admin -> AI Settings; this function just slots it into the URL.
 const GEMINI_API_BASE = "https://generativelanguage.googleapis.com/v1beta/models";
 
+// Node's built-in fetch (undici) always throws a generic top-level
+// "fetch failed" message on network errors — the actually useful info
+// (DNS failure, connection refused, timeout, TLS error, etc.) lives in
+// `err.cause`, which undici sets to the underlying system error. This
+// unwraps that so the AI Analysis tab and "Test Connection" button show
+// something an admin can act on instead of just "fetch failed".
+function describeFetchError(err: any): string {
+  const cause = err?.cause ?? err;
+  const code: string | undefined = cause?.code;
+
+  switch (code) {
+    case "ENOTFOUND":
+    case "EAI_AGAIN":
+      return "DNS lookup failed for generativelanguage.googleapis.com. The server can't resolve this hostname — check its DNS configuration/resolver.";
+    case "ECONNREFUSED":
+      return "Connection refused by generativelanguage.googleapis.com. A firewall, proxy, or security-group rule is likely blocking outbound HTTPS (port 443) from this server.";
+    case "ETIMEDOUT":
+    case "UND_ERR_CONNECT_TIMEOUT":
+      return "Connection to generativelanguage.googleapis.com timed out. This usually means outbound traffic to Google's API is being silently dropped by a firewall or egress policy, rather than actively refused.";
+    case "ECONNRESET":
+      return "Connection to generativelanguage.googleapis.com was reset mid-request. This can happen with a misconfigured proxy or an upstream network device terminating the connection.";
+    case "CERT_HAS_EXPIRED":
+    case "UNABLE_TO_VERIFY_LEAF_SIGNATURE":
+    case "DEPTH_ZERO_SELF_SIGNED_CERT":
+      return `TLS/certificate error while connecting to Gemini (${code}). Check the server's CA certificates or any TLS-intercepting proxy.`;
+    default:
+      // Unrecognized cause — surface whatever detail we have rather than
+      // silently swallowing it, so it's still possible to diagnose.
+      return cause?.message
+        ? `${cause.message}${code ? ` (${code})` : ""}`
+        : err?.message || "unknown network error";
+  }
+}
+
 export async function callGemini(apiKey: string, model: string, prompt: string): Promise<string> {
   const url = `${GEMINI_API_BASE}/${encodeURIComponent(model)}:generateContent?key=${encodeURIComponent(apiKey)}`;
 
@@ -27,7 +61,7 @@ export async function callGemini(apiKey: string, model: string, prompt: string):
       }),
     });
   } catch (err: any) {
-    throw new Error(`Could not reach the Gemini API: ${err.message || "network error"}`);
+    throw new Error(`Could not reach the Gemini API: ${describeFetchError(err)}`);
   }
 
   const body: any = await res.json().catch(() => null);
