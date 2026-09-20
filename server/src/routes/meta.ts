@@ -46,6 +46,47 @@ router.post("/years", requireRole("GROUP_INTEGRATOR", "SUPERADMIN"), async (req,
   res.status(201).json(year);
 });
 
+// Sets the four per-Quarter deadlines this Year's Rocks are auto-statused
+// against (see utils/rockAutoStatus.ts) — Group Integrator/Superadmin only,
+// same governance tier as TargetLock. Every field is optional and nullable:
+// sending null (or omitting a field) clears that Quarter's custom deadline,
+// which makes the auto-status rule fall back to that Quarter's standard
+// calendar end date instead of turning it off. Applies to every Company at
+// once for this Year, same as TargetLock.
+const quarterEndDatesSchema = z.object({
+  q1EndDate: z.string().datetime().nullable().optional(),
+  q2EndDate: z.string().datetime().nullable().optional(),
+  q3EndDate: z.string().datetime().nullable().optional(),
+  q4EndDate: z.string().datetime().nullable().optional(),
+});
+
+router.put("/years/:id/quarter-end-dates", requireRole("GROUP_INTEGRATOR", "SUPERADMIN"), async (req, res) => {
+  const parsed = quarterEndDatesSchema.safeParse(req.body);
+  if (!parsed.success) return res.status(400).json({ error: "Invalid quarter end dates", details: parsed.error.issues });
+
+  const existing = await prisma.year.findUnique({ where: { id: req.params.id } });
+  if (!existing) return res.status(404).json({ error: "Year not found" });
+
+  const data: Record<string, Date | null> = {};
+  for (const key of ["q1EndDate", "q2EndDate", "q3EndDate", "q4EndDate"] as const) {
+    if (key in parsed.data) {
+      const value = parsed.data[key];
+      data[key] = value ? new Date(value) : null;
+    }
+  }
+
+  const year = await prisma.year.update({ where: { id: req.params.id }, data });
+  await logAudit({
+    user: req.user,
+    action: "YEAR_QUARTER_END_DATES_UPDATE",
+    entityType: "Year",
+    entityId: year.id,
+    summary: `Updated Quarter end dates for Year ${year.year}`,
+    metadata: data as Record<string, unknown>,
+  });
+  res.json(year);
+});
+
 // ---------- Business Units ----------
 
 router.get("/business-units", async (req, res) => {

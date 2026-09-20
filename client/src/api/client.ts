@@ -89,6 +89,14 @@ export const api = {
 
   years: () => request<Year[]>("/years"),
   createYear: (year: number) => request<Year>("/years", { method: "POST", body: JSON.stringify({ year }) }),
+  // Sets this Year's four Quarter End Dates (Group Integrator/Superadmin
+  // only) — the deadlines the Rocks auto-status rule measures against (see
+  // server/src/utils/rockAutoStatus.ts). Pass null to clear a Quarter's
+  // date, which opts that Quarter's Rocks back out of the auto-status rule.
+  updateYearQuarterEndDates: (
+    yearId: string,
+    payload: Partial<{ q1EndDate: string | null; q2EndDate: string | null; q3EndDate: string | null; q4EndDate: string | null }>
+  ) => request<Year>(`/years/${yearId}/quarter-end-dates`, { method: "PUT", body: JSON.stringify(payload) }),
   // The real calendar quarter "right now" per the server clock — yearId is
   // null if that Year hasn't been created yet. Used to default filter bars
   // to the actual current quarter instead of guessing from the year list.

@@ -1,6 +1,7 @@
 import { FormEvent, useEffect, useMemo, useState } from "react";
 import {
   AlertTriangle,
+  CalendarClock,
   CheckCircle2,
   ListChecks,
   Loader2,
@@ -56,8 +57,8 @@ const STATUS_LABELS: Record<RockStatus, string> = {
 };
 
 // Orange = Pending, Blue = On Track ("in progress"), Red = At Risk
-// (including Rocks auto-flagged by the 60-day staleness rule — see
-// server/src/utils/rockAutoStatus.ts), Green = Target Met.
+// (including Rocks auto-flagged by the Quarter End Date-based status rule —
+// see server/src/utils/rockAutoStatus.ts), Green = Target Met.
 const STATUS_BADGE: Record<RockStatus, string> = {
   PENDING: "bg-orange-50 dark:bg-orange-950/40 text-orange-700 dark:text-orange-300",
   ON_TRACK: "bg-blue-50 dark:bg-blue-950/40 text-blue-700 dark:text-blue-300",
@@ -71,6 +72,18 @@ function clampProgress(n: number): number {
   if (Number.isNaN(n)) return 0;
   return Math.round(Math.max(0, Math.min(100, n)) * 100) / 100;
 }
+
+// Quarter End Dates are stored as full ISO datetimes (a deadline defaults
+// to the end of the chosen calendar day) but edited as plain HTML date
+// inputs — these two helpers convert between the two.
+function isoToDateInput(iso: string | null): string {
+  return iso ? iso.slice(0, 10) : "";
+}
+function dateInputToIso(value: string): string | null {
+  return value ? new Date(`${value}T23:59:59.999Z`).toISOString() : null;
+}
+
+const emptyQuarterEndDatesForm = { q1EndDate: "", q2EndDate: "", q3EndDate: "", q4EndDate: "" };
 
 const emptyRockForm = {
   id: "" as string | null,
@@ -188,6 +201,54 @@ export default function Rocks() {
   const [editGoalForm, setEditGoalForm] = useState(emptyGoalForm);
   const [savingGoal, setSavingGoal] = useState(false);
 
+  // Quarter End Dates panel — Group Integrator/Superadmin only (see
+  // canManageStructure). Always reflects the currently-selected Year; saving
+  // reloads both the Years list (so the filter bar's copy is fresh) and the
+  // Rocks list (since a new/changed deadline can immediately flip a Rock's
+  // auto-computed status — see server/src/utils/rockAutoStatus.ts).
+  const [endDatesForm, setEndDatesForm] = useState(emptyQuarterEndDatesForm);
+  const [savingEndDates, setSavingEndDates] = useState(false);
+  const [endDatesError, setEndDatesError] = useState("");
+  const [endDatesSaved, setEndDatesSaved] = useState(false);
+
+  useEffect(() => {
+    const y = years.find((year) => year.id === yearId);
+    setEndDatesForm(
+      y
+        ? {
+            q1EndDate: isoToDateInput(y.q1EndDate),
+            q2EndDate: isoToDateInput(y.q2EndDate),
+            q3EndDate: isoToDateInput(y.q3EndDate),
+            q4EndDate: isoToDateInput(y.q4EndDate),
+          }
+        : emptyQuarterEndDatesForm
+    );
+    setEndDatesError("");
+    setEndDatesSaved(false);
+  }, [yearId, years]);
+
+  async function handleSaveEndDates(e: FormEvent) {
+    e.preventDefault();
+    if (!yearId) return;
+    setEndDatesError("");
+    setSavingEndDates(true);
+    try {
+      const updated = await api.updateYearQuarterEndDates(yearId, {
+        q1EndDate: dateInputToIso(endDatesForm.q1EndDate),
+        q2EndDate: dateInputToIso(endDatesForm.q2EndDate),
+        q3EndDate: dateInputToIso(endDatesForm.q3EndDate),
+        q4EndDate: dateInputToIso(endDatesForm.q4EndDate),
+      });
+      setYears((prev) => prev.map((y) => (y.id === updated.id ? updated : y)));
+      setEndDatesSaved(true);
+      loadRocks(); // Statuses may have just shifted under the new deadlines.
+    } catch (err: any) {
+      setEndDatesError(err.message || "Failed to save quarter end dates");
+    } finally {
+      setSavingEndDates(false);
+    }
+  }
+
   function refreshGoals() {
     api.businessGoals().then(setBusinessGoals);
   }
@@ -251,6 +312,12 @@ export default function Rocks() {
     const timer = setTimeout(() => setSavedMessage(""), 3000);
     return () => clearTimeout(timer);
   }, [savedMessage]);
+
+  useEffect(() => {
+    if (!endDatesSaved) return;
+    const timer = setTimeout(() => setEndDatesSaved(false), 3000);
+    return () => clearTimeout(timer);
+  }, [endDatesSaved]);
 
   // Business goals usable for a given Business Unit: global (no BU tags) or explicitly assigned to it.
   function goalsForBu(buId: string) {
@@ -600,6 +667,52 @@ export default function Rocks() {
         <KpiCard icon={<AlertTriangle className="h-4 w-4" />} label="At Risk / Pending" value={String(atRiskPending)} />
         <KpiCard icon={<Percent className="h-4 w-4" />} label="Avg Progress" value={`${avgProgress}%`} />
       </div>
+
+      {canManageStructure && (
+        <div className="rounded-lg border border-slate-200 dark:border-slate-700 bg-white dark:bg-slate-900 p-4 shadow-sm">
+          <div className="mb-1 flex items-center gap-2 text-xs font-semibold uppercase text-slate-500 dark:text-slate-400">
+            <CalendarClock className="h-3.5 w-3.5" /> Quarter End Dates{" "}
+            {years.find((y) => y.id === yearId) && <span className="normal-case text-slate-400 dark:text-slate-500">— {years.find((y) => y.id === yearId)?.year}</span>}
+          </div>
+          <p className="mb-3 text-xs text-slate-500 dark:text-slate-400">
+            Sets the deadline each Quarter's Rocks are measured against for their auto-computed status. Leave a Quarter
+            blank to use its standard calendar end date instead (Q1 Mar 31, Q2 Jun 30, Q3 Sep 30, Q4 Dec 31).
+          </p>
+          {yearId ? (
+            <form onSubmit={handleSaveEndDates} className="flex flex-col gap-3">
+              <div className="grid grid-cols-2 gap-3 sm:flex sm:flex-wrap">
+                {([1, 2, 3, 4] as const).map((q) => {
+                  const key = `q${q}EndDate` as keyof typeof endDatesForm;
+                  return (
+                    <div key={q} className="flex flex-col gap-1">
+                      <label className="text-xs font-medium text-slate-500 dark:text-slate-400">Q{q} End Date</label>
+                      <input
+                        type="date"
+                        className="rounded-md border border-slate-300 dark:border-slate-600 dark:bg-slate-800 dark:text-slate-100 px-2 py-1.5 text-sm"
+                        value={endDatesForm[key]}
+                        onChange={(e) => setEndDatesForm((f) => ({ ...f, [key]: e.target.value }))}
+                      />
+                    </div>
+                  );
+                })}
+              </div>
+              {endDatesError && <div className="text-sm text-red-600 dark:text-red-400">{endDatesError}</div>}
+              <div className="flex items-center gap-3">
+                <button
+                  type="submit"
+                  disabled={savingEndDates}
+                  className="flex w-fit items-center gap-2 rounded-md bg-brand-500 px-3 py-1.5 text-xs font-medium text-white hover:bg-brand-600 disabled:opacity-50"
+                >
+                  {savingEndDates && <Loader2 className="h-3.5 w-3.5 animate-spin" />} Save End Dates
+                </button>
+                {endDatesSaved && <span className="text-xs font-medium text-emerald-600 dark:text-emerald-400">Saved</span>}
+              </div>
+            </form>
+          ) : (
+            <span className="text-xs text-slate-500 dark:text-slate-400">Select a Year above to set its Quarter End Dates.</span>
+          )}
+        </div>
+      )}
 
       {canManageStructure && (
         <div className="rounded-lg border border-slate-200 dark:border-slate-700 bg-white dark:bg-slate-900 p-4 shadow-sm">

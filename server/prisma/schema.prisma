@@ -268,6 +268,23 @@ model Year {
   year      Int      @unique
   createdAt DateTime @default(now())
 
+  // Manual, admin-set deadline for each Quarter, used by the Rocks auto-
+  // status rule (see utils/rockAutoStatus.ts) to know how many days a Rock
+  // is from "done". Deliberately separate from the calendar quarter
+  // boundaries in utils/quarterDates.ts — the real internal deadline for
+  // closing out a Quarter's Rocks often isn't the calendar's last day (e.g.
+  // a grace period, or an earlier internal review date). null means "no
+  // custom deadline set" — the auto-status rule then falls back to that
+  // Quarter's standard calendar end date instead (Q1 Mar 31, Q2 Jun 30, Q3
+  // Sep 30, Q4 Dec 31), so every Rock always has some end date to be
+  // measured against. Only a Group Integrator or Superadmin can set these
+  // (see requireRole in routes/meta.ts) — same governance tier as
+  // TargetLock above, applies to every Company at once.
+  q1EndDate DateTime?
+  q2EndDate DateTime?
+  q3EndDate DateTime?
+  q4EndDate DateTime?
+
   quarterTargets      QuarterTarget[]
   quarterActuals      QuarterActual[]
   disbursementActuals DisbursementActual[]

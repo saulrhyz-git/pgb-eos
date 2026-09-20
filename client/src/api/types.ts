@@ -103,6 +103,13 @@ export interface AiSettings {
 export interface Year {
   id: string;
   year: number;
+  // Manual per-Quarter deadlines used by the Rocks auto-status rule — null
+  // means that Quarter's Rocks are left out of the auto-status calculation.
+  // Group Integrator/Superadmin only (see PUT /years/:id/quarter-end-dates).
+  q1EndDate: string | null;
+  q2EndDate: string | null;
+  q3EndDate: string | null;
+  q4EndDate: string | null;
 }
 
 // A manual, admin-controlled lock on one Quarter of a Year's Targets (Group
