@@ -27,7 +27,7 @@ import { api } from "../api/client";
 import { useAuth } from "../contexts/AuthContext";
 import { useTheme } from "../contexts/ThemeContext";
 import { attainmentColor, formatCurrency, formatCurrencyShort, formatPct, formatProgressPct } from "../utils/format";
-import type { BusinessUnit, ScorecardResponse, Year } from "../api/types";
+import type { BusinessUnit, Company, ScorecardResponse, Year } from "../api/types";
 
 // Same Orange/Blue/Red/Green convention as the Rocks page.
 const STATUS_BADGE: Record<string, string> = {
@@ -221,9 +221,11 @@ export default function Scorecard() {
 
   const [years, setYears] = useState<Year[]>([]);
   const [businessUnits, setBusinessUnits] = useState<BusinessUnit[]>([]);
+  const [companies, setCompanies] = useState<Company[]>([]);
   const [yearId, setYearId] = useState("");
   const [quarter, setQuarter] = useState(0); // 0 = All Quarters — board-level view defaults to the full year
   const [businessUnitId, setBusinessUnitId] = useState("");
+  const [companyId, setCompanyId] = useState(""); // "" = all Companies in whichever Business Unit scope is selected
 
   const [data, setData] = useState<ScorecardResponse | null>(null);
   const [loading, setLoading] = useState(false);
@@ -249,20 +251,28 @@ export default function Scorecard() {
     // eslint-disable-next-line react-hooks/exhaustive-deps
   }, []);
 
+  // Same as FilterBar.tsx's Company dropdown: re-fetched whenever the
+  // Business Unit scope changes, since the list of selectable Companies
+  // depends on it (all Companies when "All Business Units", just that BU's
+  // when one is picked).
+  useEffect(() => {
+    api.companies(businessUnitId || undefined).then(setCompanies);
+  }, [businessUnitId]);
+
   useEffect(() => {
     if (!yearId) return;
     setLoading(true);
     setError("");
     setForbidden(false);
     api
-      .scorecard({ yearId, quarter, businessUnitId: businessUnitId || undefined })
+      .scorecard({ yearId, quarter, businessUnitId: businessUnitId || undefined, companyId: companyId || undefined })
       .then(setData)
       .catch((err) => {
         if (err.status === 403) setForbidden(true);
         else setError(err.message || "Failed to load the Executive Scorecard");
       })
       .finally(() => setLoading(false));
-  }, [yearId, quarter, businessUnitId]);
+  }, [yearId, quarter, businessUnitId, companyId]);
 
   const chartData = useMemo(
     () => (data ? data.revenue.chart.map((c) => ({ label: c.label, Target: c.targetTotal, Actual: c.actualTotal })) : []),
@@ -368,17 +378,35 @@ export default function Scorecard() {
               ))}
             </select>
           </div>
-          <div className="col-span-2 flex flex-col gap-1">
+          <div className="col-span-2 flex flex-col gap-1 sm:col-span-1">
             <label className="text-xs font-medium text-slate-500 dark:text-slate-400">Business Unit</label>
             <select
               className="w-full rounded-md border border-slate-300 dark:border-slate-600 dark:bg-slate-800 dark:text-slate-100 px-3 py-1.5 text-sm sm:min-w-[180px]"
               value={businessUnitId}
-              onChange={(e) => setBusinessUnitId(e.target.value)}
+              onChange={(e) => {
+                setBusinessUnitId(e.target.value);
+                setCompanyId(""); // Narrowing to a different BU scope invalidates whichever Company was picked.
+              }}
             >
               {canSeeAllBUs && <option value="">All Business Units</option>}
               {businessUnits.map((bu) => (
                 <option key={bu.id} value={bu.id}>
                   {bu.name}
+                </option>
+              ))}
+            </select>
+          </div>
+          <div className="col-span-2 flex flex-col gap-1 sm:col-span-1">
+            <label className="text-xs font-medium text-slate-500 dark:text-slate-400">Company</label>
+            <select
+              className="w-full rounded-md border border-slate-300 dark:border-slate-600 dark:bg-slate-800 dark:text-slate-100 px-3 py-1.5 text-sm sm:min-w-[180px]"
+              value={companyId}
+              onChange={(e) => setCompanyId(e.target.value)}
+            >
+              <option value="">All Companies</option>
+              {companies.map((c) => (
+                <option key={c.id} value={c.id}>
+                  {c.name}
                 </option>
               ))}
             </select>

@@ -297,10 +297,11 @@ export const api = {
   // Condensed, BU-level-only summary for a C-Level/BOD audience. Default
   // access is Superadmin + Group Integrator; a BU Integrator needs a Custom
   // Role that grants SCORECARD view to see it at all (403 otherwise).
-  scorecard: (params: { yearId: string; quarter: number; businessUnitId?: string }) => {
+  scorecard: (params: { yearId: string; quarter: number; businessUnitId?: string; companyId?: string }) => {
     // quarter === 0 means "All Quarters" (full year) in the UI, same convention as the Revenue dashboard.
     const qs = new URLSearchParams({ yearId: params.yearId, quarter: params.quarter === 0 ? "all" : String(params.quarter) });
     if (params.businessUnitId) qs.set("businessUnitId", params.businessUnitId);
+    if (params.companyId) qs.set("companyId", params.companyId);
     return request<ScorecardResponse>(`/scorecard?${qs.toString()}`);
   },
 

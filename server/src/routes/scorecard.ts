@@ -1,6 +1,14 @@
 import { Router } from "express";
 import { prisma } from "../lib/prisma";
-import { AuthUser, blockPendingPasswordChange, loadUserPermissions, requireAuth, scopedBusinessUnitFilter } from "../middleware/auth";
+import {
+  AuthUser,
+  assertBusinessUnitAccess,
+  blockPendingPasswordChange,
+  loadUserPermissions,
+  requireAuth,
+  resolveCompanyBusinessUnit,
+  scopedBusinessUnitFilter,
+} from "../middleware/auth";
 import { can, canAnyOf, FINANCIAL_RESOURCES, narrowingApplies } from "../utils/permissions";
 import {
   addDisbursementFigures,
@@ -46,6 +54,11 @@ export interface ScorecardParams {
   yearId?: string;
   quarter?: string;
   businessUnitId?: string;
+  // Optional Company-level drill-down, same behavior as dashboard.ts's
+  // companyId param: narrows every section down to just that one Company
+  // (which also narrows the Business Unit tables/rows down to just its
+  // parent BU) rather than the whole Business Unit it belongs to.
+  companyId?: string;
 }
 
 /**
@@ -61,7 +74,7 @@ export interface ScorecardParams {
  * `err.status || 500`, same as every other route in this file.
  */
 export async function computeScorecard(user: AuthUser, params: ScorecardParams) {
-  const { yearId, businessUnitId } = params;
+  const { yearId, businessUnitId, companyId } = params;
   const quarterParam = params.quarter;
   const isAllQuarters = quarterParam === "all" || quarterParam === undefined;
   const quarter = isAllQuarters ? 4 : Number(quarterParam);
@@ -80,10 +93,24 @@ export async function computeScorecard(user: AuthUser, params: ScorecardParams) 
 
   const buWhere: any = {};
   const companyWhere: any = {};
-  const buFilter = scopedBusinessUnitFilter(user, businessUnitId);
-  if (buFilter) {
-    buWhere.id = buFilter;
-    companyWhere.businessUnitId = buFilter;
+  // Same Company-drill-down pattern as dashboard.ts: a companyId narrows
+  // both which Companies are summed AND which Business Unit(s) show up (to
+  // just that Company's own BU), and is access-checked on its own via
+  // assertBusinessUnitAccess rather than combined with the businessUnitId
+  // param — the two are mutually exclusive scope selectors, matching how
+  // FilterBar.tsx/the Scorecard filter bar present them (picking a Company
+  // is a further narrowing of whichever Business Unit is selected).
+  if (companyId) {
+    const buId = await resolveCompanyBusinessUnit(companyId);
+    assertBusinessUnitAccess(user, buId);
+    buWhere.id = buId;
+    companyWhere.id = companyId;
+  } else {
+    const buFilter = scopedBusinessUnitFilter(user, businessUnitId);
+    if (buFilter) {
+      buWhere.id = buFilter;
+      companyWhere.businessUnitId = buFilter;
+    }
   }
 
   const permRows = await loadUserPermissions(user);
