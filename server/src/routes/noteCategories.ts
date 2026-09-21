@@ -5,8 +5,8 @@ import { blockPendingPasswordChange, requireAuth, requireRole } from "../middlew
 import { logAudit } from "../utils/auditLog";
 
 // Superadmin-only CRUD over the NoteCategory catalog — the master list of
-// selectable categories for the Expenses/Disbursements "notable line items"
-// facility (see routes/notes.ts). Not gated by a Custom Role/
+// selectable categories for the Revenue/Collections/Expenses/Disbursements
+// "notable line items" facility (see routes/notes.ts). Not gated by a Custom Role/
 // PermissionResource, same as SMTP/AI Settings: this is app configuration,
 // not per-Business-Unit data.
 const router = Router();
@@ -20,7 +20,7 @@ router.get("/", async (_req, res) => {
 });
 
 const createSchema = z.object({
-  type: z.enum(["EXPENSE", "DISBURSEMENT"]),
+  type: z.enum(["EXPENSE", "DISBURSEMENT", "REVENUE", "COLLECTION"]),
   label: z.string().trim().min(1).max(100),
   sortOrder: z.number().int().default(0),
 });

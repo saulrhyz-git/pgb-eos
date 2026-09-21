@@ -256,6 +256,8 @@ model Company {
   disbursementActuals DisbursementActual[]
   expenseNotes        ExpenseNote[]
   disbursementNotes   DisbursementNote[]
+  revenueNotes        RevenueNote[]
+  collectionNotes     CollectionNote[]
   rocks               Rock[]
   rolePermissions     RolePermission[]
 
@@ -290,6 +292,8 @@ model Year {
   disbursementActuals DisbursementActual[]
   expenseNotes        ExpenseNote[]
   disbursementNotes   DisbursementNote[]
+  revenueNotes        RevenueNote[]
+  collectionNotes     CollectionNote[]
   rocks               Rock[]
   targetLocks         TargetLock[]
 }
@@ -449,18 +453,22 @@ model DisbursementActual {
 enum NoteCategoryType {
   EXPENSE
   DISBURSEMENT
+  REVENUE
+  COLLECTION
 }
 
 // Superadmin-managed catalog of selectable categories for the "notable line
-// items" record-keeping facility on Expenses and Disbursements (see
-// ExpenseNote/DisbursementNote below) — e.g. "Interest", "Depreciation",
-// "Other Non-Cash", "Cost of Sales", "OPEX" for Expenses; "Advances",
-// "Loans", "Interest" for Disbursements, seeded as defaults by migration but
-// freely editable afterward at Admin -> Note Categories. Purely a label
-// picklist with no bearing on any total/calculation. `active` lets a
-// category be retired without breaking historical notes that still
-// reference it (existing notes keep their categoryId; the picker in
-// new-entry UI just hides inactive ones going forward).
+// items" record-keeping facility on Revenue, Collections, Expenses, and
+// Disbursements (see RevenueNote/CollectionNote/ExpenseNote/
+// DisbursementNote below) — e.g. "Interest", "Depreciation", "Other
+// Non-Cash", "Cost of Sales", "OPEX" for Expenses; "Advances", "Loans",
+// "Interest" for Disbursements, seeded as defaults by migration but freely
+// editable afterward at Admin -> Note Categories. Revenue and Collections
+// start with no seeded defaults — a Superadmin adds whatever categories fit
+// there. Purely a label picklist with no bearing on any total/calculation.
+// `active` lets a category be retired without breaking historical notes
+// that still reference it (existing notes keep their categoryId; the
+// picker in new-entry UI just hides inactive ones going forward).
 model NoteCategory {
   id        String           @id @default(uuid())
   type      NoteCategoryType
@@ -471,6 +479,8 @@ model NoteCategory {
 
   expenseNotes      ExpenseNote[]
   disbursementNotes DisbursementNote[]
+  revenueNotes      RevenueNote[]
+  collectionNotes   CollectionNote[]
 
   @@unique([type, label])
   @@index([type])
@@ -507,6 +517,51 @@ model ExpenseNote {
 // Same idea as ExpenseNote, for Disbursements — gated by the DISBURSEMENTS
 // Custom Role resource instead.
 model DisbursementNote {
+  id         String   @id @default(uuid())
+  companyId  String
+  yearId     String
+  quarter    Int // 1-4
+  categoryId String
+  amount     Decimal  @default(0) @db.Decimal(14, 2)
+  remarks    String   @default("")
+  createdAt  DateTime @default(now())
+  updatedAt  DateTime @updatedAt
+
+  company  Company      @relation(fields: [companyId], references: [id], onDelete: Cascade)
+  year     Year         @relation(fields: [yearId], references: [id], onDelete: Cascade)
+  category NoteCategory @relation(fields: [categoryId], references: [id], onDelete: Restrict)
+
+  @@index([companyId, yearId, quarter])
+  @@index([categoryId])
+}
+
+// Same idea as ExpenseNote, for Revenue — gated by the REVENUE Custom Role
+// resource instead. Added alongside CollectionNote below so all four
+// Financials categories (Revenue, Collections, Expenses, Disbursements)
+// have the same notable-line-items facility; Expenses/Disbursements had it
+// first.
+model RevenueNote {
+  id         String   @id @default(uuid())
+  companyId  String
+  yearId     String
+  quarter    Int // 1-4
+  categoryId String
+  amount     Decimal  @default(0) @db.Decimal(14, 2)
+  remarks    String   @default("")
+  createdAt  DateTime @default(now())
+  updatedAt  DateTime @updatedAt
+
+  company  Company      @relation(fields: [companyId], references: [id], onDelete: Cascade)
+  year     Year         @relation(fields: [yearId], references: [id], onDelete: Cascade)
+  category NoteCategory @relation(fields: [categoryId], references: [id], onDelete: Restrict)
+
+  @@index([companyId, yearId, quarter])
+  @@index([categoryId])
+}
+
+// Same idea as ExpenseNote, for Collections — gated by the COLLECTIONS
+// Custom Role resource instead.
+model CollectionNote {
   id         String   @id @default(uuid())
   companyId  String
   yearId     String

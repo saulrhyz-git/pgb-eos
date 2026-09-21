@@ -1,0 +1,784 @@
+diff --git a/client/src/api/client.ts b/client/src/api/client.ts
+index bf0c4c9..502cbb8 100644
+--- a/client/src/api/client.ts
++++ b/client/src/api/client.ts
+@@ -479,11 +479,11 @@ export const api = {
+     request<NoteCategory>(`/note-categories/${id}`, { method: "PUT", body: JSON.stringify(payload) }),
+   deleteNoteCategory: (id: string) => request<void>(`/note-categories/${id}`, { method: "DELETE" }),
+ 
+-  // ---------- Notable Expense / Disbursement line items ----------
++  // ---------- Notable Revenue / Collections / Expense / Disbursement line items ----------
+   // Growable, informational-only record-keeping facility — never rolled into
+-  // any total/calculation. Gated by the same EXPENSES/DISBURSEMENTS Custom
+-  // Role resource as the parent actual, not a resource of their own — see
+-  // server/src/routes/notes.ts.
++  // any total/calculation. Gated by the same REVENUE/COLLECTIONS/EXPENSES/
++  // DISBURSEMENTS Custom Role resource as the parent actual, not a resource
++  // of their own — see server/src/routes/notes.ts.
+   expenseNotes: (params: { yearId: string; quarter?: number; businessUnitId?: string; companyId?: string }) => {
+     const qs = new URLSearchParams({ yearId: params.yearId });
+     if (params.quarter) qs.set("quarter", String(params.quarter));
+@@ -505,4 +505,26 @@ export const api = {
+   createDisbursementNote: (payload: { companyId: string; yearId: string; quarter: number; categoryId: string; amount: number; remarks?: string }) =>
+     request<NoteEntry>("/disbursement-notes", { method: "POST", body: JSON.stringify(payload) }),
+   deleteDisbursementNote: (id: string) => request<void>(`/disbursement-notes/${id}`, { method: "DELETE" }),
++
++  revenueNotes: (params: { yearId: string; quarter?: number; businessUnitId?: string; companyId?: string }) => {
++    const qs = new URLSearchParams({ yearId: params.yearId });
++    if (params.quarter) qs.set("quarter", String(params.quarter));
++    if (params.businessUnitId) qs.set("businessUnitId", params.businessUnitId);
++    if (params.companyId) qs.set("companyId", params.companyId);
++    return request<NoteEntry[]>(`/revenue-notes?${qs.toString()}`);
++  },
++  createRevenueNote: (payload: { companyId: string; yearId: string; quarter: number; categoryId: string; amount: number; remarks?: string }) =>
++    request<NoteEntry>("/revenue-notes", { method: "POST", body: JSON.stringify(payload) }),
++  deleteRevenueNote: (id: string) => request<void>(`/revenue-notes/${id}`, { method: "DELETE" }),
++
++  collectionNotes: (params: { yearId: string; quarter?: number; businessUnitId?: string; companyId?: string }) => {
++    const qs = new URLSearchParams({ yearId: params.yearId });
++    if (params.quarter) qs.set("quarter", String(params.quarter));
++    if (params.businessUnitId) qs.set("businessUnitId", params.businessUnitId);
++    if (params.companyId) qs.set("companyId", params.companyId);
++    return request<NoteEntry[]>(`/collection-notes?${qs.toString()}`);
++  },
++  createCollectionNote: (payload: { companyId: string; yearId: string; quarter: number; categoryId: string; amount: number; remarks?: string }) =>
++    request<NoteEntry>("/collection-notes", { method: "POST", body: JSON.stringify(payload) }),
++  deleteCollectionNote: (id: string) => request<void>(`/collection-notes/${id}`, { method: "DELETE" }),
+ };
+diff --git a/client/src/api/types.ts b/client/src/api/types.ts
+index 9517241..7e117a2 100644
+--- a/client/src/api/types.ts
++++ b/client/src/api/types.ts
+@@ -479,12 +479,12 @@ export interface DisbursementActual {
+   company: { id: string; name: string; businessUnitId: string };
+ }
+ 
+-// ---------- Notable line items (Expenses/Disbursements record-keeping) ----------
++// ---------- Notable line items (Revenue/Collections/Expenses/Disbursements record-keeping) ----------
+ // A superadmin-managed catalog of selectable categories (e.g. "Interest",
+-// "Cost of Sales" for Expenses; "Advances", "Loans" for Disbursements),
+-// freely editable at Admin -> Note Categories — see
+-// server/src/routes/noteCategories.ts.
+-export type NoteCategoryType = "EXPENSE" | "DISBURSEMENT";
++// "Cost of Sales" for Expenses; "Advances", "Loans" for Disbursements; freely
++// defined for Revenue/Collections), freely editable at Admin -> Note
++// Categories — see server/src/routes/noteCategories.ts.
++export type NoteCategoryType = "EXPENSE" | "DISBURSEMENT" | "REVENUE" | "COLLECTION";
+ 
+ export interface NoteCategory {
+   id: string;
+@@ -496,9 +496,10 @@ export interface NoteCategory {
+ }
+ 
+ // A single growable, informational-only "notable item" logged against a
+-// Company/Year/Quarter — never rolled into any total/calculation. Expense
+-// and Disbursement notes share this exact shape; only the endpoint and the
+-// category's `type` differ — see server/src/routes/notes.ts.
++// Company/Year/Quarter — never rolled into any total/calculation. Revenue,
++// Collection, Expense, and Disbursement notes all share this exact shape;
++// only the endpoint and the category's `type` differ — see
++// server/src/routes/notes.ts.
+ export interface NoteEntry {
+   id: string;
+   companyId: string;
+@@ -506,12 +507,13 @@ export interface NoteEntry {
+   quarter: number;
+   categoryId: string;
+   category: { id: string; label: string; type: NoteCategoryType };
+-  // Only present on the list endpoint (GET /expense-notes, /disbursement-
+-  // notes) — omitted from the create response, since the caller there
+-  // already knows which Company it just posted for. Lets a scope spanning
+-  // multiple Companies (a whole Business Unit, or "All Business Units") say
+-  // which Company each note belongs to — see the read-only notable-items
+-  // list on the Financials Expenses/Disbursements sub-tabs.
++  // Only present on the list endpoints (GET /revenue-notes,
++  // /collection-notes, /expense-notes, /disbursement-notes) — omitted from
++  // the create response, since the caller there already knows which Company
++  // it just posted for. Lets a scope spanning multiple Companies (a whole
++  // Business Unit, or "All Business Units") say which Company each note
++  // belongs to — see the read-only notable-items list on the Financials
++  // sub-tabs.
+   company?: { id: string; name: string; businessUnitId: string };
+   amount: number;
+   remarks: string;
+diff --git a/client/src/components/DisbursementRemarksList.tsx b/client/src/components/DisbursementRemarksList.tsx
+new file mode 100644
+index 0000000..da1d5dd
+--- /dev/null
++++ b/client/src/components/DisbursementRemarksList.tsx
+@@ -0,0 +1,87 @@
++import { useEffect, useState } from "react";
++import { MessageSquare } from "lucide-react";
++import { api } from "../api/client";
++import type { DisbursementActual } from "../api/types";
++import { formatCurrency } from "../utils/format";
++
++interface Props {
++  yearId: string;
++  quarter: number;
++  businessUnitId?: string;
++  companyId?: string;
++}
++
++// Read-only listing of Disbursements' own per-Company/Quarter Remarks field
++// (DisbursementActual.remarks — entered alongside the amount itself on the
++// Data Entry page), filtered to rows that actually have one. Revenue,
++// Collections, and Expenses already surface this same kind of remarks
++// inline in OperationalGrid.tsx (expand a Business Unit row); Disbursements
++// isn't targeted so it has no Operational Grid to expand, and this field
++// was otherwise never shown anywhere on the dashboard. Separate from —
++// and simpler than — NotableItemsList.tsx's categorized "Notable
++// Disbursement Items", which is a different, growable list of ad-hoc line
++// items (DisbursementNote) rather than the one plain Remarks field on the
++// actual itself.
++export default function DisbursementRemarksList({ yearId, quarter, businessUnitId, companyId }: Props) {
++  const [rows, setRows] = useState<DisbursementActual[]>([]);
++  const [loading, setLoading] = useState(false);
++  const [error, setError] = useState("");
++
++  useEffect(() => {
++    if (!yearId) return;
++    setLoading(true);
++    setError("");
++    api
++      .disbursements({ yearId, quarter: quarter || undefined, businessUnitId: businessUnitId || undefined, companyId: companyId || undefined })
++      .then((all) => setRows(all.filter((r) => r.remarks)))
++      .catch((err) => setError(err.message || "Failed to load disbursement remarks"))
++      .finally(() => setLoading(false));
++  }, [yearId, quarter, businessUnitId, companyId]);
++
++  // quarter === 0 means "All Quarters" (full year) — show a Quarter column
++  // in that case, since rows can then span more than one.
++  const isAllQuarters = quarter === 0;
++
++  return (
++    <div className="rounded-lg border border-slate-200 dark:border-slate-700 bg-white dark:bg-slate-900 p-3 shadow-sm sm:p-4">
++      <div className="mb-1 flex items-center gap-2 text-sm font-semibold text-slate-700 dark:text-slate-200">
++        <MessageSquare className="h-4 w-4" /> Disbursement Remarks
++      </div>
++      <p className="mb-4 text-xs text-slate-500 dark:text-slate-400">
++        Remarks entered alongside each Company's Disbursements amount on the Data Entry page. Only shown here when
++        there's something entered.
++      </p>
++
++      {error && <div className="mb-3 rounded-md bg-red-50 dark:bg-red-950/40 px-3 py-2 text-xs text-red-600 dark:text-red-400">{error}</div>}
++
++      {loading ? (
++        <div className="py-6 text-center text-sm text-slate-500 dark:text-slate-400">Loading...</div>
++      ) : rows.length === 0 ? (
++        <div className="py-6 text-center text-sm text-slate-500 dark:text-slate-400">No disbursement remarks for this scope.</div>
++      ) : (
++        <div className="overflow-x-auto">
++          <table className="w-full min-w-[560px] text-sm">
++            <thead>
++              <tr className="border-b border-slate-200 dark:border-slate-700 text-left text-xs font-medium uppercase text-slate-500 dark:text-slate-400">
++                <th className="py-2 pr-3">Company</th>
++                {isAllQuarters && <th className="py-2 pr-3">Quarter</th>}
++                <th className="py-2 pr-3 text-right">Amount</th>
++                <th className="py-2 pr-3">Remarks</th>
++              </tr>
++            </thead>
++            <tbody className="divide-y divide-slate-100 dark:divide-slate-800">
++              {rows.map((r) => (
++                <tr key={r.id}>
++                  <td className="py-2 pr-3 font-medium text-slate-700 dark:text-slate-200">{r.company?.name ?? "—"}</td>
++                  {isAllQuarters && <td className="py-2 pr-3 text-slate-600 dark:text-slate-300">Q{r.quarter}</td>}
++                  <td className="py-2 pr-3 text-right text-slate-700 dark:text-slate-200">{formatCurrency(r.amount)}</td>
++                  <td className="py-2 pr-3 text-slate-500 dark:text-slate-400">{r.remarks}</td>
++                </tr>
++              ))}
++            </tbody>
++          </table>
++        </div>
++      )}
++    </div>
++  );
++}
+diff --git a/client/src/components/NotableItemsList.tsx b/client/src/components/NotableItemsList.tsx
+index 5dabdf1..bc30893 100644
+--- a/client/src/components/NotableItemsList.tsx
++++ b/client/src/components/NotableItemsList.tsx
+@@ -13,14 +13,21 @@ interface Props {
+   companyId?: string;
+ }
+ 
+-// Read-only listing of every notable Expense/Disbursement line item logged
+-// for the current Financials scope — the growable, informational-only
+-// record-keeping facility entered on the Data Entry page (see
+-// IntegratorPortal.tsx's NotableItemsCard). Purely a lookup: nothing here
+-// feeds any KPI/attainment/AI Analysis figure, and there's no add/edit/
+-// delete UI here — that only happens on Data Entry. Shared between
+-// ExpensesTab.tsx and DisbursementsTab.tsx, which just pick a different
+-// `type` and title.
++// Read-only listing of every notable Revenue/Collections/Expense/
++// Disbursement line item logged for the current Financials scope — the
++// growable, informational-only record-keeping facility entered on the Data
++// Entry page (see IntegratorPortal.tsx's NotableItemsCard). Purely a
++// lookup: nothing here feeds any KPI/attainment/AI Analysis figure, and
++// there's no add/edit/delete UI here — that only happens on Data Entry.
++// Shared between RevenueTab.tsx, CollectionsTab.tsx, ExpensesTab.tsx, and
++// DisbursementsTab.tsx, which just pick a different `type` and title.
++const NOTES_FETCHER: Record<NoteCategoryType, typeof api.expenseNotes> = {
++  REVENUE: api.revenueNotes,
++  COLLECTION: api.collectionNotes,
++  EXPENSE: api.expenseNotes,
++  DISBURSEMENT: api.disbursementNotes,
++};
++
+ export default function NotableItemsList({ title, type, yearId, quarter, businessUnitId, companyId }: Props) {
+   const [notes, setNotes] = useState<NoteEntry[]>([]);
+   const [loading, setLoading] = useState(false);
+@@ -30,8 +37,7 @@ export default function NotableItemsList({ title, type, yearId, quarter, busines
+     if (!yearId) return;
+     setLoading(true);
+     setError("");
+-    const fetcher = type === "EXPENSE" ? api.expenseNotes : api.disbursementNotes;
+-    fetcher({ yearId, quarter: quarter || undefined, businessUnitId: businessUnitId || undefined, companyId: companyId || undefined })
++    NOTES_FETCHER[type]({ yearId, quarter: quarter || undefined, businessUnitId: businessUnitId || undefined, companyId: companyId || undefined })
+       .then(setNotes)
+       .catch((err) => setError(err.message || "Failed to load notable items"))
+       .finally(() => setLoading(false));
+diff --git a/client/src/pages/IntegratorPortal.tsx b/client/src/pages/IntegratorPortal.tsx
+index 948cf9a..f2c4efd 100644
+--- a/client/src/pages/IntegratorPortal.tsx
++++ b/client/src/pages/IntegratorPortal.tsx
+@@ -340,14 +340,23 @@ export default function IntegratorPortal() {
+   const [reloadKey, setReloadKey] = useState(0);
+ 
+   // Notable line items — the growable, informational-only record-keeping
+-  // facility for Expenses and Disbursements (see NotableItemsCard above).
++  // facility for Revenue, Collections, Expenses, and Disbursements (see
++  // NotableItemsCard above).
++  const [revenueCategories, setRevenueCategories] = useState<NoteCategory[]>([]);
++  const [collectionCategories, setCollectionCategories] = useState<NoteCategory[]>([]);
+   const [expenseCategories, setExpenseCategories] = useState<NoteCategory[]>([]);
+   const [disbursementCategories, setDisbursementCategories] = useState<NoteCategory[]>([]);
++  const [revenueNotes, setRevenueNotes] = useState<NoteEntry[]>([]);
++  const [collectionNotes, setCollectionNotes] = useState<NoteEntry[]>([]);
+   const [expenseNotes, setExpenseNotes] = useState<NoteEntry[]>([]);
+   const [disbursementNotes, setDisbursementNotes] = useState<NoteEntry[]>([]);
+   const [notesLoading, setNotesLoading] = useState(false);
++  const [addingRevenueNote, setAddingRevenueNote] = useState(false);
++  const [addingCollectionNote, setAddingCollectionNote] = useState(false);
+   const [addingExpenseNote, setAddingExpenseNote] = useState(false);
+   const [addingDisbursementNote, setAddingDisbursementNote] = useState(false);
++  const [deletingRevenueNoteId, setDeletingRevenueNoteId] = useState<string | null>(null);
++  const [deletingCollectionNoteId, setDeletingCollectionNoteId] = useState<string | null>(null);
+   const [deletingExpenseNoteId, setDeletingExpenseNoteId] = useState<string | null>(null);
+   const [deletingDisbursementNoteId, setDeletingDisbursementNoteId] = useState<string | null>(null);
+ 
+@@ -372,6 +381,8 @@ export default function IntegratorPortal() {
+     });
+     // The Note Category catalogs rarely change — loaded once, not
+     // re-fetched every time the scope changes.
++    api.noteCategories("REVENUE").then(setRevenueCategories).catch(() => setRevenueCategories([]));
++    api.noteCategories("COLLECTION").then(setCollectionCategories).catch(() => setCollectionCategories([]));
+     api.noteCategories("EXPENSE").then(setExpenseCategories).catch(() => setExpenseCategories([]));
+     api.noteCategories("DISBURSEMENT").then(setDisbursementCategories).catch(() => setDisbursementCategories([]));
+   }, []);
+@@ -394,9 +405,11 @@ export default function IntegratorPortal() {
+     Promise.all([
+       api.actuals({ yearId, quarter, companyId }).catch(() => []),
+       api.disbursements({ yearId, quarter, companyId }).catch(() => []),
++      api.revenueNotes({ yearId, quarter, companyId }).catch(() => []),
++      api.collectionNotes({ yearId, quarter, companyId }).catch(() => []),
+       api.expenseNotes({ yearId, quarter, companyId }).catch(() => []),
+       api.disbursementNotes({ yearId, quarter, companyId }).catch(() => []),
+-    ]).then(([actualRows, disbRows, expNotes, disbNotes]) => {
++    ]).then(([actualRows, disbRows, revNotes, collNotes, expNotes, disbNotes]) => {
+       const existing = actualRows[0] || null;
+       if (existing) {
+         setForm({
+@@ -432,12 +445,50 @@ export default function IntegratorPortal() {
+           : emptyDisbForm
+       );
+ 
++      setRevenueNotes(revNotes);
++      setCollectionNotes(collNotes);
+       setExpenseNotes(expNotes);
+       setDisbursementNotes(disbNotes);
+       setNotesLoading(false);
+     });
+   }, [yearId, quarter, companyId, businessUnitId, reloadKey]);
+ 
++  async function handleAddRevenueNote(categoryId: string, amount: number, remarksText: string) {
++    setAddingRevenueNote(true);
++    try {
++      const row = await api.createRevenueNote({ companyId, yearId, quarter, categoryId, amount, remarks: remarksText });
++      setRevenueNotes((prev) => [...prev, row]);
++    } finally {
++      setAddingRevenueNote(false);
++    }
++  }
++  async function handleDeleteRevenueNote(id: string) {
++    setDeletingRevenueNoteId(id);
++    try {
++      await api.deleteRevenueNote(id);
++      setRevenueNotes((prev) => prev.filter((n) => n.id !== id));
++    } finally {
++      setDeletingRevenueNoteId(null);
++    }
++  }
++  async function handleAddCollectionNote(categoryId: string, amount: number, remarksText: string) {
++    setAddingCollectionNote(true);
++    try {
++      const row = await api.createCollectionNote({ companyId, yearId, quarter, categoryId, amount, remarks: remarksText });
++      setCollectionNotes((prev) => [...prev, row]);
++    } finally {
++      setAddingCollectionNote(false);
++    }
++  }
++  async function handleDeleteCollectionNote(id: string) {
++    setDeletingCollectionNoteId(id);
++    try {
++      await api.deleteCollectionNote(id);
++      setCollectionNotes((prev) => prev.filter((n) => n.id !== id));
++    } finally {
++      setDeletingCollectionNoteId(null);
++    }
++  }
+   async function handleAddExpenseNote(categoryId: string, amount: number, remarksText: string) {
+     setAddingExpenseNote(true);
+     try {
+@@ -647,6 +698,16 @@ export default function IntegratorPortal() {
+               />
+             </div>
+           </div>
++          <NotableItemsCard
++            title="Notable Revenue Items"
++            categories={revenueCategories}
++            notes={revenueNotes}
++            loading={notesLoading}
++            onAdd={handleAddRevenueNote}
++            onDelete={handleDeleteRevenueNote}
++            adding={addingRevenueNote}
++            deletingId={deletingRevenueNoteId}
++          />
+         </div>
+ 
+         {/* ---------- Collections ---------- */}
+@@ -669,6 +730,16 @@ export default function IntegratorPortal() {
+               </div>
+             </div>
+           ))}
++          <NotableItemsCard
++            title="Notable Collections Items"
++            categories={collectionCategories}
++            notes={collectionNotes}
++            loading={notesLoading}
++            onAdd={handleAddCollectionNote}
++            onDelete={handleDeleteCollectionNote}
++            adding={addingCollectionNote}
++            deletingId={deletingCollectionNoteId}
++          />
+         </div>
+ 
+         {/* ---------- Expenses ---------- */}
+diff --git a/client/src/pages/admin/AdminNoteCategories.tsx b/client/src/pages/admin/AdminNoteCategories.tsx
+index 89e43c6..d5d15a4 100644
+--- a/client/src/pages/admin/AdminNoteCategories.tsx
++++ b/client/src/pages/admin/AdminNoteCategories.tsx
+@@ -3,15 +3,16 @@ import { Check, Pencil, Plus, Trash2, X } from "lucide-react";
+ import { api } from "../../api/client";
+ import type { NoteCategory, NoteCategoryType } from "../../api/types";
+ 
+-// The master catalog behind the Expenses/Disbursements "notable line items"
+-// facility on the Data Entry page (see IntegratorPortal.tsx's
+-// NotableItemsCard) — purely a selectable dropdown of categories, never
+-// rolled into any total. Two independent catalogs (EXPENSE/DISBURSEMENT),
+-// shown as two sections on this one page. Deactivating (rather than
+-// deleting) a category in active use keeps its already-logged notes
+-// readable; deleting one that's still referenced by a note is rejected by
+-// the backend (see server/src/routes/noteCategories.ts) — the caller is
+-// asked to deactivate instead.
++// The master catalog behind the Revenue/Collections/Expenses/Disbursements
++// "notable line items" facility on the Data Entry page (see
++// IntegratorPortal.tsx's NotableItemsCard) — purely a selectable dropdown of
++// categories, never rolled into any total. Four independent catalogs
++// (REVENUE/COLLECTION/EXPENSE/DISBURSEMENT), shown as four sections on this
++// one page. Deactivating (rather than deleting) a category in active use
++// keeps its already-logged notes readable; deleting one that's still
++// referenced by a note is rejected by the backend (see
++// server/src/routes/noteCategories.ts) — the caller is asked to deactivate
++// instead.
+ function CategorySection({ type, title }: { type: NoteCategoryType; title: string }) {
+   const [categories, setCategories] = useState<NoteCategory[]>([]);
+   const [newLabel, setNewLabel] = useState("");
+@@ -179,11 +180,13 @@ export default function AdminNoteCategories() {
+       <div>
+         <h3 className="mb-1 text-base font-semibold text-slate-800 dark:text-slate-100">Note Categories</h3>
+         <p className="text-sm text-slate-500 dark:text-slate-400">
+-          The dropdown options Business Units pick from when logging notable Expense/Disbursement line items (e.g.
+-          Interest, Depreciation, Cost of Sales) for record-keeping on the Data Entry page. Purely informational —
+-          nothing here feeds into any total or attainment calculation.
++          The dropdown options Business Units pick from when logging notable Revenue/Collections/Expense/Disbursement
++          line items (e.g. Interest, Depreciation, Cost of Sales) for record-keeping on the Data Entry page. Purely
++          informational — nothing here feeds into any total or attainment calculation.
+         </p>
+       </div>
++      <CategorySection type="REVENUE" title="Revenue Categories" />
++      <CategorySection type="COLLECTION" title="Collection Categories" />
+       <CategorySection type="EXPENSE" title="Expense Categories" />
+       <CategorySection type="DISBURSEMENT" title="Disbursement Categories" />
+     </div>
+diff --git a/client/src/pages/financials/CollectionsTab.tsx b/client/src/pages/financials/CollectionsTab.tsx
+index 60bfda6..dc0e5e2 100644
+--- a/client/src/pages/financials/CollectionsTab.tsx
++++ b/client/src/pages/financials/CollectionsTab.tsx
+@@ -2,6 +2,7 @@ import { useOutletContext } from "react-router-dom";
+ import KpiCards from "../../components/KpiCards";
+ import TargetMatrix from "../../components/TargetMatrix";
+ import OperationalGrid from "../../components/OperationalGrid";
++import NotableItemsList from "../../components/NotableItemsList";
+ import type { FinancialsOutletContext } from "./FinancialsLayout";
+ 
+ // Collections-only sub-tab (/revenue/collections). No ProgressChart here —
+@@ -15,6 +16,14 @@ export default function CollectionsTab() {
+       <KpiCards kpis={data.kpis} quarter={filters.quarter} category="COLLECTIONS" />
+       <TargetMatrix rows={data.targetMatrix} category="collections" />
+       <OperationalGrid rows={data.operationalGrid} yearId={filters.yearId} quarter={filters.quarter} onRemarksSaved={reload} category="COLLECTIONS" />
++      <NotableItemsList
++        title="Notable Collections Items"
++        type="COLLECTION"
++        yearId={filters.yearId}
++        quarter={filters.quarter}
++        businessUnitId={filters.businessUnitId}
++        companyId={filters.companyId}
++      />
+     </div>
+   );
+ }
+diff --git a/client/src/pages/financials/DisbursementsTab.tsx b/client/src/pages/financials/DisbursementsTab.tsx
+index 5826313..c28755f 100644
+--- a/client/src/pages/financials/DisbursementsTab.tsx
++++ b/client/src/pages/financials/DisbursementsTab.tsx
+@@ -1,19 +1,28 @@
+ import { useOutletContext } from "react-router-dom";
+ import DisbursementCards from "../../components/DisbursementCards";
++import DisbursementRemarksList from "../../components/DisbursementRemarksList";
+ import NotableItemsList from "../../components/NotableItemsList";
+ import type { FinancialsOutletContext } from "./FinancialsLayout";
+ 
+ // Disbursements sub-tab (/revenue/disbursements). Disbursements are
+ // recorded, not targeted, so there's no BU-level Target/Actual breakdown
+ // table for them (unlike Revenue/Collections/Expenses) — just the existing
+-// DisbursementCards summary, reused as-is, plus the read-only notable
+-// items list below it.
++// DisbursementCards summary, reused as-is, plus the per-entry Remarks list
++// (DisbursementRemarksList — the one place Disbursements' own Remarks field
++// is shown, since there's no Operational Grid row to expand here) and the
++// separate categorized notable items list below it.
+ export default function DisbursementsTab() {
+   const { data, filters } = useOutletContext<FinancialsOutletContext>();
+   if (!data) return null;
+   return (
+     <div className="flex flex-col gap-6">
+       <DisbursementCards kpis={data.kpis} quarter={filters.quarter} />
++      <DisbursementRemarksList
++        yearId={filters.yearId}
++        quarter={filters.quarter}
++        businessUnitId={filters.businessUnitId}
++        companyId={filters.companyId}
++      />
+       <NotableItemsList
+         title="Notable Disbursement Items"
+         type="DISBURSEMENT"
+diff --git a/client/src/pages/financials/RevenueTab.tsx b/client/src/pages/financials/RevenueTab.tsx
+index 419f070..f5b69d9 100644
+--- a/client/src/pages/financials/RevenueTab.tsx
++++ b/client/src/pages/financials/RevenueTab.tsx
+@@ -3,6 +3,7 @@ import KpiCards from "../../components/KpiCards";
+ import ProgressChart from "../../components/ProgressChart";
+ import TargetMatrix from "../../components/TargetMatrix";
+ import OperationalGrid from "../../components/OperationalGrid";
++import NotableItemsList from "../../components/NotableItemsList";
+ import type { FinancialsOutletContext } from "./FinancialsLayout";
+ 
+ // Index route of the Financials section (/revenue) — the Revenue-only slice
+@@ -18,6 +19,14 @@ export default function RevenueTab() {
+       <ProgressChart chart={data.chart} />
+       <TargetMatrix rows={data.targetMatrix} category="revenue" />
+       <OperationalGrid rows={data.operationalGrid} yearId={filters.yearId} quarter={filters.quarter} onRemarksSaved={reload} category="REVENUE" />
++      <NotableItemsList
++        title="Notable Revenue Items"
++        type="REVENUE"
++        yearId={filters.yearId}
++        quarter={filters.quarter}
++        businessUnitId={filters.businessUnitId}
++        companyId={filters.companyId}
++      />
+     </div>
+   );
+ }
+diff --git a/server/prisma/migrations/20260921020000_add_revenue_collection_notes/migration.sql b/server/prisma/migrations/20260921020000_add_revenue_collection_notes/migration.sql
+new file mode 100644
+index 0000000..1b5c929
+--- /dev/null
++++ b/server/prisma/migrations/20260921020000_add_revenue_collection_notes/migration.sql
+@@ -0,0 +1,51 @@
++-- Adds REVENUE and COLLECTION to NoteCategoryType, and the RevenueNote /
++-- CollectionNote tables — the same "notable line items" record-keeping
++-- facility ExpenseNote/DisbursementNote already provide, now available for
++-- all four Financials categories. No seeded default categories for these
++-- two (unlike Expense/Disbursement's original migration) — a Superadmin
++-- adds whatever categories fit under Admin -> Note Categories.
++
++ALTER TYPE "NoteCategoryType" ADD VALUE 'REVENUE';
++ALTER TYPE "NoteCategoryType" ADD VALUE 'COLLECTION';
++
++CREATE TABLE "RevenueNote" (
++    "id" TEXT NOT NULL,
++    "companyId" TEXT NOT NULL,
++    "yearId" TEXT NOT NULL,
++    "quarter" INTEGER NOT NULL,
++    "categoryId" TEXT NOT NULL,
++    "amount" DECIMAL(14,2) NOT NULL DEFAULT 0,
++    "remarks" TEXT NOT NULL DEFAULT '',
++    "createdAt" TIMESTAMP(3) NOT NULL DEFAULT CURRENT_TIMESTAMP,
++    "updatedAt" TIMESTAMP(3) NOT NULL,
++
++    CONSTRAINT "RevenueNote_pkey" PRIMARY KEY ("id")
++);
++
++CREATE INDEX "RevenueNote_companyId_yearId_quarter_idx" ON "RevenueNote"("companyId", "yearId", "quarter");
++CREATE INDEX "RevenueNote_categoryId_idx" ON "RevenueNote"("categoryId");
++
++ALTER TABLE "RevenueNote" ADD CONSTRAINT "RevenueNote_companyId_fkey" FOREIGN KEY ("companyId") REFERENCES "Company"("id") ON DELETE CASCADE ON UPDATE CASCADE;
++ALTER TABLE "RevenueNote" ADD CONSTRAINT "RevenueNote_yearId_fkey" FOREIGN KEY ("yearId") REFERENCES "Year"("id") ON DELETE CASCADE ON UPDATE CASCADE;
++ALTER TABLE "RevenueNote" ADD CONSTRAINT "RevenueNote_categoryId_fkey" FOREIGN KEY ("categoryId") REFERENCES "NoteCategory"("id") ON DELETE RESTRICT ON UPDATE CASCADE;
++
++CREATE TABLE "CollectionNote" (
++    "id" TEXT NOT NULL,
++    "companyId" TEXT NOT NULL,
++    "yearId" TEXT NOT NULL,
++    "quarter" INTEGER NOT NULL,
++    "categoryId" TEXT NOT NULL,
++    "amount" DECIMAL(14,2) NOT NULL DEFAULT 0,
++    "remarks" TEXT NOT NULL DEFAULT '',
++    "createdAt" TIMESTAMP(3) NOT NULL DEFAULT CURRENT_TIMESTAMP,
++    "updatedAt" TIMESTAMP(3) NOT NULL,
++
++    CONSTRAINT "CollectionNote_pkey" PRIMARY KEY ("id")
++);
++
++CREATE INDEX "CollectionNote_companyId_yearId_quarter_idx" ON "CollectionNote"("companyId", "yearId", "quarter");
++CREATE INDEX "CollectionNote_categoryId_idx" ON "CollectionNote"("categoryId");
++
++ALTER TABLE "CollectionNote" ADD CONSTRAINT "CollectionNote_companyId_fkey" FOREIGN KEY ("companyId") REFERENCES "Company"("id") ON DELETE CASCADE ON UPDATE CASCADE;
++ALTER TABLE "CollectionNote" ADD CONSTRAINT "CollectionNote_yearId_fkey" FOREIGN KEY ("yearId") REFERENCES "Year"("id") ON DELETE CASCADE ON UPDATE CASCADE;
++ALTER TABLE "CollectionNote" ADD CONSTRAINT "CollectionNote_categoryId_fkey" FOREIGN KEY ("categoryId") REFERENCES "NoteCategory"("id") ON DELETE RESTRICT ON UPDATE CASCADE;
+diff --git a/server/prisma/schema.prisma b/server/prisma/schema.prisma
+index 1a60faa..45141f0 100644
+--- a/server/prisma/schema.prisma
++++ b/server/prisma/schema.prisma
+@@ -256,6 +256,8 @@ model Company {
+   disbursementActuals DisbursementActual[]
+   expenseNotes        ExpenseNote[]
+   disbursementNotes   DisbursementNote[]
++  revenueNotes        RevenueNote[]
++  collectionNotes     CollectionNote[]
+   rocks               Rock[]
+   rolePermissions     RolePermission[]
+ 
+@@ -290,6 +292,8 @@ model Year {
+   disbursementActuals DisbursementActual[]
+   expenseNotes        ExpenseNote[]
+   disbursementNotes   DisbursementNote[]
++  revenueNotes        RevenueNote[]
++  collectionNotes     CollectionNote[]
+   rocks               Rock[]
+   targetLocks         TargetLock[]
+ }
+@@ -449,18 +453,22 @@ model DisbursementActual {
+ enum NoteCategoryType {
+   EXPENSE
+   DISBURSEMENT
++  REVENUE
++  COLLECTION
+ }
+ 
+ // Superadmin-managed catalog of selectable categories for the "notable line
+-// items" record-keeping facility on Expenses and Disbursements (see
+-// ExpenseNote/DisbursementNote below) — e.g. "Interest", "Depreciation",
+-// "Other Non-Cash", "Cost of Sales", "OPEX" for Expenses; "Advances",
+-// "Loans", "Interest" for Disbursements, seeded as defaults by migration but
+-// freely editable afterward at Admin -> Note Categories. Purely a label
+-// picklist with no bearing on any total/calculation. `active` lets a
+-// category be retired without breaking historical notes that still
+-// reference it (existing notes keep their categoryId; the picker in
+-// new-entry UI just hides inactive ones going forward).
++// items" record-keeping facility on Revenue, Collections, Expenses, and
++// Disbursements (see RevenueNote/CollectionNote/ExpenseNote/
++// DisbursementNote below) — e.g. "Interest", "Depreciation", "Other
++// Non-Cash", "Cost of Sales", "OPEX" for Expenses; "Advances", "Loans",
++// "Interest" for Disbursements, seeded as defaults by migration but freely
++// editable afterward at Admin -> Note Categories. Revenue and Collections
++// start with no seeded defaults — a Superadmin adds whatever categories fit
++// there. Purely a label picklist with no bearing on any total/calculation.
++// `active` lets a category be retired without breaking historical notes
++// that still reference it (existing notes keep their categoryId; the
++// picker in new-entry UI just hides inactive ones going forward).
+ model NoteCategory {
+   id        String           @id @default(uuid())
+   type      NoteCategoryType
+@@ -471,6 +479,8 @@ model NoteCategory {
+ 
+   expenseNotes      ExpenseNote[]
+   disbursementNotes DisbursementNote[]
++  revenueNotes      RevenueNote[]
++  collectionNotes   CollectionNote[]
+ 
+   @@unique([type, label])
+   @@index([type])
+@@ -525,6 +535,51 @@ model DisbursementNote {
+   @@index([categoryId])
+ }
+ 
++// Same idea as ExpenseNote, for Revenue — gated by the REVENUE Custom Role
++// resource instead. Added alongside CollectionNote below so all four
++// Financials categories (Revenue, Collections, Expenses, Disbursements)
++// have the same notable-line-items facility; Expenses/Disbursements had it
++// first.
++model RevenueNote {
++  id         String   @id @default(uuid())
++  companyId  String
++  yearId     String
++  quarter    Int // 1-4
++  categoryId String
++  amount     Decimal  @default(0) @db.Decimal(14, 2)
++  remarks    String   @default("")
++  createdAt  DateTime @default(now())
++  updatedAt  DateTime @updatedAt
++
++  company  Company      @relation(fields: [companyId], references: [id], onDelete: Cascade)
++  year     Year         @relation(fields: [yearId], references: [id], onDelete: Cascade)
++  category NoteCategory @relation(fields: [categoryId], references: [id], onDelete: Restrict)
++
++  @@index([companyId, yearId, quarter])
++  @@index([categoryId])
++}
++
++// Same idea as ExpenseNote, for Collections — gated by the COLLECTIONS
++// Custom Role resource instead.
++model CollectionNote {
++  id         String   @id @default(uuid())
++  companyId  String
++  yearId     String
++  quarter    Int // 1-4
++  categoryId String
++  amount     Decimal  @default(0) @db.Decimal(14, 2)
++  remarks    String   @default("")
++  createdAt  DateTime @default(now())
++  updatedAt  DateTime @updatedAt
++
++  company  Company      @relation(fields: [companyId], references: [id], onDelete: Cascade)
++  year     Year         @relation(fields: [yearId], references: [id], onDelete: Cascade)
++  category NoteCategory @relation(fields: [categoryId], references: [id], onDelete: Restrict)
++
++  @@index([companyId, yearId, quarter])
++  @@index([categoryId])
++}
++
+ enum RockStatus {
+   PENDING
+   ON_TRACK
+diff --git a/server/src/index.ts b/server/src/index.ts
+index b901349..e97d829 100644
+--- a/server/src/index.ts
++++ b/server/src/index.ts
+@@ -27,7 +27,7 @@ import disbursementsRoutes from "./routes/disbursements";
+ import comparisonRoutes from "./routes/comparison";
+ import aiAnalysisRoutes from "./routes/aiAnalysis";
+ import noteCategoriesRoutes from "./routes/noteCategories";
+-import { expenseNotesRouter, disbursementNotesRouter } from "./routes/notes";
++import { expenseNotesRouter, disbursementNotesRouter, revenueNotesRouter, collectionNotesRouter } from "./routes/notes";
+ import bulkDataEntryRoutes from "./routes/bulkDataEntry";
+ 
+ const app = express();
+@@ -55,6 +55,8 @@ app.use("/api/ai-analysis", aiAnalysisRoutes);
+ app.use("/api/note-categories", noteCategoriesRoutes);
+ app.use("/api/expense-notes", expenseNotesRouter);
+ app.use("/api/disbursement-notes", disbursementNotesRouter);
++app.use("/api/revenue-notes", revenueNotesRouter);
++app.use("/api/collection-notes", collectionNotesRouter);
+ app.use("/api/bulk-data-entry", bulkDataEntryRoutes);
+ 
+ // Generic error handler as a safety net for anything thrown above.
+diff --git a/server/src/routes/noteCategories.ts b/server/src/routes/noteCategories.ts
+index 4f336f0..969c4b6 100644
+--- a/server/src/routes/noteCategories.ts
++++ b/server/src/routes/noteCategories.ts
+@@ -5,8 +5,8 @@ import { blockPendingPasswordChange, requireAuth, requireRole } from "../middlew
+ import { logAudit } from "../utils/auditLog";
+ 
+ // Superadmin-only CRUD over the NoteCategory catalog — the master list of
+-// selectable categories for the Expenses/Disbursements "notable line items"
+-// facility (see routes/notes.ts). Not gated by a Custom Role/
++// selectable categories for the Revenue/Collections/Expenses/Disbursements
++// "notable line items" facility (see routes/notes.ts). Not gated by a Custom Role/
+ // PermissionResource, same as SMTP/AI Settings: this is app configuration,
+ // not per-Business-Unit data.
+ const router = Router();
+@@ -20,7 +20,7 @@ router.get("/", async (_req, res) => {
+ });
+ 
+ const createSchema = z.object({
+-  type: z.enum(["EXPENSE", "DISBURSEMENT"]),
++  type: z.enum(["EXPENSE", "DISBURSEMENT", "REVENUE", "COLLECTION"]),
+   label: z.string().trim().min(1).max(100),
+   sortOrder: z.number().int().default(0),
+ });
+diff --git a/server/src/routes/notes.ts b/server/src/routes/notes.ts
+index 60999b9..8919061 100644
+--- a/server/src/routes/notes.ts
++++ b/server/src/routes/notes.ts
+@@ -13,18 +13,20 @@ import { can, narrowingApplies, PermissionError, Resource } from "../utils/permi
+ import { logAudit } from "../utils/auditLog";
+ 
+ // Shared implementation for the "notable line items" record-keeping facility
+-// attached to Expenses and Disbursements (see schema.prisma's ExpenseNote/
+-// DisbursementNote comment) — a growable list of Company/Year/Quarter-scoped
+-// entries (category + amount + remarks) that is purely informational: it is
+-// never read by aggregate.ts/computeScorecard, so nothing here ever feeds a
+-// KPI, attainment %, or AI Analysis figure. Both models are structurally
+-// identical and gated by their parent category's existing Custom Role
+-// resource (EXPENSES/DISBURSEMENTS) rather than a resource of their own, so
+-// this file builds one router per model from a shared factory instead of
+-// duplicating the CRUD logic twice.
++// attached to all four Financials categories — Revenue, Collections,
++// Expenses, and Disbursements (see schema.prisma's RevenueNote/
++// CollectionNote/ExpenseNote/DisbursementNote comments) — a growable list of
++// Company/Year/Quarter-scoped entries (category + amount + remarks) that is
++// purely informational: it is never read by aggregate.ts/computeScorecard,
++// so nothing here ever feeds a KPI, attainment %, or AI Analysis figure. All
++// four models are structurally identical and gated by their parent
++// category's existing Custom Role resource (REVENUE/COLLECTIONS/EXPENSES/
++// DISBURSEMENTS) rather than a resource of their own, so this file builds
++// one router per model from a shared factory instead of duplicating the CRUD
++// logic four times.
+ function buildNotesRouter(opts: {
+-  model: "expenseNote" | "disbursementNote";
+-  categoryType: "EXPENSE" | "DISBURSEMENT";
++  model: "revenueNote" | "collectionNote" | "expenseNote" | "disbursementNote";
++  categoryType: "REVENUE" | "COLLECTION" | "EXPENSE" | "DISBURSEMENT";
+   resource: Resource;
+   entityType: string;
+ }) {
+@@ -183,3 +185,17 @@ export const disbursementNotesRouter = buildNotesRouter({
+   resource: "DISBURSEMENTS",
+   entityType: "DisbursementNote",
+ });
++
++export const revenueNotesRouter = buildNotesRouter({
++  model: "revenueNote",
++  categoryType: "REVENUE",
++  resource: "REVENUE",
++  entityType: "RevenueNote",
++});
++
++export const collectionNotesRouter = buildNotesRouter({
++  model: "collectionNote",
++  categoryType: "COLLECTION",
++  resource: "COLLECTIONS",
++  entityType: "CollectionNote",
++});

@@ -27,7 +27,7 @@ import disbursementsRoutes from "./routes/disbursements";
 import comparisonRoutes from "./routes/comparison";
 import aiAnalysisRoutes from "./routes/aiAnalysis";
 import noteCategoriesRoutes from "./routes/noteCategories";
-import { expenseNotesRouter, disbursementNotesRouter } from "./routes/notes";
+import { expenseNotesRouter, disbursementNotesRouter, revenueNotesRouter, collectionNotesRouter } from "./routes/notes";
 import bulkDataEntryRoutes from "./routes/bulkDataEntry";
 
 const app = express();
@@ -55,6 +55,8 @@ app.use("/api/ai-analysis", aiAnalysisRoutes);
 app.use("/api/note-categories", noteCategoriesRoutes);
 app.use("/api/expense-notes", expenseNotesRouter);
 app.use("/api/disbursement-notes", disbursementNotesRouter);
+app.use("/api/revenue-notes", revenueNotesRouter);
+app.use("/api/collection-notes", collectionNotesRouter);
 app.use("/api/bulk-data-entry", bulkDataEntryRoutes);
 
 // Generic error handler as a safety net for anything thrown above.

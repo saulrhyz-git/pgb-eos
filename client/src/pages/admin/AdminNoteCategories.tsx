@@ -3,15 +3,16 @@ import { Check, Pencil, Plus, Trash2, X } from "lucide-react";
 import { api } from "../../api/client";
 import type { NoteCategory, NoteCategoryType } from "../../api/types";
 
-// The master catalog behind the Expenses/Disbursements "notable line items"
-// facility on the Data Entry page (see IntegratorPortal.tsx's
-// NotableItemsCard) — purely a selectable dropdown of categories, never
-// rolled into any total. Two independent catalogs (EXPENSE/DISBURSEMENT),
-// shown as two sections on this one page. Deactivating (rather than
-// deleting) a category in active use keeps its already-logged notes
-// readable; deleting one that's still referenced by a note is rejected by
-// the backend (see server/src/routes/noteCategories.ts) — the caller is
-// asked to deactivate instead.
+// The master catalog behind the Revenue/Collections/Expenses/Disbursements
+// "notable line items" facility on the Data Entry page (see
+// IntegratorPortal.tsx's NotableItemsCard) — purely a selectable dropdown of
+// categories, never rolled into any total. Four independent catalogs
+// (REVENUE/COLLECTION/EXPENSE/DISBURSEMENT), shown as four sections on this
+// one page. Deactivating (rather than deleting) a category in active use
+// keeps its already-logged notes readable; deleting one that's still
+// referenced by a note is rejected by the backend (see
+// server/src/routes/noteCategories.ts) — the caller is asked to deactivate
+// instead.
 function CategorySection({ type, title }: { type: NoteCategoryType; title: string }) {
   const [categories, setCategories] = useState<NoteCategory[]>([]);
   const [newLabel, setNewLabel] = useState("");
@@ -179,11 +180,13 @@ export default function AdminNoteCategories() {
       <div>
         <h3 className="mb-1 text-base font-semibold text-slate-800 dark:text-slate-100">Note Categories</h3>
         <p className="text-sm text-slate-500 dark:text-slate-400">
-          The dropdown options Business Units pick from when logging notable Expense/Disbursement line items (e.g.
-          Interest, Depreciation, Cost of Sales) for record-keeping on the Data Entry page. Purely informational —
-          nothing here feeds into any total or attainment calculation.
+          The dropdown options Business Units pick from when logging notable Revenue/Collections/Expense/Disbursement
+          line items (e.g. Interest, Depreciation, Cost of Sales) for record-keeping on the Data Entry page. Purely
+          informational — nothing here feeds into any total or attainment calculation.
         </p>
       </div>
+      <CategorySection type="REVENUE" title="Revenue Categories" />
+      <CategorySection type="COLLECTION" title="Collection Categories" />
       <CategorySection type="EXPENSE" title="Expense Categories" />
       <CategorySection type="DISBURSEMENT" title="Disbursement Categories" />
     </div>

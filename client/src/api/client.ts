@@ -479,11 +479,11 @@ export const api = {
     request<NoteCategory>(`/note-categories/${id}`, { method: "PUT", body: JSON.stringify(payload) }),
   deleteNoteCategory: (id: string) => request<void>(`/note-categories/${id}`, { method: "DELETE" }),
 
-  // ---------- Notable Expense / Disbursement line items ----------
+  // ---------- Notable Revenue / Collections / Expense / Disbursement line items ----------
   // Growable, informational-only record-keeping facility — never rolled into
-  // any total/calculation. Gated by the same EXPENSES/DISBURSEMENTS Custom
-  // Role resource as the parent actual, not a resource of their own — see
-  // server/src/routes/notes.ts.
+  // any total/calculation. Gated by the same REVENUE/COLLECTIONS/EXPENSES/
+  // DISBURSEMENTS Custom Role resource as the parent actual, not a resource
+  // of their own — see server/src/routes/notes.ts.
   expenseNotes: (params: { yearId: string; quarter?: number; businessUnitId?: string; companyId?: string }) => {
     const qs = new URLSearchParams({ yearId: params.yearId });
     if (params.quarter) qs.set("quarter", String(params.quarter));
@@ -505,4 +505,26 @@ export const api = {
   createDisbursementNote: (payload: { companyId: string; yearId: string; quarter: number; categoryId: string; amount: number; remarks?: string }) =>
     request<NoteEntry>("/disbursement-notes", { method: "POST", body: JSON.stringify(payload) }),
   deleteDisbursementNote: (id: string) => request<void>(`/disbursement-notes/${id}`, { method: "DELETE" }),
+
+  revenueNotes: (params: { yearId: string; quarter?: number; businessUnitId?: string; companyId?: string }) => {
+    const qs = new URLSearchParams({ yearId: params.yearId });
+    if (params.quarter) qs.set("quarter", String(params.quarter));
+    if (params.businessUnitId) qs.set("businessUnitId", params.businessUnitId);
+    if (params.companyId) qs.set("companyId", params.companyId);
+    return request<NoteEntry[]>(`/revenue-notes?${qs.toString()}`);
+  },
+  createRevenueNote: (payload: { companyId: string; yearId: string; quarter: number; categoryId: string; amount: number; remarks?: string }) =>
+    request<NoteEntry>("/revenue-notes", { method: "POST", body: JSON.stringify(payload) }),
+  deleteRevenueNote: (id: string) => request<void>(`/revenue-notes/${id}`, { method: "DELETE" }),
+
+  collectionNotes: (params: { yearId: string; quarter?: number; businessUnitId?: string; companyId?: string }) => {
+    const qs = new URLSearchParams({ yearId: params.yearId });
+    if (params.quarter) qs.set("quarter", String(params.quarter));
+    if (params.businessUnitId) qs.set("businessUnitId", params.businessUnitId);
+    if (params.companyId) qs.set("companyId", params.companyId);
+    return request<NoteEntry[]>(`/collection-notes?${qs.toString()}`);
+  },
+  createCollectionNote: (payload: { companyId: string; yearId: string; quarter: number; categoryId: string; amount: number; remarks?: string }) =>
+    request<NoteEntry>("/collection-notes", { method: "POST", body: JSON.stringify(payload) }),
+  deleteCollectionNote: (id: string) => request<void>(`/collection-notes/${id}`, { method: "DELETE" }),
 };

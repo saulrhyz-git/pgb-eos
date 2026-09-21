@@ -13,14 +13,21 @@ interface Props {
   companyId?: string;
 }
 
-// Read-only listing of every notable Expense/Disbursement line item logged
-// for the current Financials scope — the growable, informational-only
-// record-keeping facility entered on the Data Entry page (see
-// IntegratorPortal.tsx's NotableItemsCard). Purely a lookup: nothing here
-// feeds any KPI/attainment/AI Analysis figure, and there's no add/edit/
-// delete UI here — that only happens on Data Entry. Shared between
-// ExpensesTab.tsx and DisbursementsTab.tsx, which just pick a different
-// `type` and title.
+// Read-only listing of every notable Revenue/Collections/Expense/
+// Disbursement line item logged for the current Financials scope — the
+// growable, informational-only record-keeping facility entered on the Data
+// Entry page (see IntegratorPortal.tsx's NotableItemsCard). Purely a
+// lookup: nothing here feeds any KPI/attainment/AI Analysis figure, and
+// there's no add/edit/delete UI here — that only happens on Data Entry.
+// Shared between RevenueTab.tsx, CollectionsTab.tsx, ExpensesTab.tsx, and
+// DisbursementsTab.tsx, which just pick a different `type` and title.
+const NOTES_FETCHER: Record<NoteCategoryType, typeof api.expenseNotes> = {
+  REVENUE: api.revenueNotes,
+  COLLECTION: api.collectionNotes,
+  EXPENSE: api.expenseNotes,
+  DISBURSEMENT: api.disbursementNotes,
+};
+
 export default function NotableItemsList({ title, type, yearId, quarter, businessUnitId, companyId }: Props) {
   const [notes, setNotes] = useState<NoteEntry[]>([]);
   const [loading, setLoading] = useState(false);
@@ -30,8 +37,7 @@ export default function NotableItemsList({ title, type, yearId, quarter, busines
     if (!yearId) return;
     setLoading(true);
     setError("");
-    const fetcher = type === "EXPENSE" ? api.expenseNotes : api.disbursementNotes;
-    fetcher({ yearId, quarter: quarter || undefined, businessUnitId: businessUnitId || undefined, companyId: companyId || undefined })
+    NOTES_FETCHER[type]({ yearId, quarter: quarter || undefined, businessUnitId: businessUnitId || undefined, companyId: companyId || undefined })
       .then(setNotes)
       .catch((err) => setError(err.message || "Failed to load notable items"))
       .finally(() => setLoading(false));

@@ -13,18 +13,20 @@ import { can, narrowingApplies, PermissionError, Resource } from "../utils/permi
 import { logAudit } from "../utils/auditLog";
 
 // Shared implementation for the "notable line items" record-keeping facility
-// attached to Expenses and Disbursements (see schema.prisma's ExpenseNote/
-// DisbursementNote comment) — a growable list of Company/Year/Quarter-scoped
-// entries (category + amount + remarks) that is purely informational: it is
-// never read by aggregate.ts/computeScorecard, so nothing here ever feeds a
-// KPI, attainment %, or AI Analysis figure. Both models are structurally
-// identical and gated by their parent category's existing Custom Role
-// resource (EXPENSES/DISBURSEMENTS) rather than a resource of their own, so
-// this file builds one router per model from a shared factory instead of
-// duplicating the CRUD logic twice.
+// attached to all four Financials categories — Revenue, Collections,
+// Expenses, and Disbursements (see schema.prisma's RevenueNote/
+// CollectionNote/ExpenseNote/DisbursementNote comments) — a growable list of
+// Company/Year/Quarter-scoped entries (category + amount + remarks) that is
+// purely informational: it is never read by aggregate.ts/computeScorecard,
+// so nothing here ever feeds a KPI, attainment %, or AI Analysis figure. All
+// four models are structurally identical and gated by their parent
+// category's existing Custom Role resource (REVENUE/COLLECTIONS/EXPENSES/
+// DISBURSEMENTS) rather than a resource of their own, so this file builds
+// one router per model from a shared factory instead of duplicating the CRUD
+// logic four times.
 function buildNotesRouter(opts: {
-  model: "expenseNote" | "disbursementNote";
-  categoryType: "EXPENSE" | "DISBURSEMENT";
+  model: "revenueNote" | "collectionNote" | "expenseNote" | "disbursementNote";
+  categoryType: "REVENUE" | "COLLECTION" | "EXPENSE" | "DISBURSEMENT";
   resource: Resource;
   entityType: string;
 }) {
@@ -182,4 +184,18 @@ export const disbursementNotesRouter = buildNotesRouter({
   categoryType: "DISBURSEMENT",
   resource: "DISBURSEMENTS",
   entityType: "DisbursementNote",
+});
+
+export const revenueNotesRouter = buildNotesRouter({
+  model: "revenueNote",
+  categoryType: "REVENUE",
+  resource: "REVENUE",
+  entityType: "RevenueNote",
+});
+
+export const collectionNotesRouter = buildNotesRouter({
+  model: "collectionNote",
+  categoryType: "COLLECTION",
+  resource: "COLLECTIONS",
+  entityType: "CollectionNote",
 });

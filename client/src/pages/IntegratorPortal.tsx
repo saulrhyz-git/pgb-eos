@@ -340,14 +340,23 @@ export default function IntegratorPortal() {
   const [reloadKey, setReloadKey] = useState(0);
 
   // Notable line items — the growable, informational-only record-keeping
-  // facility for Expenses and Disbursements (see NotableItemsCard above).
+  // facility for Revenue, Collections, Expenses, and Disbursements (see
+  // NotableItemsCard above).
+  const [revenueCategories, setRevenueCategories] = useState<NoteCategory[]>([]);
+  const [collectionCategories, setCollectionCategories] = useState<NoteCategory[]>([]);
   const [expenseCategories, setExpenseCategories] = useState<NoteCategory[]>([]);
   const [disbursementCategories, setDisbursementCategories] = useState<NoteCategory[]>([]);
+  const [revenueNotes, setRevenueNotes] = useState<NoteEntry[]>([]);
+  const [collectionNotes, setCollectionNotes] = useState<NoteEntry[]>([]);
   const [expenseNotes, setExpenseNotes] = useState<NoteEntry[]>([]);
   const [disbursementNotes, setDisbursementNotes] = useState<NoteEntry[]>([]);
   const [notesLoading, setNotesLoading] = useState(false);
+  const [addingRevenueNote, setAddingRevenueNote] = useState(false);
+  const [addingCollectionNote, setAddingCollectionNote] = useState(false);
   const [addingExpenseNote, setAddingExpenseNote] = useState(false);
   const [addingDisbursementNote, setAddingDisbursementNote] = useState(false);
+  const [deletingRevenueNoteId, setDeletingRevenueNoteId] = useState<string | null>(null);
+  const [deletingCollectionNoteId, setDeletingCollectionNoteId] = useState<string | null>(null);
   const [deletingExpenseNoteId, setDeletingExpenseNoteId] = useState<string | null>(null);
   const [deletingDisbursementNoteId, setDeletingDisbursementNoteId] = useState<string | null>(null);
 
@@ -372,6 +381,8 @@ export default function IntegratorPortal() {
     });
     // The Note Category catalogs rarely change — loaded once, not
     // re-fetched every time the scope changes.
+    api.noteCategories("REVENUE").then(setRevenueCategories).catch(() => setRevenueCategories([]));
+    api.noteCategories("COLLECTION").then(setCollectionCategories).catch(() => setCollectionCategories([]));
     api.noteCategories("EXPENSE").then(setExpenseCategories).catch(() => setExpenseCategories([]));
     api.noteCategories("DISBURSEMENT").then(setDisbursementCategories).catch(() => setDisbursementCategories([]));
   }, []);
@@ -394,9 +405,11 @@ export default function IntegratorPortal() {
     Promise.all([
       api.actuals({ yearId, quarter, companyId }).catch(() => []),
       api.disbursements({ yearId, quarter, companyId }).catch(() => []),
+      api.revenueNotes({ yearId, quarter, companyId }).catch(() => []),
+      api.collectionNotes({ yearId, quarter, companyId }).catch(() => []),
       api.expenseNotes({ yearId, quarter, companyId }).catch(() => []),
       api.disbursementNotes({ yearId, quarter, companyId }).catch(() => []),
-    ]).then(([actualRows, disbRows, expNotes, disbNotes]) => {
+    ]).then(([actualRows, disbRows, revNotes, collNotes, expNotes, disbNotes]) => {
       const existing = actualRows[0] || null;
       if (existing) {
         setForm({
@@ -432,12 +445,50 @@ export default function IntegratorPortal() {
           : emptyDisbForm
       );
 
+      setRevenueNotes(revNotes);
+      setCollectionNotes(collNotes);
       setExpenseNotes(expNotes);
       setDisbursementNotes(disbNotes);
       setNotesLoading(false);
     });
   }, [yearId, quarter, companyId, businessUnitId, reloadKey]);
 
+  async function handleAddRevenueNote(categoryId: string, amount: number, remarksText: string) {
+    setAddingRevenueNote(true);
+    try {
+      const row = await api.createRevenueNote({ companyId, yearId, quarter, categoryId, amount, remarks: remarksText });
+      setRevenueNotes((prev) => [...prev, row]);
+    } finally {
+      setAddingRevenueNote(false);
+    }
+  }
+  async function handleDeleteRevenueNote(id: string) {
+    setDeletingRevenueNoteId(id);
+    try {
+      await api.deleteRevenueNote(id);
+      setRevenueNotes((prev) => prev.filter((n) => n.id !== id));
+    } finally {
+      setDeletingRevenueNoteId(null);
+    }
+  }
+  async function handleAddCollectionNote(categoryId: string, amount: number, remarksText: string) {
+    setAddingCollectionNote(true);
+    try {
+      const row = await api.createCollectionNote({ companyId, yearId, quarter, categoryId, amount, remarks: remarksText });
+      setCollectionNotes((prev) => [...prev, row]);
+    } finally {
+      setAddingCollectionNote(false);
+    }
+  }
+  async function handleDeleteCollectionNote(id: string) {
+    setDeletingCollectionNoteId(id);
+    try {
+      await api.deleteCollectionNote(id);
+      setCollectionNotes((prev) => prev.filter((n) => n.id !== id));
+    } finally {
+      setDeletingCollectionNoteId(null);
+    }
+  }
   async function handleAddExpenseNote(categoryId: string, amount: number, remarksText: string) {
     setAddingExpenseNote(true);
     try {
@@ -647,6 +698,16 @@ export default function IntegratorPortal() {
               />
             </div>
           </div>
+          <NotableItemsCard
+            title="Notable Revenue Items"
+            categories={revenueCategories}
+            notes={revenueNotes}
+            loading={notesLoading}
+            onAdd={handleAddRevenueNote}
+            onDelete={handleDeleteRevenueNote}
+            adding={addingRevenueNote}
+            deletingId={deletingRevenueNoteId}
+          />
         </div>
 
         {/* ---------- Collections ---------- */}
@@ -669,6 +730,16 @@ export default function IntegratorPortal() {
               </div>
             </div>
           ))}
+          <NotableItemsCard
+            title="Notable Collections Items"
+            categories={collectionCategories}
+            notes={collectionNotes}
+            loading={notesLoading}
+            onAdd={handleAddCollectionNote}
+            onDelete={handleDeleteCollectionNote}
+            adding={addingCollectionNote}
+            deletingId={deletingCollectionNoteId}
+          />
         </div>
 
         {/* ---------- Expenses ---------- */}

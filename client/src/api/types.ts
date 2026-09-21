@@ -479,12 +479,12 @@ export interface DisbursementActual {
   company: { id: string; name: string; businessUnitId: string };
 }
 
-// ---------- Notable line items (Expenses/Disbursements record-keeping) ----------
+// ---------- Notable line items (Revenue/Collections/Expenses/Disbursements record-keeping) ----------
 // A superadmin-managed catalog of selectable categories (e.g. "Interest",
-// "Cost of Sales" for Expenses; "Advances", "Loans" for Disbursements),
-// freely editable at Admin -> Note Categories — see
-// server/src/routes/noteCategories.ts.
-export type NoteCategoryType = "EXPENSE" | "DISBURSEMENT";
+// "Cost of Sales" for Expenses; "Advances", "Loans" for Disbursements; freely
+// defined for Revenue/Collections), freely editable at Admin -> Note
+// Categories — see server/src/routes/noteCategories.ts.
+export type NoteCategoryType = "EXPENSE" | "DISBURSEMENT" | "REVENUE" | "COLLECTION";
 
 export interface NoteCategory {
   id: string;
@@ -496,9 +496,10 @@ export interface NoteCategory {
 }
 
 // A single growable, informational-only "notable item" logged against a
-// Company/Year/Quarter — never rolled into any total/calculation. Expense
-// and Disbursement notes share this exact shape; only the endpoint and the
-// category's `type` differ — see server/src/routes/notes.ts.
+// Company/Year/Quarter — never rolled into any total/calculation. Revenue,
+// Collection, Expense, and Disbursement notes all share this exact shape;
+// only the endpoint and the category's `type` differ — see
+// server/src/routes/notes.ts.
 export interface NoteEntry {
   id: string;
   companyId: string;
@@ -506,12 +507,13 @@ export interface NoteEntry {
   quarter: number;
   categoryId: string;
   category: { id: string; label: string; type: NoteCategoryType };
-  // Only present on the list endpoint (GET /expense-notes, /disbursement-
-  // notes) — omitted from the create response, since the caller there
-  // already knows which Company it just posted for. Lets a scope spanning
-  // multiple Companies (a whole Business Unit, or "All Business Units") say
-  // which Company each note belongs to — see the read-only notable-items
-  // list on the Financials Expenses/Disbursements sub-tabs.
+  // Only present on the list endpoints (GET /revenue-notes,
+  // /collection-notes, /expense-notes, /disbursement-notes) — omitted from
+  // the create response, since the caller there already knows which Company
+  // it just posted for. Lets a scope spanning multiple Companies (a whole
+  // Business Unit, or "All Business Units") say which Company each note
+  // belongs to — see the read-only notable-items list on the Financials
+  // sub-tabs.
   company?: { id: string; name: string; businessUnitId: string };
   amount: number;
   remarks: string;
