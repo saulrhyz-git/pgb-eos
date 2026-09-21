@@ -95,3 +95,31 @@ export function computeNiat(revenue: number, expenses: number, assetsExceed100M:
     niat,
   };
 }
+
+// Sums a list of already-computed per-Company NiatResults into one total —
+// tax must be computed per Company first (each is its own taxable entity;
+// summing revenue/expenses across Companies before computing tax would
+// wrongly apply one company's MSME-rate eligibility to a combined multi-
+// company total), so this is just addition, not a re-computation. Used by
+// the NIAT tab's aggregate (Business Unit / All) view, which computes
+// every Company at default assumptions (assets exceed ₱100M, no Cost of
+// Sales entered) — a fast, single-pane-of-glass approximation. Switching to
+// a specific Company gives the adjustable, per-Company version of this
+// same computation. assetsExceed100M/cogs/opex/usedMcit are per-Company
+// inputs/flags with no meaningful sum across a mixed group, so they're
+// dropped here.
+export function sumNiat(results: NiatResult[]): Pick<NiatResult, "revenue" | "expenses" | "netIncomeBeforeTax" | "grossIncome" | "rcit" | "mcit" | "taxDue" | "niat"> {
+  return results.reduce(
+    (sum, r) => ({
+      revenue: sum.revenue + r.revenue,
+      expenses: sum.expenses + r.expenses,
+      netIncomeBeforeTax: sum.netIncomeBeforeTax + r.netIncomeBeforeTax,
+      grossIncome: sum.grossIncome + r.grossIncome,
+      rcit: sum.rcit + r.rcit,
+      mcit: sum.mcit + r.mcit,
+      taxDue: sum.taxDue + r.taxDue,
+      niat: sum.niat + r.niat,
+    }),
+    { revenue: 0, expenses: 0, netIncomeBeforeTax: 0, grossIncome: 0, rcit: 0, mcit: 0, taxDue: 0, niat: 0 }
+  );
+}
