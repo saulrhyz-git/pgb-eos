@@ -8,6 +8,7 @@ import RevenueTab from "./pages/financials/RevenueTab";
 import CollectionsTab from "./pages/financials/CollectionsTab";
 import ExpensesTab from "./pages/financials/ExpensesTab";
 import DisbursementsTab from "./pages/financials/DisbursementsTab";
+import NiatTab from "./pages/financials/NiatTab";
 import Profile from "./pages/Profile";
 import Scorecard from "./pages/Scorecard";
 import Compare from "./pages/Compare";
@@ -83,6 +84,7 @@ export default function App() {
           <Route path="collections" element={<CollectionsTab />} />
           <Route path="expenses" element={<ExpensesTab />} />
           <Route path="disbursements" element={<DisbursementsTab />} />
+          <Route path="niat" element={<NiatTab />} />
         </Route>
         <Route path="rocks" element={<Rocks />} />
         <Route path="reports" element={<Reports />} />

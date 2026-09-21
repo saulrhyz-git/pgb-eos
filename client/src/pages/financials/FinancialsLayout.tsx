@@ -1,6 +1,6 @@
 import { useCallback, useEffect, useState } from "react";
 import { NavLink, Outlet } from "react-router-dom";
-import { LayoutDashboard, Wallet, Receipt, HandCoins } from "lucide-react";
+import { LayoutDashboard, Wallet, Receipt, HandCoins, Scale } from "lucide-react";
 import { api } from "../../api/client";
 import type { DashboardResponse } from "../../api/types";
 import FilterBar, { DashboardFilters } from "../../components/FilterBar";
@@ -57,7 +57,7 @@ export default function FinancialsLayout() {
     <div className="flex flex-col gap-6">
       <div>
         <h2 className="mb-1 text-lg font-semibold text-slate-800 dark:text-slate-100">Financials</h2>
-        <p className="text-sm text-slate-500 dark:text-slate-400">Revenue, Collections, Expenses, and Disbursements for the selected scope.</p>
+        <p className="text-sm text-slate-500 dark:text-slate-400">Revenue, Collections, Expenses, Disbursements, and NIAT for the selected scope.</p>
       </div>
 
       <FilterBar filters={filters} onChange={setFilters} />
@@ -74,6 +74,10 @@ export default function FinancialsLayout() {
         </NavLink>
         <NavLink to="/revenue/disbursements" className={tabClass}>
           <HandCoins className="h-4 w-4" /> Disbursements
+        </NavLink>
+        <NavLink to="/revenue/niat" className={tabClass}>
+          <Scale className="h-4 w-4" /> NIAT
+          <span className="rounded-full bg-amber-400 px-1.5 py-0.5 text-[9px] font-bold uppercase leading-none text-amber-950">Beta</span>
         </NavLink>
       </nav>
 
