@@ -221,6 +221,20 @@ model AiSettings {
   updatedAt DateTime @updatedAt
 }
 
+// Singleton row (fixed id "default") of simple global feature toggles a
+// Superadmin can flip without a deploy — currently just niatEnabled, which
+// shows/hides the NIAT sub-tab under Financials for everyone (see
+// routes/appSettings.ts and the NIAT nav link in FinancialsLayout.tsx).
+// Unlike SmtpSettings/AiSettings above — Superadmin-only to even view,
+// since they hold credentials — this is readable by any authenticated
+// user, since every user needs to know whether to show a feature; only
+// writing to it is Superadmin-gated.
+model AppSettings {
+  id          String   @id
+  niatEnabled Boolean  @default(true)
+  updatedAt   DateTime @updatedAt
+}
+
 // Join table: which BU(s) a BU Integrator is responsible for.
 model UserBusinessUnit {
   userId        String

@@ -3,6 +3,7 @@ import type {
   AdminUser,
   AiAnalysisResult,
   AiSettings,
+  AppSettings,
   AuditLogMeta,
   AuditLogPage,
   AuthUser,
@@ -273,6 +274,14 @@ export const api = {
   putAiSettings: (payload: { apiKey?: string; model: string }) =>
     request<AiSettings>("/settings/ai", { method: "PUT", body: JSON.stringify(payload) }),
   testAiSettings: () => request<{ ok: true; reply: string }>("/settings/ai/test", { method: "POST" }),
+
+  // ---------- App Settings (readable by everyone, Superadmin-writable) ----------
+  // Simple global feature toggles — currently just niatEnabled, which
+  // shows/hides the NIAT sub-tab under Financials for every user. Unlike
+  // SMTP/AI settings above, GET here needs no role — see
+  // server/src/routes/appSettings.ts.
+  appSettings: () => request<AppSettings>("/app-settings"),
+  updateAppSettings: (payload: Partial<AppSettings>) => request<AppSettings>("/app-settings", { method: "PUT", body: JSON.stringify(payload) }),
 
   // ---------- Custom Roles (Superadmin only) ----------
   // Named permission profiles assignable to Users as an additional,

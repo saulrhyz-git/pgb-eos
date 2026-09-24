@@ -23,9 +23,21 @@ import type { FinancialsOutletContext } from "./FinancialsLayout";
 // already masked by whatever REVENUE/EXPENSES view permissions the viewer
 // has, same as everywhere else in Financials.
 export default function NiatTab() {
-  const { data, filters } = useOutletContext<FinancialsOutletContext>();
+  const { data, filters, niatEnabled } = useOutletContext<FinancialsOutletContext>();
 
   if (!data) return null;
+
+  // Hiding the nav link in FinancialsLayout doesn't block this route
+  // itself — someone with a bookmark or a typed URL could still land here
+  // while a Superadmin has it turned off (Admin -> Feature Flags).
+  if (!niatEnabled) {
+    return (
+      <div className="py-12 text-center text-sm text-slate-500 dark:text-slate-400">
+        The NIAT tab is currently turned off. Ask a Superadmin to re-enable it under Admin → Feature Flags if you need
+        it.
+      </div>
+    );
+  }
 
   return (
     <div className="flex flex-col gap-6">

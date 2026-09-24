@@ -100,6 +100,13 @@ export interface AiSettings {
   updatedAt: string;
 }
 
+// Simple global feature toggles a Superadmin can flip without a deploy —
+// see server/src/routes/appSettings.ts. Readable by every authenticated
+// user (unlike AiSettings/SmtpSettings above), only writable by Superadmin.
+export interface AppSettings {
+  niatEnabled: boolean;
+}
+
 export interface Year {
   id: string;
   year: number;

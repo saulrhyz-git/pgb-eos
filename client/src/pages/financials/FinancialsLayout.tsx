@@ -15,6 +15,11 @@ export interface FinancialsOutletContext {
   filters: DashboardFilters;
   loading: boolean;
   reload: () => void;
+  // Whether a Superadmin has the NIAT tab turned on (see Admin -> Feature
+  // Flags) — passed through so NiatTab.tsx can show a "disabled" state if
+  // someone lands there directly (a bookmark, a typed URL) while it's off,
+  // since hiding the nav link below doesn't block the route itself.
+  niatEnabled: boolean;
 }
 
 // This used to be the whole of Dashboard.tsx (Revenue/Collections/Expenses/
@@ -32,6 +37,14 @@ export default function FinancialsLayout() {
   const [data, setData] = useState<DashboardResponse | null>(null);
   const [error, setError] = useState("");
   const [loading, setLoading] = useState(false);
+  // Defaults true so the tab doesn't flash visible-then-hidden for the
+  // common case (enabled) while this loads — it only ever flips to false
+  // briefly if a Superadmin has actually turned it off.
+  const [niatEnabled, setNiatEnabled] = useState(true);
+
+  useEffect(() => {
+    api.appSettings().then((s) => setNiatEnabled(s.niatEnabled));
+  }, []);
 
   const load = useCallback(() => {
     if (!filters.yearId) return;
@@ -75,16 +88,18 @@ export default function FinancialsLayout() {
         <NavLink to="/revenue/disbursements" className={tabClass}>
           <HandCoins className="h-4 w-4" /> Disbursements
         </NavLink>
-        <NavLink to="/revenue/niat" className={tabClass}>
-          <Scale className="h-4 w-4" /> NIAT
-          <span className="rounded-full bg-amber-400 px-1.5 py-0.5 text-[9px] font-bold uppercase leading-none text-amber-950">Beta</span>
-        </NavLink>
+        {niatEnabled && (
+          <NavLink to="/revenue/niat" className={tabClass}>
+            <Scale className="h-4 w-4" /> NIAT
+            <span className="rounded-full bg-amber-400 px-1.5 py-0.5 text-[9px] font-bold uppercase leading-none text-amber-950">Beta</span>
+          </NavLink>
+        )}
       </nav>
 
       {error && <div className="rounded-md bg-red-50 dark:bg-red-950/40 px-4 py-3 text-sm text-red-600 dark:text-red-400">{error}</div>}
 
       {data ? (
-        <Outlet context={{ data, filters, loading, reload: load } satisfies FinancialsOutletContext} />
+        <Outlet context={{ data, filters, loading, reload: load, niatEnabled } satisfies FinancialsOutletContext} />
       ) : (
         loading && <div className="py-12 text-center text-slate-500 dark:text-slate-400">Loading Financials...</div>
       )}
