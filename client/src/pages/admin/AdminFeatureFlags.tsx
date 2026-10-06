@@ -54,7 +54,7 @@ export default function AdminFeatureFlags() {
             <div>
               <div className="text-sm font-medium text-slate-700 dark:text-slate-200">NIAT tab</div>
               <p className="mt-0.5 text-xs text-slate-500 dark:text-slate-400">
-                Shows/hides the NIAT (Net Income After Taxes) sub-tab under Financials, for every user. Currently BETA.
+                Shows/hides the NIAT (Net Income After Taxes) tax computation under Financials, for every user. When off, the tab stays as a plain Net Income view. Currently BETA.
               </p>
             </div>
             <label className="inline-flex shrink-0 cursor-pointer items-center gap-2">

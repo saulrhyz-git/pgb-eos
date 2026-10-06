@@ -15,10 +15,9 @@ export interface FinancialsOutletContext {
   filters: DashboardFilters;
   loading: boolean;
   reload: () => void;
-  // Whether a Superadmin has the NIAT tab turned on (see Admin -> Feature
-  // Flags) — passed through so NiatTab.tsx can show a "disabled" state if
-  // someone lands there directly (a bookmark, a typed URL) while it's off,
-  // since hiding the nav link below doesn't block the route itself.
+  // Whether a Superadmin has NIAT turned on (see Admin -> Feature Flags).
+  // Off only hides the tax computation (RCIT/MCIT/Tax Due/NIAT) — the tab
+  // itself stays, relabeled "Net Income", showing Revenue − Expenses.
   niatEnabled: boolean;
 }
 
@@ -70,7 +69,7 @@ export default function FinancialsLayout() {
     <div className="flex flex-col gap-6">
       <div>
         <h2 className="mb-1 text-lg font-semibold text-slate-800 dark:text-slate-100">Financials</h2>
-        <p className="text-sm text-slate-500 dark:text-slate-400">Revenue, Collections, Expenses, Disbursements, and NIAT for the selected scope.</p>
+        <p className="text-sm text-slate-500 dark:text-slate-400">Revenue, Collections, Expenses, Disbursements, and {niatEnabled ? "NIAT" : "Net Income"} for the selected scope.</p>
       </div>
 
       <FilterBar filters={filters} onChange={setFilters} />
@@ -88,12 +87,14 @@ export default function FinancialsLayout() {
         <NavLink to="/revenue/disbursements" className={tabClass}>
           <HandCoins className="h-4 w-4" /> Disbursements
         </NavLink>
-        {niatEnabled && (
-          <NavLink to="/revenue/niat" className={tabClass}>
-            <Scale className="h-4 w-4" /> NIAT
+        {/* Always shown — the NIAT feature flag only hides the tax side.
+            With it off, this same tab shows just Revenue/Expenses/Net Income. */}
+        <NavLink to="/revenue/niat" className={tabClass}>
+          <Scale className="h-4 w-4" /> {niatEnabled ? "NIAT" : "Net Income"}
+          {niatEnabled && (
             <span className="rounded-full bg-amber-400 px-1.5 py-0.5 text-[9px] font-bold uppercase leading-none text-amber-950">Beta</span>
-          </NavLink>
-        )}
+          )}
+        </NavLink>
       </nav>
 
       {error && <div className="rounded-md bg-red-50 dark:bg-red-950/40 px-4 py-3 text-sm text-red-600 dark:text-red-400">{error}</div>}

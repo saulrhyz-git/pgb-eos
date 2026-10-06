@@ -1,0 +1,82 @@
+diff --git a/server/src/auth.js b/server/src/auth.js
+index 664281d..b11aa90 100644
+--- a/server/src/auth.js
++++ b/server/src/auth.js
+@@ -161,7 +161,9 @@ function requireProjectScopeForUser(pool) {
+   return async (req, res, next) => {
+     if (req.method === 'GET') return next();
+     const user = req.session?.user;
+-    if (!user || user.role !== 'user') return next();
++    // superadmin is unrestricted; project_admin and role='user' can only
++    // write submissions for projects in their session.user.project_ids.
++    if (!user || user.role === 'superadmin') return next();
+     const table = req.params?.table;
+     if (!PROJECT_SCOPED_TABLES.has(table)) return next();
+     try {
+diff --git a/server/src/restApi.js b/server/src/restApi.js
+index e741519..011fa50 100644
+--- a/server/src/restApi.js
++++ b/server/src/restApi.js
+@@ -124,6 +124,35 @@ function parseListQuery(query, columns) {
+   return { filters, orderCol, orderDir, limit };
+ }
+ 
++// ─────────────────────────────────────────────────────────────────
++// Per-user project scoping for reads. Every non-superadmin account only
++// gets rows for the projects in session.user.project_ids (for
++// project_admin that's their own assignment; for role='user' it's their
++// assigned role's list — see auth.js resolveUserRole). Before this, GETs
++// returned every row to any logged-in user, so index.html/admin.html
++// showed all projects regardless of what was assigned.
++//
++// Deny by default: a non-superadmin with no assigned projects gets an
++// empty list, never "everything".
++// ─────────────────────────────────────────────────────────────────
++const UUID_RE = /^[0-9a-f]{8}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{12}$/i;
++
++function scopeClause(table, user, params) {
++  if (user?.role === 'superadmin') return null; // sees everything
++  const ids = (Array.isArray(user?.project_ids) ? user.project_ids : [])
++    .map(String).filter((id) => UUID_RE.test(id));
++  params.push(ids);
++  const p = `$${params.length}::uuid[]`;
++  switch (table) {
++    case 'psc_projects':    return `id = ANY(${p})`;
++    case 'psc_submissions': return `project_id = ANY(${p})`;
++    case 'psc_history':     return `project_id = ANY(${p})`;
++    // report meta is keyed by project code/name, not id
++    case 'psc_report_meta': return `project_code IN (SELECT code FROM psc_projects WHERE id = ANY(${p}))`;
++    default:                return 'false'; // unknown table: fail closed
++  }
++}
++
+ function buildRestRouter(pool) {
+   const router = express.Router();
+ 
+@@ -134,13 +163,13 @@ function buildRestRouter(pool) {
+       const { filters, orderCol, orderDir, limit } = parseListQuery(req.query, def.columns);
+       const params = [];
+       let sql = `SELECT ${def.columns.join(', ')} FROM ${req.params.table}`;
+-      if (filters.length) {
+-        const clauses = filters.map(({ col, val }) => {
+-          params.push(val);
+-          return `${col} = $${params.length}`;
+-        });
+-        sql += ` WHERE ${clauses.join(' AND ')}`;
+-      }
++      const clauses = filters.map(({ col, val }) => {
++        params.push(val);
++        return `${col} = $${params.length}`;
++      });
++      const scope = scopeClause(req.params.table, req.session?.user, params);
++      if (scope) clauses.push(scope);
++      if (clauses.length) sql += ` WHERE ${clauses.join(' AND ')}`;
+       if (orderCol) sql += ` ORDER BY ${orderCol} ${orderDir.toUpperCase()}`;
+       if (limit != null) sql += ` LIMIT ${limit}`;
+       const { rows } = await pool.query(sql, params);
+@@ -192,4 +221,4 @@ function buildRestRouter(pool) {
+   return router;
+ }
+ 
+-module.exports = { buildRestRouter, TABLES, parseListQuery };
++module.exports = { buildRestRouter, TABLES, parseListQuery, scopeClause };
