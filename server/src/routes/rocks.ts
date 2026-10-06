@@ -178,9 +178,13 @@ router.post("/", async (req, res) => {
 // never creates a Year). Each carried-over Rock is a new row in the target
 // quarter with the same details/status/progress; the original Rock in its
 // original quarter is left untouched, so this is a "carry forward a copy",
-// not a "move". Restricted to Group Integrator/Superadmin since it acts
-// across whatever scope is currently filtered on the Rocks page, not just a
-// single Company.
+// not a "move". Open to Group Integrators, BU Integrators and Superadmins.
+// Scope is enforced the same way as every other Rocks query: a BU Integrator
+// (or a BU-assigned Group Integrator) only ever rolls over Rocks in their
+// assigned Business Unit(s) — scopedBusinessUnitFilter() narrows a broad
+// rollover to those BUs, and an explicit businessUnitId/companyId outside
+// them is rejected with a 403. Custom Role ROCKS edit grants narrow it
+// further still.
 const rolloverSchema = z.object({
   yearId: z.string().uuid(),
   quarter: z.number().int().min(1).max(4),
@@ -189,7 +193,7 @@ const rolloverSchema = z.object({
   businessGoalId: z.string().uuid().optional(),
 });
 
-router.post("/rollover", requireRole("GROUP_INTEGRATOR", "SUPERADMIN"), async (req, res) => {
+router.post("/rollover", requireRole("GROUP_INTEGRATOR", "BU_INTEGRATOR", "SUPERADMIN"), async (req, res) => {
   const parsed = rolloverSchema.safeParse(req.body);
   if (!parsed.success) return res.status(400).json({ error: "Invalid rollover payload", details: parsed.error.issues });
   const { yearId, quarter, businessUnitId, companyId, businessGoalId } = parsed.data;

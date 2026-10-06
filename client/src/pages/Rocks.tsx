@@ -149,6 +149,9 @@ export default function Rocks() {
   // which a Group Integrator can also do) — see server/src/routes/businessGoals.ts.
   const canDeleteGoal = user?.role === "SUPERADMIN";
   const canSeeAllBUs = user?.role === "GROUP_INTEGRATOR" || user?.role === "SUPERADMIN";
+  // Rollover is open to BU Integrators too — the server limits it to Rocks
+  // in their own assigned Business Unit(s).
+  const canRollover = canManageStructure || user?.role === "BU_INTEGRATOR";
 
   const [years, setYears] = useState<Year[]>([]);
   const [businessUnits, setBusinessUnits] = useState<BusinessUnit[]>([]);
@@ -634,7 +637,7 @@ export default function Rocks() {
           </div>
         </div>
         <div className="flex flex-col gap-2 xs:flex-row sm:justify-end">
-          {canManageStructure && (
+          {canRollover && (
             <button
               onClick={handleRollover}
               disabled={rollingOver || !yearId || !quarter}
