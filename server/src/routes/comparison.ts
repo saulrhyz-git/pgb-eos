@@ -25,6 +25,7 @@ import {
   toFigures,
 } from "../utils/aggregate";
 import { escalateStaleRocks } from "../utils/rockAutoStatus";
+import { latestRockVersions } from "../utils/rockRollover";
 
 // Side-by-side Comparison tab: given an arbitrary Year+Quarter(+Business
 // Unit+Company) scope, returns ONE aggregated snapshot covering "everything"
@@ -190,13 +191,19 @@ router.get("/snapshot", async (req, res) => {
   const rockWhere: any = { yearId };
   if (!isAllQuarters) rockWhere.quarter = quarter;
   if (rockCompanyIds.length) rockWhere.companyId = { in: rockCompanyIds };
-  const rocks = rockCompanyIds.length ? await prisma.rock.findMany({ where: rockWhere, select: { status: true, progressPct: true } }) : [];
+  // Rollover-aware: a Rock carried forward within this scope counts once.
+  const rocks = latestRockVersions(
+    rockCompanyIds.length
+      ? await prisma.rock.findMany({ where: rockWhere, select: { id: true, rolledFromId: true, status: true, progressPct: true } })
+      : []
+  );
 
   const rocksTotal = rocks.length;
   const rocksTargetMet = rocks.filter((r) => r.status === "TARGET_MET").length;
   const rocksOnTrack = rocks.filter((r) => r.status === "ON_TRACK").length;
   const rocksAtRisk = rocks.filter((r) => r.status === "AT_RISK").length;
   const rocksPending = rocks.filter((r) => r.status === "PENDING").length;
+  const rocksRolledOver = rocks.filter((r) => r.status === "ROLLED_OVER").length;
   const rocksAvgProgressPct = rocksTotal ? Math.round(rocks.reduce((sum, r) => sum + r.progressPct, 0) / rocksTotal) : 0;
 
   // ---------- Disbursements ----------
@@ -241,6 +248,7 @@ router.get("/snapshot", async (req, res) => {
     rocksOnTrack,
     rocksAtRisk,
     rocksPending,
+    rocksRolledOver,
     rocksAvgProgressPct,
     disbursementsActual: disbursementsActualTotal,
   });

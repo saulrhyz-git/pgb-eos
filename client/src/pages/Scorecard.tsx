@@ -11,6 +11,7 @@ import {
   PhilippinePeso,
   Scale,
   ShieldAlert,
+  SkipForward,
   TrendingUp,
 } from "lucide-react";
 import {
@@ -35,12 +36,14 @@ const STATUS_BADGE: Record<string, string> = {
   ON_TRACK: "bg-blue-50 dark:bg-blue-950/40 text-blue-700 dark:text-blue-300",
   AT_RISK: "bg-red-50 dark:bg-red-950/40 text-red-700 dark:text-red-300",
   TARGET_MET: "bg-green-50 dark:bg-green-950/40 text-green-700 dark:text-green-300",
+  ROLLED_OVER: "bg-slate-100 dark:bg-slate-800 text-slate-600 dark:text-slate-300",
 };
 const STATUS_LABELS: Record<string, string> = {
   PENDING: "Pending",
   ON_TRACK: "On Track",
   AT_RISK: "At Risk",
   TARGET_MET: "Target Met",
+  ROLLED_OVER: "Rolled Over",
 };
 
 function attainmentBadge(pct: number) {
@@ -595,11 +598,12 @@ export default function Scorecard() {
           <section className="flex flex-col gap-4">
             <h3 className="text-base font-semibold text-slate-800 dark:text-slate-100">Rocks Performance Summary</h3>
 
-            <div className="grid grid-cols-1 gap-4 sm:grid-cols-2 lg:grid-cols-5">
+            <div className="grid grid-cols-1 gap-4 sm:grid-cols-2 lg:grid-cols-6">
               <SummaryStat icon={<ListChecks className="h-4 w-4" />} label="Total Rocks" value={String(data.rocks.summary.total)} />
               <SummaryStat icon={<CheckCircle2 className="h-4 w-4" />} label="Target Met" value={String(data.rocks.summary.targetMet)} />
               <SummaryStat icon={<TrendingUp className="h-4 w-4" />} label="On Track" value={String(data.rocks.summary.onTrack)} />
               <SummaryStat icon={<AlertTriangle className="h-4 w-4" />} label="At Risk / Pending" value={String(data.rocks.summary.atRisk + data.rocks.summary.pending)} />
+              <SummaryStat icon={<SkipForward className="h-4 w-4" />} label="Rolled Over" value={String(data.rocks.summary.rolledOver)} />
               <SummaryStat icon={<Gauge className="h-4 w-4" />} label="Avg Progress" value={`${data.rocks.summary.avgProgressPct}%`} />
             </div>
 

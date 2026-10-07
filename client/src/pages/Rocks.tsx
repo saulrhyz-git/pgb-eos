@@ -26,7 +26,7 @@ type RockSortKey = "companyName" | "quarter" | "title" | "businessGoalName" | "o
 
 // Workflow order (not alphabetical) so sorting by Status reads as a
 // progression rather than shuffling the four labels alphabetically.
-const ROCK_STATUS_ORDER: RockStatus[] = ["PENDING", "ON_TRACK", "AT_RISK", "TARGET_MET"];
+const ROCK_STATUS_ORDER: RockStatus[] = ["PENDING", "ON_TRACK", "AT_RISK", "TARGET_MET", "ROLLED_OVER"];
 
 function compareRocks(a: Rock, b: Rock, key: RockSortKey): number {
   switch (key) {
@@ -54,7 +54,19 @@ const STATUS_LABELS: Record<RockStatus, string> = {
   ON_TRACK: "On Track",
   AT_RISK: "At Risk",
   TARGET_MET: "Target Met",
+  ROLLED_OVER: "Rolled Over",
 };
+
+// What a person can pick by hand — Rolled Over is only ever set by Rollover.
+const EDITABLE_STATUSES: RockStatus[] = ["PENDING", "ON_TRACK", "AT_RISK", "TARGET_MET"];
+
+// A Rock carried forward within the current filter scope (e.g. All
+// Quarters) counts once — its latest copy — not once per quarter it passed
+// through. Mirrors server/src/utils/rockRollover.ts.
+function latestRockVersions(list: Rock[]): Rock[] {
+  const superseded = new Set(list.map((r) => r.rolledFromId).filter(Boolean));
+  return list.filter((r) => !superseded.has(r.id));
+}
 
 // Orange = Pending, Blue = On Track ("in progress"), Red = At Risk
 // (including Rocks auto-flagged by the Quarter End Date-based status rule —
@@ -64,6 +76,7 @@ const STATUS_BADGE: Record<RockStatus, string> = {
   ON_TRACK: "bg-blue-50 dark:bg-blue-950/40 text-blue-700 dark:text-blue-300",
   AT_RISK: "bg-red-50 dark:bg-red-950/40 text-red-700 dark:text-red-300",
   TARGET_MET: "bg-green-50 dark:bg-green-950/40 text-green-700 dark:text-green-300",
+  ROLLED_OVER: "bg-slate-100 dark:bg-slate-800 text-slate-600 dark:text-slate-300",
 };
 
 // Progress is entered to up to 2 decimal places — clamp to 0-100 and round
@@ -394,7 +407,10 @@ export default function Rocks() {
   }
 
   async function handleDeleteRock(r: Rock) {
-    if (!confirm(`Delete rock "${r.title}"?`)) return;
+    const msg = r.rolledFromId
+      ? `Delete rock "${r.title}"? This is a rolled-over copy — deleting it undoes the rollover and makes the original in the previous quarter live again.`
+      : `Delete rock "${r.title}"?`;
+    if (!confirm(msg)) return;
     try {
       await api.deleteRock(r.id);
       loadRocks();
@@ -416,7 +432,7 @@ export default function Rocks() {
         : `Q${quarter + 1}${currentYear ? ` ${currentYear.year}` : ""}`;
     if (
       !confirm(
-        `Roll over all incomplete Rocks from ${fromLabel} to ${toLabel}? This creates a copy of each incomplete Rock in ${toLabel} — the originals in ${fromLabel} are left as-is.`
+        `Roll over all incomplete Rocks from ${fromLabel} to ${toLabel}? This creates a copy of each incomplete Rock in ${toLabel} and marks the originals in ${fromLabel} as Rolled Over. Rocks already rolled over are skipped.`
       )
     ) {
       return;
@@ -516,11 +532,13 @@ export default function Rocks() {
     }
   }
 
-  const total = rocks.length;
-  const targetMet = rocks.filter((r) => r.status === "TARGET_MET").length;
-  const onTrack = rocks.filter((r) => r.status === "ON_TRACK").length;
-  const atRiskPending = rocks.filter((r) => r.status === "AT_RISK" || r.status === "PENDING").length;
-  const avgProgress = total ? Math.round(rocks.reduce((sum, r) => sum + r.progressPct, 0) / total) : 0;
+  const countedRocks = useMemo(() => latestRockVersions(rocks), [rocks]);
+  const total = countedRocks.length;
+  const targetMet = countedRocks.filter((r) => r.status === "TARGET_MET").length;
+  const onTrack = countedRocks.filter((r) => r.status === "ON_TRACK").length;
+  const atRiskPending = countedRocks.filter((r) => r.status === "AT_RISK" || r.status === "PENDING").length;
+  const rolledOver = countedRocks.filter((r) => r.status === "ROLLED_OVER").length;
+  const avgProgress = total ? Math.round(countedRocks.reduce((sum, r) => sum + r.progressPct, 0) / total) : 0;
 
   const formGoals = goalsForBu(formBusinessUnitId);
 
@@ -663,11 +681,12 @@ export default function Rocks() {
 
       {error && <div className="rounded-md bg-red-50 dark:bg-red-950/40 px-4 py-3 text-sm text-red-600 dark:text-red-400">{error}</div>}
 
-      <div className="grid grid-cols-1 gap-4 sm:grid-cols-2 lg:grid-cols-5">
+      <div className="grid grid-cols-1 gap-4 sm:grid-cols-2 lg:grid-cols-6">
         <KpiCard icon={<ListChecks className="h-4 w-4" />} label="Total Rocks" value={String(total)} />
         <KpiCard icon={<CheckCircle2 className="h-4 w-4" />} label="Target Met" value={String(targetMet)} />
         <KpiCard icon={<TrendingUp className="h-4 w-4" />} label="On Track" value={String(onTrack)} />
         <KpiCard icon={<AlertTriangle className="h-4 w-4" />} label="At Risk / Pending" value={String(atRiskPending)} />
+        <KpiCard icon={<SkipForward className="h-4 w-4" />} label="Rolled Over" value={String(rolledOver)} />
         <KpiCard icon={<Percent className="h-4 w-4" />} label="Avg Progress" value={`${avgProgress}%`} />
       </div>
 
@@ -871,6 +890,7 @@ export default function Rocks() {
               <select
                 className="rounded-md border border-slate-300 dark:border-slate-600 dark:bg-slate-800 dark:text-slate-100 px-3 py-2 text-sm"
                 value={rockForm.quarter}
+                disabled={rockForm.status === "ROLLED_OVER"}
                 onChange={(e) => setRockForm((f) => ({ ...f, quarter: Number(e.target.value) }))}
               >
                 {[1, 2, 3, 4].map((q) => (
@@ -942,11 +962,13 @@ export default function Rocks() {
               <select
                 className="rounded-md border border-slate-300 dark:border-slate-600 dark:bg-slate-800 dark:text-slate-100 px-3 py-2 text-sm"
                 value={rockForm.status}
+                disabled={rockForm.status === "ROLLED_OVER"}
+                title={rockForm.status === "ROLLED_OVER" ? "Rolled over to the next quarter — update the carried-forward copy instead" : undefined}
                 onChange={(e) => setRockForm((f) => ({ ...f, status: e.target.value as RockStatus }))}
               >
-                {Object.entries(STATUS_LABELS).map(([value, label]) => (
+                {(rockForm.status === "ROLLED_OVER" ? (["ROLLED_OVER"] as RockStatus[]) : EDITABLE_STATUSES).map((value) => (
                   <option key={value} value={value}>
-                    {label}
+                    {STATUS_LABELS[value]}
                   </option>
                 ))}
               </select>
@@ -1040,11 +1062,13 @@ export default function Rocks() {
                     <select
                       className={`rounded-full border-0 px-2 py-1 text-xs font-medium ${STATUS_BADGE[r.status]}`}
                       value={r.status}
+                      disabled={r.status === "ROLLED_OVER"}
+                      title={r.status === "ROLLED_OVER" ? "Rolled over to the next quarter — update the carried-forward copy instead" : undefined}
                       onChange={(e) => quickUpdate(r, { status: e.target.value as RockStatus })}
                     >
-                      {Object.entries(STATUS_LABELS).map(([value, label]) => (
+                      {(r.status === "ROLLED_OVER" ? (["ROLLED_OVER"] as RockStatus[]) : EDITABLE_STATUSES).map((value) => (
                         <option key={value} value={value}>
-                          {label}
+                          {STATUS_LABELS[value]}
                         </option>
                       ))}
                     </select>

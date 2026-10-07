@@ -26,6 +26,7 @@ import {
   toFigures,
 } from "../utils/aggregate";
 import { escalateStaleRocks } from "../utils/rockAutoStatus";
+import { latestRockVersions } from "../utils/rockRollover";
 
 const router = Router();
 router.use(requireAuth);
@@ -340,12 +341,16 @@ export async function computeScorecard(user: AuthUser, params: ScorecardParams) 
   if (!isAllQuarters) rockWhere.quarter = quarter;
   if (rockCompanyIds.length) rockWhere.companyId = { in: rockCompanyIds };
 
-  const rocks = rockCompanyIds.length
-    ? await prisma.rock.findMany({
-        where: rockWhere,
-        include: { company: { select: { id: true, name: true, businessUnitId: true } } },
-      })
-    : [];
+  // latestRockVersions: a Rock carried forward within this scope counts
+  // once (its latest copy), not once per quarter — see utils/rockRollover.ts.
+  const rocks = latestRockVersions(
+    rockCompanyIds.length
+      ? await prisma.rock.findMany({
+          where: rockWhere,
+          include: { company: { select: { id: true, name: true, businessUnitId: true } } },
+        })
+      : []
+  );
 
   const buNameById = new Map(rockBusinessUnits.map((bu) => [bu.id, bu.name]));
 
@@ -355,8 +360,11 @@ export async function computeScorecard(user: AuthUser, params: ScorecardParams) 
     const onTrack = list.filter((r) => r.status === "ON_TRACK").length;
     const atRisk = list.filter((r) => r.status === "AT_RISK").length;
     const pending = list.filter((r) => r.status === "PENDING").length;
+    // Originals that slipped into the next quarter, only present when that
+    // next quarter is outside the current scope (e.g. a single-quarter view).
+    const rolledOver = list.filter((r) => r.status === "ROLLED_OVER").length;
     const avgProgressPct = total ? Math.round(list.reduce((sum, r) => sum + r.progressPct, 0) / total) : 0;
-    return { total, targetMet, onTrack, atRisk, pending, avgProgressPct };
+    return { total, targetMet, onTrack, atRisk, pending, rolledOver, avgProgressPct };
   }
 
   const rocksByBu = new Map<string, typeof rocks>();

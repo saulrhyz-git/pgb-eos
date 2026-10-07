@@ -11,6 +11,7 @@ import {
 import { assertPermission, can, canAnyOf, FINANCIAL_RESOURCES, narrowingApplies } from "../utils/permissions";
 import { addFigures, emptyFigures, Figures, expensesTotal, collectionsTotal, revenueTotal, pct, toFigures } from "../utils/aggregate";
 import { escalateStaleRocks } from "../utils/rockAutoStatus";
+import { latestRockVersions } from "../utils/rockRollover";
 
 /**
  * The Reports engine: a filterable, exportable view over the same
@@ -208,6 +209,7 @@ const ROCK_STATUS_LABELS: Record<string, string> = {
   ON_TRACK: "On Track",
   AT_RISK: "At Risk",
   TARGET_MET: "Target Met",
+  ROLLED_OVER: "Rolled Over",
 };
 
 /**
@@ -314,6 +316,7 @@ function executiveSummaryColumns(): ReportColumn[] {
     { key: "rocksTargetMet", label: "Target Met", type: "number" },
     { key: "rocksOnTrack", label: "On Track", type: "number" },
     { key: "rocksAtRiskPending", label: "At Risk / Pending", type: "number" },
+    { key: "rocksRolledOver", label: "Rolled Over", type: "number" },
     { key: "rocksAvgProgressPct", label: "Avg Progress %", type: "number" },
   ];
 }
@@ -404,12 +407,15 @@ router.get("/executive-summary", async (req, res) => {
   const rockWhere: any = { yearId };
   if (!isAllQuarters) rockWhere.quarter = quarter;
   if (rockCompanyIds.length) rockWhere.companyId = { in: rockCompanyIds };
-  const rocks = rockCompanyIds.length
-    ? await prisma.rock.findMany({
-        where: rockWhere,
-        select: { status: true, progressPct: true, company: { select: { businessUnitId: true } } },
-      })
-    : [];
+  // Rollover-aware: a Rock carried forward within this scope counts once.
+  const rocks = latestRockVersions(
+    rockCompanyIds.length
+      ? await prisma.rock.findMany({
+          where: rockWhere,
+          select: { id: true, rolledFromId: true, status: true, progressPct: true, company: { select: { businessUnitId: true } } },
+        })
+      : []
+  );
   const rocksByBu = new Map<string, typeof rocks>();
   for (const r of rocks) {
     const list = rocksByBu.get(r.company.businessUnitId) || [];
@@ -435,6 +441,7 @@ router.get("/executive-summary", async (req, res) => {
     const rocksTargetMet = buRocks.filter((r) => r.status === "TARGET_MET").length;
     const rocksOnTrack = buRocks.filter((r) => r.status === "ON_TRACK").length;
     const rocksAtRiskPending = buRocks.filter((r) => r.status === "AT_RISK" || r.status === "PENDING").length;
+    const rocksRolledOver = buRocks.filter((r) => r.status === "ROLLED_OVER").length;
     const rocksAvgProgressPct = rocksTotal ? Math.round(buRocks.reduce((sum, r) => sum + r.progressPct, 0) / rocksTotal) : 0;
 
     return {
@@ -446,6 +453,7 @@ router.get("/executive-summary", async (req, res) => {
       rocksTargetMet,
       rocksOnTrack,
       rocksAtRiskPending,
+      rocksRolledOver,
       rocksAvgProgressPct,
     };
   });

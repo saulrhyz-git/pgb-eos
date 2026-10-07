@@ -86,7 +86,9 @@ export function computeAutoRockStatus(progressPct: number, endDate: Date, now: D
 // Prisma.RockWhereInput, since callers build these objects the same way.
 export async function escalateStaleRocks(scopeWhere: Record<string, unknown>): Promise<number> {
   const candidates = await prisma.rock.findMany({
-    where: { ...scopeWhere, status: { not: "TARGET_MET" } },
+    // ROLLED_OVER is frozen too — the live version of that Rock is its copy
+    // in the next quarter, which gets its own auto-status.
+    where: { ...scopeWhere, status: { notIn: ["TARGET_MET", "ROLLED_OVER"] } },
     select: {
       id: true,
       quarter: true,

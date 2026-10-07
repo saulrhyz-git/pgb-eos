@@ -36,6 +36,7 @@ const STATUS_LABELS: Record<RockStatus, string> = {
   ON_TRACK: "On Track",
   AT_RISK: "At Risk",
   TARGET_MET: "Target Met",
+  ROLLED_OVER: "Rolled Over",
 };
 
 function csvEscape(value: string): string {

@@ -599,6 +599,11 @@ enum RockStatus {
   ON_TRACK
   AT_RISK
   TARGET_MET
+  // Set only by POST /api/rocks/rollover on the ORIGINAL Rock once it's been
+  // carried forward into the next quarter (see Rock.rolledFromId). Never
+  // auto-recomputed and not selectable by hand — it means "this quarter's
+  // version slipped; the live version is the copy in the next quarter".
+  ROLLED_OVER
 }
 
 // A strategic objective / theme that Rocks can be tied to. Managed by
@@ -651,6 +656,15 @@ model Rock {
   // since Float can't enforce that at the column level the way
   // @db.Decimal(5, 2) would.
   progressPct    Float      @default(0)
+
+  // Rollover chain. On a carried-forward copy, points at the Rock it was
+  // copied from (whose status becomes ROLLED_OVER). @unique so a Rock can
+  // only ever be rolled forward once — a second rollover of the same
+  // quarter can't duplicate it. Multi-quarter totals use this to count only
+  // the latest version of a Rock (see utils/rockRollover.ts).
+  rolledFromId String?    @unique
+  rolledFrom   Rock?      @relation("RockRollover", fields: [rolledFromId], references: [id], onDelete: SetNull)
+  rolledTo     Rock?      @relation("RockRollover")
 
   createdById String?
   updatedById String?

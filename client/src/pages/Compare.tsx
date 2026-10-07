@@ -22,6 +22,7 @@ type MetricKey =
   | "rocksOnTrack"
   | "rocksAtRisk"
   | "rocksPending"
+  | "rocksRolledOver"
   | "rocksAvgProgressPct"
   | "disbursementsActual";
 
@@ -67,6 +68,7 @@ const SECTIONS: { title: string; metrics: MetricDef[] }[] = [
       { key: "rocksOnTrack", label: "On Track", type: "count" },
       { key: "rocksAtRisk", label: "At Risk", type: "count" },
       { key: "rocksPending", label: "Pending", type: "count" },
+      { key: "rocksRolledOver", label: "Rolled Over", type: "count" },
       { key: "rocksAvgProgressPct", label: "Avg Progress", type: "pct" },
     ],
   },

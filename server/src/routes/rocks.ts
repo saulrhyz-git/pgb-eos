@@ -27,7 +27,11 @@ const router = Router();
 router.use(requireAuth);
 router.use(blockPendingPasswordChange);
 
-const statusEnum = z.enum(["PENDING", "ON_TRACK", "AT_RISK", "TARGET_MET"]);
+// Every status, for read-side filters (GET ?status=...).
+const statusEnum = z.enum(["PENDING", "ON_TRACK", "AT_RISK", "TARGET_MET", "ROLLED_OVER"]);
+// Statuses a person can set by hand. ROLLED_OVER is only ever set by the
+// rollover endpoint below, never typed in.
+const editableStatusEnum = z.enum(["PENDING", "ON_TRACK", "AT_RISK", "TARGET_MET"]);
 
 const rockInclude = {
   company: { select: { id: true, name: true, businessUnitId: true } },
@@ -131,7 +135,7 @@ const createSchema = z.object({
   description: z.string().max(4000).optional().default(""),
   remarks: z.string().max(4000).optional().default(""),
   ownerName: z.string().max(200).optional().default(""),
-  status: statusEnum.optional().default("PENDING"),
+  status: editableStatusEnum.optional().default("PENDING"),
   // Up to 2 decimal places (e.g. 45.25) — rounded server-side so a client
   // can't sneak in more precision than the UI exposes.
   progressPct: z
@@ -172,13 +176,17 @@ router.post("/", async (req, res) => {
 });
 
 // ---------- Rollover ----------
-// Carries every not-yet-complete Rock (status != TARGET_MET) in the given
-// scope forward one quarter: Q1-Q3 roll into Q2-Q4 of the same Year; Q4 rolls
-// into Q1 of the following Year (which must already exist — this endpoint
-// never creates a Year). Each carried-over Rock is a new row in the target
-// quarter with the same details/status/progress; the original Rock in its
-// original quarter is left untouched, so this is a "carry forward a copy",
-// not a "move". Open to Group Integrators, BU Integrators and Superadmins.
+// Carries every not-yet-complete Rock (status not TARGET_MET or already
+// ROLLED_OVER) in the given scope forward one quarter: Q1-Q3 roll into Q2-Q4
+// of the same Year; Q4 rolls into Q1 of the following Year (which must
+// already exist — this endpoint never creates a Year). Each carried-over
+// Rock is a new row in the target quarter with the same details/status/
+// progress and rolledFromId pointing back at the original; the original
+// stays in its quarter (so that quarter's history still shows it slipped)
+// but is marked ROLLED_OVER, which (a) stops it being rolled over a second
+// time — re-running Rollover on the same quarter is a no-op — and (b) lets
+// multi-quarter totals count only the latest version (utils/rockRollover.ts).
+// rolledFromId is also UNIQUE in the database as a backstop. Open to Group Integrators, BU Integrators and Superadmins.
 // Scope is enforced the same way as every other Rocks query: a BU Integrator
 // (or a BU-assigned Group Integrator) only ever rolls over Rocks in their
 // assigned Business Unit(s) — scopedBusinessUnitFilter() narrows a broad
@@ -226,7 +234,7 @@ router.post("/rollover", requireRole("GROUP_INTEGRATOR", "BU_INTEGRATOR", "SUPER
     targetQuarter = 1;
   }
 
-  const where: any = { yearId, quarter, status: { not: "TARGET_MET" } };
+  const where: any = { yearId, quarter, status: { notIn: ["TARGET_MET", "ROLLED_OVER"] } };
   if (businessGoalId) where.businessGoalId = businessGoalId;
 
   if (companyId) {
@@ -260,27 +268,51 @@ router.post("/rollover", requireRole("GROUP_INTEGRATOR", "BU_INTEGRATOR", "SUPER
     return res.json({ rolledOver: 0, targetYearId, targetQuarter, rocks: [] });
   }
 
-  const created = await prisma.$transaction(
-    sourceRocks.map((r) =>
-      prisma.rock.create({
-        data: {
-          companyId: r.companyId,
-          yearId: targetYearId,
-          quarter: targetQuarter,
-          businessGoalId: r.businessGoalId,
-          title: r.title,
-          description: r.description,
-          remarks: r.remarks,
-          ownerName: r.ownerName,
-          status: r.status,
-          progressPct: r.progressPct,
-          createdById: user.id,
-          updatedById: user.id,
-        },
-        include: rockInclude,
-      })
-    )
-  );
+  // One transaction: create every copy (linked back via rolledFromId), then
+  // mark the originals ROLLED_OVER. If anything fails nothing is written.
+  let created;
+  try {
+    created = await prisma.$transaction(
+      async (tx) => {
+        const copies = [];
+        for (const r of sourceRocks) {
+          copies.push(
+            await tx.rock.create({
+              data: {
+                rolledFromId: r.id,
+                companyId: r.companyId,
+                yearId: targetYearId,
+                quarter: targetQuarter,
+                businessGoalId: r.businessGoalId,
+                title: r.title,
+                description: r.description,
+                remarks: r.remarks,
+                ownerName: r.ownerName,
+                status: r.status,
+                progressPct: r.progressPct,
+                createdById: user.id,
+                updatedById: user.id,
+              },
+              include: rockInclude,
+            })
+          );
+        }
+        await tx.rock.updateMany({
+          where: { id: { in: sourceRocks.map((r) => r.id) } },
+          data: { status: "ROLLED_OVER", updatedById: user.id },
+        });
+        return copies;
+      },
+      { timeout: 30_000 }
+    );
+  } catch (err: any) {
+    // Unique rolledFromId: someone else rolled these same Rocks over at the
+    // same moment. Nothing was written (the transaction rolled back).
+    if (err?.code === "P2002") {
+      return res.status(409).json({ error: "These Rocks were just rolled over by someone else. Refresh to see the result." });
+    }
+    throw err;
+  }
 
   await logAudit({
     user: req.user,
@@ -300,6 +332,9 @@ const updateSchema = z.object({
   description: z.string().max(4000).optional(),
   remarks: z.string().max(4000).optional(),
   ownerName: z.string().max(200).optional(),
+  // ROLLED_OVER is also accepted, but only as a no-op on a Rock that's
+  // already ROLLED_OVER (the edit form re-sends the current status) — see
+  // the PUT handler.
   status: statusEnum.optional(),
   progressPct: z
     .number()
@@ -324,6 +359,22 @@ router.put("/:id", async (req, res) => {
     if (parsed.data.businessGoalId) await assertBusinessGoalUsable(parsed.data.businessGoalId, businessUnitId);
   } catch (err: any) {
     return res.status(err.status || 500).json({ error: err.message });
+  }
+
+  // A rolled-over original is frozen in its quarter: its live version is the
+  // copy in the next quarter, so reviving it here (new status or a move to
+  // another quarter) would double-count the same Rock. Text fields (remarks,
+  // description, etc.) stay editable. To undo a rollover, delete the copy —
+  // that restores this original (see DELETE below).
+  if (existing.status === "ROLLED_OVER") {
+    if ((parsed.data.status && parsed.data.status !== "ROLLED_OVER") || (parsed.data.quarter && parsed.data.quarter !== existing.quarter)) {
+      return res.status(400).json({
+        error:
+          "This Rock was rolled over to the next quarter, so its status and quarter are locked. Update the carried-forward copy instead, or delete that copy to undo the rollover.",
+      });
+    }
+  } else if (parsed.data.status === "ROLLED_OVER") {
+    return res.status(400).json({ error: "Rolled Over is set automatically by Rollover and can't be chosen by hand." });
   }
 
   const rock = await prisma.rock.update({
@@ -355,13 +406,29 @@ router.delete("/:id", async (req, res) => {
     return res.status(err.status || 500).json({ error: err.message });
   }
 
-  await prisma.rock.delete({ where: { id: req.params.id } });
+  // Deleting a carried-forward copy undoes that rollover: the original goes
+  // back to being the live version, so it's taken out of ROLLED_OVER and
+  // re-run through the normal auto-status rule. (Deleting an original that
+  // has a copy just clears the copy's rolledFromId via ON DELETE SET NULL.)
+  await prisma.$transaction(async (tx) => {
+    await tx.rock.delete({ where: { id: req.params.id } });
+    if (existing.rolledFromId) {
+      await tx.rock.updateMany({
+        where: { id: existing.rolledFromId, status: "ROLLED_OVER" },
+        data: { status: "PENDING", updatedById: req.user!.id },
+      });
+    }
+  });
+  if (existing.rolledFromId) await escalateStaleRocks({ id: existing.rolledFromId });
+
   await logAudit({
     user: req.user,
     action: "ROCK_DELETE",
     entityType: "Rock",
     entityId: existing.id,
-    summary: `Deleted Rock "${existing.title}"`,
+    summary: existing.rolledFromId
+      ? `Deleted Rock "${existing.title}" (a rolled-over copy — original restored as the live version)`
+      : `Deleted Rock "${existing.title}"`,
   });
   res.status(204).send();
 });

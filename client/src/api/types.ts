@@ -341,7 +341,9 @@ export interface ReportResult {
   rows: Record<string, string | number>[];
 }
 
-export type RockStatus = "PENDING" | "ON_TRACK" | "AT_RISK" | "TARGET_MET";
+// ROLLED_OVER is set only by Rollover, on the original Rock once it's been
+// carried forward (the copy points back at it via rolledFromId).
+export type RockStatus = "PENDING" | "ON_TRACK" | "AT_RISK" | "TARGET_MET" | "ROLLED_OVER";
 
 export interface BusinessGoal {
   id: string;
@@ -403,6 +405,7 @@ export interface ScorecardRocksSummary {
   onTrack: number;
   atRisk: number;
   pending: number;
+  rolledOver: number;
   avgProgressPct: number;
 }
 
@@ -530,6 +533,8 @@ export interface NoteEntry {
 
 export interface Rock {
   id: string;
+  // Set on a carried-forward copy — the id of the Rock it was rolled over from.
+  rolledFromId: string | null;
   companyId: string;
   yearId: string;
   quarter: number;
@@ -583,6 +588,7 @@ export interface ComparisonSnapshot {
   rocksOnTrack: number;
   rocksAtRisk: number;
   rocksPending: number;
+  rocksRolledOver: number;
   rocksAvgProgressPct: number;
   disbursementsActual: number;
 }
