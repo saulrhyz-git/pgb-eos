@@ -93,12 +93,12 @@ model User {
   // any number of Custom Roles (see UserCustomRole below), not just one.
   customRoles UserCustomRole[]
 
-  businessUnits       UserBusinessUnit[]
-  actualEdits         QuarterActual[]      @relation("ActualEditedBy")
-  disbursementEdits   DisbursementActual[] @relation("DisbursementEditedBy")
-  rockCreations       Rock[]               @relation("RockCreatedBy")
-  rockEdits           Rock[]               @relation("RockUpdatedBy")
-  targetLocks         TargetLock[]
+  businessUnits     UserBusinessUnit[]
+  actualEdits       QuarterActual[]      @relation("ActualEditedBy")
+  disbursementEdits DisbursementActual[] @relation("DisbursementEditedBy")
+  rockCreations     Rock[]               @relation("RockCreatedBy")
+  rockEdits         Rock[]               @relation("RockUpdatedBy")
+  targetLocks       TargetLock[]
 
   @@index([role])
 }
@@ -180,7 +180,7 @@ model AuditLog {
   entityType String // e.g. "User", "QuarterTarget", "Rock", "BusinessUnit"
   entityId   String?
   summary    String // human-readable one-line description
-  metadata   Json?  // optional structured details (e.g. changed fields, old/new values)
+  metadata   Json? // optional structured details (e.g. changed fields, old/new values)
 
   @@index([createdAt])
   @@index([userId])
@@ -237,10 +237,10 @@ model AppSettings {
 
 // Join table: which BU(s) a BU Integrator is responsible for.
 model UserBusinessUnit {
-  userId        String
+  userId         String
   businessUnitId String
-  user         User         @relation(fields: [userId], references: [id], onDelete: Cascade)
-  businessUnit BusinessUnit @relation(fields: [businessUnitId], references: [id], onDelete: Cascade)
+  user           User         @relation(fields: [userId], references: [id], onDelete: Cascade)
+  businessUnit   BusinessUnit @relation(fields: [businessUnitId], references: [id], onDelete: Cascade)
 
   @@id([userId, businessUnitId])
   @@index([businessUnitId])
@@ -251,9 +251,9 @@ model BusinessUnit {
   name      String   @unique
   createdAt DateTime @default(now())
 
-  companies      Company[]
-  users          UserBusinessUnit[]
-  businessGoals  BusinessGoalBusinessUnit[]
+  companies       Company[]
+  users           UserBusinessUnit[]
+  businessGoals   BusinessGoalBusinessUnit[]
   rolePermissions RolePermission[]
 }
 
@@ -300,6 +300,22 @@ model Year {
   q2EndDate DateTime?
   q3EndDate DateTime?
   q4EndDate DateTime?
+
+  // Year wrap-up (see routes/years.ts). Once wrappedUpAt is set the whole
+  // Year is soft-locked: every write that touches this Year's data
+  // (targets, actuals, disbursements, notes, Rocks, quarter end dates,
+  // target locks) is refused by utils/yearLock.ts, and the Rocks auto-status
+  // rule stops recomputing its Rocks. "Soft" because nothing is deleted or
+  // moved — a Superadmin can reopen the Year (with a reason, audit-logged).
+  // wrappedUpByName is a snapshot (no FK), same convention as AuditLog, so
+  // it still reads correctly if that user is later deleted.
+  wrappedUpAt     DateTime?
+  wrappedUpById   String?
+  wrappedUpByName String?
+  // The full-year report generated at wrap-up (utils/yearReport.ts), frozen
+  // as JSON so it reads the same forever, even if Company/BU names or data
+  // change later. Replaced if the Year is reopened and wrapped up again.
+  wrapUpReport    Json?
 
   quarterTargets      QuarterTarget[]
   quarterActuals      QuarterActual[]
@@ -662,9 +678,9 @@ model Rock {
   // only ever be rolled forward once — a second rollover of the same
   // quarter can't duplicate it. Multi-quarter totals use this to count only
   // the latest version of a Rock (see utils/rockRollover.ts).
-  rolledFromId String?    @unique
-  rolledFrom   Rock?      @relation("RockRollover", fields: [rolledFromId], references: [id], onDelete: SetNull)
-  rolledTo     Rock?      @relation("RockRollover")
+  rolledFromId String? @unique
+  rolledFrom   Rock?   @relation("RockRollover", fields: [rolledFromId], references: [id], onDelete: SetNull)
+  rolledTo     Rock?   @relation("RockRollover")
 
   createdById String?
   updatedById String?

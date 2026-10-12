@@ -1,6 +1,7 @@
 import { useEffect, useState } from "react";
 import { Link, NavLink, Outlet } from "react-router-dom";
 import {
+  CalendarCheck,
   ChevronsLeft,
   ChevronsRight,
   ClipboardEdit,
@@ -90,6 +91,12 @@ export default function Layout() {
           <FileSpreadsheet className="h-4 w-4 shrink-0" />
           {showLabels && "Reports"}
         </NavLink>
+        {(user?.role === "GROUP_INTEGRATOR" || user?.role === "SUPERADMIN") && (
+          <NavLink to="/years" className={linkClass} onClick={closeMobile} title="Years">
+            <CalendarCheck className="h-4 w-4 shrink-0" />
+            {showLabels && "Years"}
+          </NavLink>
+        )}
         {/* Default access is Superadmin; shown unconditionally to everyone
             (same as Scorecard/Reports/Audit Log) since the backend is the
             real gate — a user without AI_ANALYSIS view just sees the
@@ -127,10 +134,10 @@ export default function Layout() {
     // shows/hides, rather than always reserving a fixed 100vh that can run
     // taller than what's actually visible — see the matching note in
     // index.css.
-    <div className="flex min-h-dvh bg-slate-50 dark:bg-slate-950">
+    <div className="flex min-h-dvh bg-slate-50 dark:bg-slate-950 print:bg-white">
       {/* ---------- Desktop sidebar (collapsible icon-only / icon+label) ---------- */}
       <aside
-        className={`sticky top-0 hidden h-dvh shrink-0 flex-col border-r border-slate-200 dark:border-slate-700 bg-white dark:bg-slate-900 transition-[width] duration-200 md:flex ${
+        className={`print:!hidden sticky top-0 hidden h-dvh shrink-0 flex-col border-r border-slate-200 dark:border-slate-700 bg-white dark:bg-slate-900 transition-[width] duration-200 md:flex ${
           collapsed ? "w-16" : "w-60"
         }`}
       >
@@ -214,7 +221,7 @@ export default function Layout() {
 
       {/* ---------- Main column ---------- */}
       <div className="flex min-h-dvh flex-1 flex-col">
-        <header className="border-b border-slate-200 dark:border-slate-700 bg-white dark:bg-slate-900">
+        <header className="print:!hidden border-b border-slate-200 dark:border-slate-700 bg-white dark:bg-slate-900">
           <div className="flex items-center justify-between gap-2 py-3 pl-[calc(1rem+env(safe-area-inset-left))] pr-[calc(1rem+env(safe-area-inset-right))] sm:pl-[calc(1.5rem+env(safe-area-inset-left))] sm:pr-[calc(1.5rem+env(safe-area-inset-right))]">
             <div className="flex items-center gap-2">
               <button

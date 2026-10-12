@@ -10,6 +10,7 @@ import {
   scopedBusinessUnitFilter,
 } from "../middleware/auth";
 import { can, narrowingApplies, PermissionError } from "../utils/permissions";
+import { assertYearOpen } from "../utils/yearLock";
 import { logAudit } from "../utils/auditLog";
 
 // Disbursements: recorded — not targeted — per Company/Year/Quarter, same
@@ -98,6 +99,7 @@ router.put("/", async (req, res) => {
   const { companyId, yearId, quarter, amount, remarks } = parsed.data;
 
   try {
+    await assertYearOpen(yearId);
     const businessUnitId = await resolveCompanyBusinessUnit(companyId);
     assertBusinessUnitAccess(req.user!, businessUnitId);
     const permRows = await loadUserPermissions(req.user!);

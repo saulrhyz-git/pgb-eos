@@ -4,6 +4,7 @@ import { prisma } from "../lib/prisma";
 import { blockPendingPasswordChange, loadUserPermissions, requireAuth, requireRole, scopedBusinessUnitFilter } from "../middleware/auth";
 import { ALL_RESOURCES, canAny, narrowingApplies } from "../utils/permissions";
 import { currentCalendarQuarter } from "../utils/quarterDates";
+import { YearLockedError } from "../utils/yearLock";
 import { logAudit } from "../utils/auditLog";
 
 const router = Router();
@@ -12,8 +13,25 @@ router.use(blockPendingPasswordChange);
 
 // ---------- Years ----------
 
+// Every Year field except wrapUpReport (a large JSON blob, served on its own
+// by GET /api/years/:id/wrap-up/report).
+const YEAR_PUBLIC_SELECT = {
+  id: true,
+  year: true,
+  createdAt: true,
+  q1EndDate: true,
+  q2EndDate: true,
+  q3EndDate: true,
+  q4EndDate: true,
+  wrappedUpAt: true,
+  wrappedUpById: true,
+  wrappedUpByName: true,
+} as const;
+
+// The wrap-up report itself (a large JSON blob) is left out here — it's
+// fetched on its own from GET /api/years/:id/wrap-up/report.
 router.get("/years", async (_req, res) => {
-  const years = await prisma.year.findMany({ orderBy: { year: "desc" } });
+  const years = await prisma.year.findMany({ orderBy: { year: "desc" }, select: YEAR_PUBLIC_SELECT });
   res.json(years);
 });
 
@@ -31,17 +49,26 @@ router.get("/current-quarter", async (_req, res) => {
 router.post("/years", requireRole("GROUP_INTEGRATOR", "SUPERADMIN"), async (req, res) => {
   const parsed = z.object({ year: z.number().int().min(2000).max(2100) }).safeParse(req.body);
   if (!parsed.success) return res.status(400).json({ error: "Valid 'year' is required" });
-  const year = await prisma.year.upsert({
-    where: { year: parsed.data.year },
-    update: {},
-    create: { year: parsed.data.year },
-  });
+  // A new Year always starts as a blank slate: no Targets, Actuals,
+  // Disbursements, Notes, Rocks, Target Locks or Quarter End Dates are
+  // copied from any other Year. (Business Units, Companies, Business Goals,
+  // users and roles aren't per-Year, so they're simply shared.) Creating a
+  // Year that already exists is refused rather than silently returning it.
+  const existing = await prisma.year.findUnique({ where: { year: parsed.data.year } });
+  if (existing) return res.status(409).json({ error: `Year ${parsed.data.year} already exists.` });
+  let year;
+  try {
+    year = await prisma.year.create({ data: { year: parsed.data.year }, select: YEAR_PUBLIC_SELECT });
+  } catch (err: any) {
+    if (err.code === "P2002") return res.status(409).json({ error: `Year ${parsed.data.year} already exists.` });
+    throw err;
+  }
   await logAudit({
     user: req.user,
     action: "YEAR_CREATE",
     entityType: "Year",
     entityId: year.id,
-    summary: `Created Year ${year.year}`,
+    summary: `Created Year ${year.year} (blank slate)`,
   });
   res.status(201).json(year);
 });
@@ -66,6 +93,7 @@ router.put("/years/:id/quarter-end-dates", requireRole("GROUP_INTEGRATOR", "SUPE
 
   const existing = await prisma.year.findUnique({ where: { id: req.params.id } });
   if (!existing) return res.status(404).json({ error: "Year not found" });
+  if (existing.wrappedUpAt) return res.status(423).json({ error: new YearLockedError(existing.year).message });
 
   const data: Record<string, Date | null> = {};
   for (const key of ["q1EndDate", "q2EndDate", "q3EndDate", "q4EndDate"] as const) {
@@ -75,7 +103,7 @@ router.put("/years/:id/quarter-end-dates", requireRole("GROUP_INTEGRATOR", "SUPE
     }
   }
 
-  const year = await prisma.year.update({ where: { id: req.params.id }, data });
+  const year = await prisma.year.update({ where: { id: req.params.id }, data, select: YEAR_PUBLIC_SELECT });
   await logAudit({
     user: req.user,
     action: "YEAR_QUARTER_END_DATES_UPDATE",

@@ -27,6 +27,8 @@ import AdminNoteCategories from "./pages/admin/AdminNoteCategories";
 import AdminFeatureFlags from "./pages/admin/AdminFeatureFlags";
 import AdminAuditLog from "./pages/admin/AdminAuditLog";
 import AdminLayout from "./pages/admin/AdminLayout";
+import Years from "./pages/Years";
+import YearReport from "./pages/YearReport";
 
 function RequireAuth({ children }: { children: JSX.Element }) {
   const { user, loading } = useAuth();
@@ -103,6 +105,10 @@ export default function App() {
             there's just one Data Entry tab covering every recorded figure. */}
         <Route path="data-entry" element={<IntegratorPortal />} />
         <Route path="targets" element={<TargetConfig />} />
+        {/* Year management + wrap-up (Group Integrator / Superadmin — the
+            page shows a notice to anyone else, and the server enforces it). */}
+        <Route path="years" element={<Years />} />
+        <Route path="years/:id/report" element={<YearReport />} />
         {/* This top-level /audit-log route exists only so a non-superadmin
             granted AUDIT_LOG view through a Custom Role has a way to reach
             the page at all, since /admin/* below is entirely gated by

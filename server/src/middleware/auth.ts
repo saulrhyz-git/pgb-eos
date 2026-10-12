@@ -102,7 +102,7 @@ export function blockPendingPasswordChange(req: Request, res: Response, next: Ne
  * businessUnitIds is always empty — every coarse check below denies them by
  * default.
  */
-function hasGlobalBusinessUnitAccess(user: AuthUser): boolean {
+export function hasGlobalBusinessUnitAccess(user: AuthUser): boolean {
   if (user.role === "SUPERADMIN") return true;
   if (user.role === "GROUP_INTEGRATOR") return user.businessUnitIds.length === 0;
   if (user.role === null) return user.customRoleIds.length > 0;

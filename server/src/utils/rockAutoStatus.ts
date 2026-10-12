@@ -88,7 +88,9 @@ export async function escalateStaleRocks(scopeWhere: Record<string, unknown>): P
   const candidates = await prisma.rock.findMany({
     // ROLLED_OVER is frozen too — the live version of that Rock is its copy
     // in the next quarter, which gets its own auto-status.
-    where: { ...scopeWhere, status: { notIn: ["TARGET_MET", "ROLLED_OVER"] } },
+    // A wrapped-up Year is frozen (see utils/yearLock.ts) — its Rocks keep
+    // whatever status they had at wrap-up instead of drifting afterwards.
+    where: { ...scopeWhere, status: { notIn: ["TARGET_MET", "ROLLED_OVER"] }, year: { wrappedUpAt: null } },
     select: {
       id: true,
       quarter: true,

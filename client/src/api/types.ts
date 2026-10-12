@@ -117,6 +117,94 @@ export interface Year {
   q2EndDate: string | null;
   q3EndDate: string | null;
   q4EndDate: string | null;
+  // Year wrap-up: once set, the whole Year is read-only (see
+  // server/src/utils/yearLock.ts). A Superadmin can reopen it.
+  wrappedUpAt: string | null;
+  wrappedUpById: string | null;
+  wrappedUpByName: string | null;
+}
+
+export interface YearWrapUpPreview {
+  yearId: string;
+  year: number;
+  wrappedUpAt: string | null;
+  wrappedUpByName: string | null;
+  yearEnded: boolean;
+  companiesTotal: number;
+  companiesWithActuals: number;
+  rocksTotal: number;
+  openRocks: number;
+  openQ4Rocks: number;
+  nextYearExists: boolean;
+  canWrapUp: boolean;
+}
+
+// Mirrors server/src/utils/yearReport.ts — the frozen full-year report.
+export interface YearReportPeriod {
+  revenueTarget: number;
+  revenueActual: number;
+  revenueAttainmentPct: number;
+  collectionsTarget: number;
+  collectionsActual: number;
+  collectionsAttainmentPct: number;
+  expensesTarget: number;
+  expensesActual: number;
+  expensesAttainmentPct: number;
+  netIncomeTarget: number;
+  netIncomeActual: number;
+  disbursementsActual: number;
+}
+
+export interface YearReportRockSummary {
+  total: number;
+  targetMet: number;
+  onTrack: number;
+  atRisk: number;
+  pending: number;
+  rolledOver: number;
+  avgProgressPct: number;
+  completionPct: number;
+}
+
+export interface YearReportRockItem {
+  id: string;
+  rolledFromId: string | null;
+  businessUnitId: string;
+  businessUnitName: string;
+  companyName: string;
+  quarter: number;
+  title: string;
+  businessGoalName: string;
+  ownerName: string;
+  status: RockStatus;
+  progressPct: number;
+  remarks: string;
+}
+
+export interface YearReportData {
+  version: 1;
+  year: number;
+  generatedAt: string;
+  generatedBy: { id: string; name: string };
+  quarterEndDates: string[];
+  annual: YearReportPeriod;
+  quarters: YearReportPeriod[];
+  businessUnits: {
+    businessUnitId: string;
+    businessUnitName: string;
+    annual: YearReportPeriod;
+    quarters: YearReportPeriod[];
+    companies: { companyId: string; companyName: string; annual: YearReportPeriod; quarters: YearReportPeriod[] }[];
+  }[];
+  rocks: {
+    summary: YearReportRockSummary;
+    byQuarter: YearReportRockSummary[];
+    byBusinessUnit: (YearReportRockSummary & { businessUnitId: string; businessUnitName: string })[];
+    byGoal: (YearReportRockSummary & { businessGoalName: string })[];
+    items: YearReportRockItem[];
+  };
+  wrappedUpAt: string;
+  wrappedUpByName: string | null;
 }
 
 // A manual, admin-controlled lock on one Quarter of a Year's Targets (Group

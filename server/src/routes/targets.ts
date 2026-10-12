@@ -11,6 +11,7 @@ import {
   scopedBusinessUnitFilter,
 } from "../middleware/auth";
 import { assertPermission, can, narrowingApplies } from "../utils/permissions";
+import { YearLockedError } from "../utils/yearLock";
 import { logAudit } from "../utils/auditLog";
 
 const router = Router();
@@ -241,8 +242,9 @@ router.put("/quarter", async (req, res) => {
 
   const { companyId, yearId, quarter, ...figures } = parsed.data;
 
-  const yearRow = await prisma.year.findUnique({ where: { id: yearId }, select: { year: true } });
+  const yearRow = await prisma.year.findUnique({ where: { id: yearId }, select: { year: true, wrappedUpAt: true } });
   if (!yearRow) return res.status(404).json({ error: "Year not found" });
+  if (yearRow.wrappedUpAt) return res.status(423).json({ error: new YearLockedError(yearRow.year).message });
   const manualLock = await prisma.targetLock.findUnique({ where: { yearId_quarter: { yearId, quarter } } });
   if (manualLock) {
     return res.status(403).json({ error: "This quarter has been manually locked by an admin and can no longer be edited" });
@@ -311,8 +313,9 @@ router.post("/quarter/bulk", async (req, res) => {
   }
   const { yearId, rows } = parsed.data;
 
-  const yearRow = await prisma.year.findUnique({ where: { id: yearId }, select: { year: true } });
+  const yearRow = await prisma.year.findUnique({ where: { id: yearId }, select: { year: true, wrappedUpAt: true } });
   if (!yearRow) return res.status(404).json({ error: "Year not found" });
+  if (yearRow.wrappedUpAt) return res.status(423).json({ error: new YearLockedError(yearRow.year).message });
 
   const manuallyLockedQuarters = await getManuallyLockedQuarters(yearId);
   const permRows = await loadUserPermissions(req.user!);
@@ -417,8 +420,9 @@ router.put("/annual", async (req, res) => {
 
   const { companyId, yearId, ...annualFigures } = parsed.data;
 
-  const yearRow = await prisma.year.findUnique({ where: { id: yearId }, select: { year: true } });
+  const yearRow = await prisma.year.findUnique({ where: { id: yearId }, select: { year: true, wrappedUpAt: true } });
   if (!yearRow) return res.status(404).json({ error: "Year not found" });
+  if (yearRow.wrappedUpAt) return res.status(423).json({ error: new YearLockedError(yearRow.year).message });
 
   const manuallyLockedQuarters = await getManuallyLockedQuarters(yearId);
   const editableQuarters = [1, 2, 3, 4].filter((q) => !manuallyLockedQuarters.has(q));
@@ -504,8 +508,9 @@ router.post("/lock", requireRole("GROUP_INTEGRATOR", "SUPERADMIN"), async (req, 
   if (!parsed.success) return res.status(400).json({ error: "Invalid lock payload", details: parsed.error.issues });
   const { yearId, quarter } = parsed.data;
 
-  const yearRow = await prisma.year.findUnique({ where: { id: yearId }, select: { year: true } });
+  const yearRow = await prisma.year.findUnique({ where: { id: yearId }, select: { year: true, wrappedUpAt: true } });
   if (!yearRow) return res.status(404).json({ error: "Year not found" });
+  if (yearRow.wrappedUpAt) return res.status(423).json({ error: new YearLockedError(yearRow.year).message });
 
   // Idempotent: locking an already-locked quarter is a no-op, not an error —
   // simpler for the frontend than needing to check state before every click.
@@ -543,8 +548,9 @@ router.post("/unlock", requireRole("GROUP_INTEGRATOR", "SUPERADMIN"), async (req
   if (!parsed.success) return res.status(400).json({ error: parsed.error.issues[0]?.message || "Invalid unlock payload", details: parsed.error.issues });
   const { yearId, quarter, reason } = parsed.data;
 
-  const yearRow = await prisma.year.findUnique({ where: { id: yearId }, select: { year: true } });
+  const yearRow = await prisma.year.findUnique({ where: { id: yearId }, select: { year: true, wrappedUpAt: true } });
   if (!yearRow) return res.status(404).json({ error: "Year not found" });
+  if (yearRow.wrappedUpAt) return res.status(423).json({ error: new YearLockedError(yearRow.year).message });
 
   const existing = await prisma.targetLock.findUnique({ where: { yearId_quarter: { yearId, quarter } } });
   if (!existing) return res.status(404).json({ error: "This quarter isn't manually locked" });

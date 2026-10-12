@@ -14,6 +14,7 @@ import {
   X,
 } from "lucide-react";
 import { api } from "../api/client";
+import YearLockedBanner, { isYearLocked } from "../components/YearLockedBanner";
 import { useAuth } from "../contexts/AuthContext";
 import Pagination from "../components/Pagination";
 import SortableTh from "../components/SortableTh";
@@ -173,6 +174,9 @@ export default function Rocks() {
   const [rocks, setRocks] = useState<Rock[]>([]);
 
   const [yearId, setYearId] = useState("");
+  // Wrapped-up Years are read-only (server/src/utils/yearLock.ts).
+  const selectedYearRow = years.find((y) => y.id === yearId);
+  const yearLocked = isYearLocked(selectedYearRow);
   const [quarter, setQuarter] = useState(0); // 0 = All Quarters
   const [businessUnitId, setBusinessUnitId] = useState("");
   const [companyId, setCompanyId] = useState("");
@@ -658,7 +662,7 @@ export default function Rocks() {
           {canRollover && (
             <button
               onClick={handleRollover}
-              disabled={rollingOver || !yearId || !quarter}
+              disabled={rollingOver || !yearId || !quarter || yearLocked}
               title={
                 !quarter
                   ? "Select a specific Quarter (not All Quarters) to roll over"
@@ -672,12 +676,15 @@ export default function Rocks() {
           )}
           <button
             onClick={startAddRock}
-            className="flex items-center justify-center gap-2 rounded-md bg-brand-500 px-3 py-2 text-sm font-medium text-white hover:bg-brand-600"
+            disabled={yearLocked}
+            className="flex items-center justify-center gap-2 rounded-md bg-brand-500 px-3 py-2 text-sm font-medium text-white hover:bg-brand-600 disabled:cursor-not-allowed disabled:opacity-50"
           >
             <Plus className="h-4 w-4" /> Add Rock
           </button>
         </div>
       </div>
+
+      <YearLockedBanner year={selectedYearRow} showReportLink={canManageStructure} />
 
       {error && <div className="rounded-md bg-red-50 dark:bg-red-950/40 px-4 py-3 text-sm text-red-600 dark:text-red-400">{error}</div>}
 

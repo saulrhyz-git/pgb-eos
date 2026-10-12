@@ -10,6 +10,7 @@ import {
   scopedBusinessUnitFilter,
 } from "../middleware/auth";
 import { can, narrowingApplies, PermissionError, Resource } from "../utils/permissions";
+import { assertYearOpen } from "../utils/yearLock";
 import { logAudit } from "../utils/auditLog";
 
 // Shared implementation for the "notable line items" record-keeping facility
@@ -113,6 +114,7 @@ function buildNotesRouter(opts: {
 
     let businessUnitId: string;
     try {
+      await assertYearOpen(yearId);
       businessUnitId = await resolveCompanyBusinessUnit(companyId);
       assertBusinessUnitAccess(req.user!, businessUnitId);
       const permRows = await loadUserPermissions(req.user!);
@@ -148,6 +150,7 @@ function buildNotesRouter(opts: {
     if (!existing) return res.status(404).json({ error: "Not found" });
 
     try {
+      await assertYearOpen(existing.yearId);
       const businessUnitId = await resolveCompanyBusinessUnit(existing.companyId);
       assertBusinessUnitAccess(req.user!, businessUnitId);
       const permRows = await loadUserPermissions(req.user!);

@@ -1,6 +1,7 @@
 import { FormEvent, useEffect, useState } from "react";
 import { CheckCircle2, Plus, Save, Trash2, Upload } from "lucide-react";
 import { api } from "../api/client";
+import YearLockedBanner, { isYearLocked } from "../components/YearLockedBanner";
 import type { BusinessUnit, Company, NoteCategory, NoteEntry, Year } from "../api/types";
 import { useAuth } from "../contexts/AuthContext";
 import BulkDataEntryUpload from "../components/BulkDataEntryUpload";
@@ -611,6 +612,10 @@ export default function IntegratorPortal() {
           : "You can enter or override Revenue, Collections, Expenses, and Disbursements figures for any company."}
       </p>
 
+      <div className="mb-4 empty:hidden">
+        <YearLockedBanner year={currentYear} showReportLink={user?.role === "GROUP_INTEGRATOR" || user?.role === "SUPERADMIN"} />
+      </div>
+
       <form onSubmit={handleSubmit} className="flex flex-col gap-6 rounded-lg border border-slate-200 dark:border-slate-700 bg-white dark:bg-slate-900 p-4 shadow-sm sm:p-6">
         <div className="grid grid-cols-1 gap-4 xs:grid-cols-2 sm:grid-cols-4">
           <div className="flex flex-col gap-1">
@@ -790,7 +795,7 @@ export default function IntegratorPortal() {
 
         <button
           type="submit"
-          disabled={saving || !companyId || !yearId}
+          disabled={saving || !companyId || !yearId || isYearLocked(currentYear)}
           className="flex items-center justify-center gap-2 rounded-md bg-brand-500 px-4 py-2 text-sm font-medium text-white hover:bg-brand-600 disabled:opacity-50"
         >
           {saved ? <CheckCircle2 className="h-4 w-4" /> : <Save className="h-4 w-4" />}

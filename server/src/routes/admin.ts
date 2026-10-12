@@ -3,6 +3,7 @@ import bcrypt from "bcryptjs";
 import { z } from "zod";
 import { prisma } from "../lib/prisma";
 import { blockPendingPasswordChange, requireAuth, requireRole } from "../middleware/auth";
+import { assertNoWrappedUpYearData } from "../utils/yearLock";
 import { logAudit } from "../utils/auditLog";
 
 // Superadmin-only management surface: full CRUD over Users, Companies, and
@@ -287,6 +288,8 @@ router.put("/business-units/:id", async (req, res) => {
 
 router.delete("/business-units/:id", async (req, res) => {
   try {
+    const companies = await prisma.company.findMany({ where: { businessUnitId: req.params.id }, select: { id: true } });
+    await assertNoWrappedUpYearData(companies.map((c) => c.id));
     const bu = await prisma.businessUnit.delete({ where: { id: req.params.id } });
     await logAudit({
       user: req.user,
@@ -298,6 +301,7 @@ router.delete("/business-units/:id", async (req, res) => {
     res.status(204).send();
   } catch (err: any) {
     if (err.code === "P2025") return res.status(404).json({ error: "Business unit not found" });
+    if (err.status) return res.status(err.status).json({ error: err.message });
     throw err;
   }
 });
@@ -333,6 +337,7 @@ router.put("/companies/:id", async (req, res) => {
 
 router.delete("/companies/:id", async (req, res) => {
   try {
+    await assertNoWrappedUpYearData([req.params.id]);
     const company = await prisma.company.delete({ where: { id: req.params.id } });
     await logAudit({
       user: req.user,
@@ -344,6 +349,7 @@ router.delete("/companies/:id", async (req, res) => {
     res.status(204).send();
   } catch (err: any) {
     if (err.code === "P2025") return res.status(404).json({ error: "Company not found" });
+    if (err.status) return res.status(err.status).json({ error: err.message });
     throw err;
   }
 });

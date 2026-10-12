@@ -2,7 +2,8 @@ import { useCallback, useEffect, useState } from "react";
 import { NavLink, Outlet } from "react-router-dom";
 import { LayoutDashboard, Wallet, Receipt, HandCoins, Scale } from "lucide-react";
 import { api } from "../../api/client";
-import type { DashboardResponse } from "../../api/types";
+import type { DashboardResponse, Year } from "../../api/types";
+import YearLockedBanner from "../../components/YearLockedBanner";
 import FilterBar, { DashboardFilters } from "../../components/FilterBar";
 
 // Shared context handed down to each of the 4 leaf tabs below via
@@ -43,7 +44,12 @@ export default function FinancialsLayout() {
 
   useEffect(() => {
     api.appSettings().then((s) => setNiatEnabled(s.niatEnabled));
+    api.years().then(setYears).catch(() => {});
   }, []);
+
+  // Only to show the "wrapped up / read-only" banner for the selected Year.
+  const [years, setYears] = useState<Year[]>([]);
+  const selectedYear = years.find((y) => y.id === filters.yearId);
 
   const load = useCallback(() => {
     if (!filters.yearId) return;
@@ -96,6 +102,8 @@ export default function FinancialsLayout() {
           )}
         </NavLink>
       </nav>
+
+      <YearLockedBanner year={selectedYear} />
 
       {error && <div className="rounded-md bg-red-50 dark:bg-red-950/40 px-4 py-3 text-sm text-red-600 dark:text-red-400">{error}</div>}
 

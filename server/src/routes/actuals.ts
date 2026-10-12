@@ -10,6 +10,7 @@ import {
   scopedBusinessUnitFilter,
 } from "../middleware/auth";
 import { can, canAnyOf, FINANCIAL_RESOURCES, narrowingApplies, PermissionError } from "../utils/permissions";
+import { assertYearOpen } from "../utils/yearLock";
 import { logAudit } from "../utils/auditLog";
 
 const router = Router();
@@ -102,6 +103,7 @@ router.put("/", async (req, res) => {
   if (!parsed.success) return res.status(400).json({ error: "Invalid actuals payload", details: parsed.error.issues });
 
   try {
+    await assertYearOpen(parsed.data.yearId);
     const businessUnitId = await resolveCompanyBusinessUnit(parsed.data.companyId);
     assertBusinessUnitAccess(req.user!, businessUnitId);
     const permRows = await loadUserPermissions(req.user!);
@@ -162,6 +164,7 @@ router.patch("/:companyId/:yearId/:quarter/remarks", async (req, res) => {
   const quarter = Number(req.params.quarter);
 
   try {
+    await assertYearOpen(yearId);
     const businessUnitId = await resolveCompanyBusinessUnit(companyId);
     assertBusinessUnitAccess(req.user!, businessUnitId);
     const permRows = await loadUserPermissions(req.user!);

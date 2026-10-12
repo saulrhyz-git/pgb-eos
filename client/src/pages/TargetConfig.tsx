@@ -1,6 +1,7 @@
 import { Dispatch, FormEvent, SetStateAction, useEffect, useState } from "react";
 import { AlertTriangle, CheckCircle2, Lock, LockOpen, Plus, Save, Upload } from "lucide-react";
 import { api } from "../api/client";
+import YearLockedBanner, { isYearLocked } from "../components/YearLockedBanner";
 import { useAuth } from "../contexts/AuthContext";
 import BulkTargetUpload from "../components/BulkTargetUpload";
 import type { BusinessUnit, Company, TargetLockEntry, Year } from "../api/types";
@@ -702,10 +703,16 @@ export default function TargetConfig() {
     }
   }
 
+  // Creates a blank-slate Year (nothing copied from other Years). The full
+  // Year management page — including wrap-up — is /years.
   async function handleAddYear(e: FormEvent) {
     e.preventDefault();
-    await api.createYear(Number(newYear));
-    refreshYears();
+    try {
+      await api.createYear(Number(newYear));
+      refreshYears();
+    } catch (err: any) {
+      alert(err.message || "Failed to create the year");
+    }
   }
   async function handleAddBu(e: FormEvent) {
     e.preventDefault();
@@ -740,6 +747,8 @@ export default function TargetConfig() {
             : ", unless a Group Integrator or Superadmin has manually locked it."}
         </p>
       </div>
+
+      <YearLockedBanner year={selectedYear} showReportLink={canManageStructure} />
 
       {canManageStructure && (
         <div className="grid grid-cols-1 gap-4 sm:grid-cols-3">

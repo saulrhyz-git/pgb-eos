@@ -29,6 +29,8 @@ import type {
   SmtpSettings,
   TargetLockEntry,
   Year,
+  YearReportData,
+  YearWrapUpPreview,
 } from "./types";
 
 const BASE_URL = import.meta.env.VITE_API_URL || "http://localhost:4000/api";
@@ -90,6 +92,15 @@ export const api = {
 
   years: () => request<Year[]>("/years"),
   createYear: (year: number) => request<Year>("/years", { method: "POST", body: JSON.stringify({ year }) }),
+  yearWrapUpPreview: (yearId: string) => request<YearWrapUpPreview>(`/years/${yearId}/wrap-up/preview`),
+  wrapUpYear: (yearId: string, confirmYear: number) =>
+    request<{ yearId: string; year: number; wrappedUpAt: string; wrappedUpByName: string }>(`/years/${yearId}/wrap-up`, {
+      method: "POST",
+      body: JSON.stringify({ confirmYear }),
+    }),
+  yearWrapUpReport: (yearId: string) => request<YearReportData>(`/years/${yearId}/wrap-up/report`),
+  reopenYear: (yearId: string, reason: string) =>
+    request<{ yearId: string; year: number }>(`/years/${yearId}/reopen`, { method: "POST", body: JSON.stringify({ reason }) }),
   // Sets this Year's four Quarter End Dates (Group Integrator/Superadmin
   // only) — the deadlines the Rocks auto-status rule measures against (see
   // server/src/utils/rockAutoStatus.ts). Pass null to clear a Quarter's

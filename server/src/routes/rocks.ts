@@ -11,6 +11,7 @@ import {
   scopedBusinessUnitFilter,
 } from "../middleware/auth";
 import { assertPermission, can, narrowingApplies } from "../utils/permissions";
+import { assertYearOpen } from "../utils/yearLock";
 import { logAudit } from "../utils/auditLog";
 import { escalateStaleRocks } from "../utils/rockAutoStatus";
 
@@ -152,6 +153,7 @@ router.post("/", async (req, res) => {
   if (!parsed.success) return res.status(400).json({ error: "Invalid rock payload", details: parsed.error.issues });
 
   try {
+    await assertYearOpen(parsed.data.yearId);
     const businessUnitId = await resolveCompanyBusinessUnit(parsed.data.companyId);
     assertBusinessUnitAccess(req.user!, businessUnitId);
     const permRows = await loadUserPermissions(req.user!);
@@ -232,6 +234,15 @@ router.post("/rollover", requireRole("GROUP_INTEGRATOR", "BU_INTEGRATOR", "SUPER
     }
     targetYearId = nextYear.id;
     targetQuarter = 1;
+  }
+
+  // Rollover writes to both sides (the copy lands in the target Year, the
+  // original is marked ROLLED_OVER in the source Year), so both must be open.
+  try {
+    await assertYearOpen(yearId);
+    await assertYearOpen(targetYearId);
+  } catch (err: any) {
+    return res.status(err.status || 500).json({ error: err.message });
   }
 
   const where: any = { yearId, quarter, status: { notIn: ["TARGET_MET", "ROLLED_OVER"] } };
@@ -352,6 +363,7 @@ router.put("/:id", async (req, res) => {
   if (!existing) return res.status(404).json({ error: "Rock not found" });
 
   try {
+    await assertYearOpen(existing.yearId);
     const businessUnitId = await resolveCompanyBusinessUnit(existing.companyId);
     assertBusinessUnitAccess(req.user!, businessUnitId);
     const permRows = await loadUserPermissions(req.user!);
@@ -398,6 +410,7 @@ router.delete("/:id", async (req, res) => {
   if (!existing) return res.status(404).json({ error: "Rock not found" });
 
   try {
+    await assertYearOpen(existing.yearId);
     const businessUnitId = await resolveCompanyBusinessUnit(existing.companyId);
     assertBusinessUnitAccess(req.user!, businessUnitId);
     const permRows = await loadUserPermissions(req.user!);

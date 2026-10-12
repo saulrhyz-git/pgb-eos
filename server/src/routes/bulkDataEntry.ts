@@ -2,6 +2,7 @@ import { Router } from "express";
 import { z } from "zod";
 import { prisma } from "../lib/prisma";
 import { blockPendingPasswordChange, requireAuth, requireRole } from "../middleware/auth";
+import { YearLockedError } from "../utils/yearLock";
 import { logAudit } from "../utils/auditLog";
 
 // Superadmin-only bulk data entry: lets a Superadmin load many Companies'
@@ -113,8 +114,9 @@ router.post("/", async (req, res) => {
   }
   const { yearId, rows } = parsed.data;
 
-  const yearRow = await prisma.year.findUnique({ where: { id: yearId }, select: { year: true } });
+  const yearRow = await prisma.year.findUnique({ where: { id: yearId }, select: { year: true, wrappedUpAt: true } });
   if (!yearRow) return res.status(404).json({ error: "Year not found" });
+  if (yearRow.wrappedUpAt) return res.status(423).json({ error: new YearLockedError(yearRow.year).message });
 
   // Pre-load every Company (with its Business Unit name) once, rather than
   // querying per row — bulk uploads are exactly the case where an N+1 query
