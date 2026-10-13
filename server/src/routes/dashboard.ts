@@ -17,12 +17,14 @@ import {
   emptyFigures,
   expensesTotal,
   Figures,
+  n,
   pct,
   revenueTotal,
   toDisbursementFigures,
   toFigures,
 } from "../utils/aggregate";
 import { addStreamActuals, addStreamDisbursements, buildStreamBreakdown } from "../utils/streams";
+import { canIncomeTax } from "../utils/incomeTaxAccess";
 import { can, canAnyOf, FINANCIAL_RESOURCES, narrowingApplies, Resource } from "../utils/permissions";
 
 const router = Router();
@@ -249,6 +251,14 @@ router.get("/", async (req, res) => {
   // here, before any total below is computed, so every KPI, chart bar and
   // grid cell includes them.
   await addStreamActuals(qActualByCompanyQuarter, yearId, companyIds);
+
+  // Entered quarterly income tax, for the NIAT tab (routes/incomeTax.ts).
+  // Only Companies whose tax the viewer may see are included; everything
+  // else reads as "not entered", so the NIAT tab estimates it instead.
+  const taxRows = companyIds.length
+    ? await prisma.incomeTax.findMany({ where: { yearId, companyId: { in: companyIds }, quarter: { in: quartersInScope } } })
+    : [];
+  const taxByCompanyQuarter = new Map(taxRows.map((t) => [`${t.companyId}:${t.quarter}`, n(t.amount)]));
 
   const companiesByBu = new Map<string, typeof companies>();
   const businessUnitIdByCompany = new Map<string, string>();
@@ -510,6 +520,21 @@ router.get("/", async (req, res) => {
         collectionsExternalUnearnedRemarks: collectionsOk && remarks ? r.collectionsExternalUnearnedRemarks : "",
         collectionsExternalOthersRemarks: collectionsOk && remarks ? r.collectionsExternalOthersRemarks : "",
         expensesRemarks: expensesOk && remarks ? r.expensesRemarks : "",
+        // Per-quarter inputs for the NIAT tab: Revenue/Expenses (masked
+        // like the totals above) and the entered income tax, or null where
+        // none was entered (or the viewer can't see it) — NIAT estimates
+        // those quarters instead.
+        niatQuarters: quartersInScope.map((q) => {
+          const a = qActualByCompanyQuarter.get(`${c.id}:${q}`) || emptyFigures();
+          const taxVisible = canIncomeTax(user, permRows, "view", { businessUnitId: c.businessUnitId, companyId: c.id });
+          const tax = taxByCompanyQuarter.get(`${c.id}:${q}`);
+          return {
+            quarter: q,
+            revenue: revenueOk ? revenueTotal(a) : 0,
+            expenses: expensesOk ? expensesTotal(a) : 0,
+            incomeTax: taxVisible && tax !== undefined ? tax : null,
+          };
+        }),
       };
     });
 

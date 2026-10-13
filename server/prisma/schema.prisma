@@ -56,6 +56,9 @@ enum PermissionResource {
   // governed by the matching category resource (REVENUE, COLLECTIONS,
   // EXPENSES, DISBURSEMENTS), same as the original figures.
   STREAMS
+  // Entering a Company's actual quarterly income tax (Data Entry), which
+  // the NIAT tab uses in place of its RCIT/MCIT estimate.
+  INCOME_TAX
 }
 
 // Which figure a Financial Stream adds to.
@@ -290,6 +293,7 @@ model Company {
   rolePermissions     RolePermission[]
   financialStreams    FinancialStream[]
   streamActuals       FinancialStreamActual[]
+  incomeTaxes         IncomeTax[]
 
   @@unique([businessUnitId, name])
   @@index([businessUnitId])
@@ -343,6 +347,7 @@ model Year {
   rocks               Rock[]
   targetLocks         TargetLock[]
   streamActuals       FinancialStreamActual[]
+  incomeTaxes         IncomeTax[]
 }
 
 // A manual, admin-controlled lock on a Year+Quarter's Targets. This is the
@@ -799,4 +804,28 @@ model FinancialStreamActual {
   @@unique([streamId, companyId, yearId, quarter])
   @@index([yearId, quarter])
   @@index([companyId])
+}
+
+// A Company's actual income tax for one quarter, entered on Data Entry. The
+// NIAT tab uses it as that quarter's tax (NIAT = Net Income − this), and
+// only falls back to its RCIT/MCIT estimate for quarters with no row here.
+// A row always means "tax was entered" — clearing the field deletes the row,
+// so 0 is a real "no tax this quarter", not "not entered".
+model IncomeTax {
+  id        String @id @default(uuid())
+  companyId String
+  yearId    String
+  quarter   Int // 1-4
+
+  amount  Decimal @default(0) @db.Decimal(14, 2)
+  remarks String  @default("")
+
+  updatedById String?
+  updatedAt   DateTime @updatedAt
+
+  company Company @relation(fields: [companyId], references: [id], onDelete: Cascade)
+  year    Year    @relation(fields: [yearId], references: [id], onDelete: Cascade)
+
+  @@unique([companyId, yearId, quarter])
+  @@index([yearId, quarter])
 }

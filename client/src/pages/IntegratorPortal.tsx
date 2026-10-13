@@ -4,6 +4,7 @@ import { api } from "../api/client";
 import YearLockedBanner, { isYearLocked } from "../components/YearLockedBanner";
 import type { BusinessUnit, Company, NoteCategory, NoteEntry, StreamActualRow, StreamCategory, Year } from "../api/types";
 import StreamEntryCard from "../components/StreamEntryCard";
+import IncomeTaxCard from "../components/IncomeTaxCard";
 import { useAuth } from "../contexts/AuthContext";
 import BulkDataEntryUpload from "../components/BulkDataEntryUpload";
 
@@ -822,6 +823,16 @@ export default function IntegratorPortal() {
             adding={addingDisbursementNote}
             deletingId={deletingDisbursementNoteId}
           />
+        </div>
+
+        {/* ---------- Income Tax ---------- */}
+        {/* Always shown, whatever the NIAT feature flag says — tax can always
+            be recorded; the NIAT tab uses it in place of its estimate. */}
+        <div className="grid grid-cols-1 gap-4">
+          <h3 className="-mb-2 text-xs font-semibold uppercase tracking-wide text-slate-400 dark:text-slate-500">Income Tax</h3>
+          {companyId && yearId ? (
+            <IncomeTaxCard yearId={yearId} quarter={quarter} companyId={companyId} locked={isYearLocked(years.find((y) => y.id === yearId))} />
+          ) : null}
         </div>
 
         {error && <div className="rounded-md bg-red-50 dark:bg-red-950/40 px-3 py-2 text-sm text-red-600 dark:text-red-400">{error}</div>}

@@ -123,3 +123,92 @@ export function sumNiat(results: NiatResult[]): Pick<NiatResult, "revenue" | "ex
     { revenue: 0, expenses: 0, netIncomeBeforeTax: 0, grossIncome: 0, rcit: 0, mcit: 0, taxDue: 0, niat: 0 }
   );
 }
+
+// ---------------------------------------------------------------------------
+// Entered income tax (Data Entry → Income Tax).
+//
+// For each quarter in scope, a Company's entered income tax is used as that
+// quarter's tax. Only the quarters with nothing entered are estimated, by
+// running computeNiat() above on just those quarters' Revenue/Expenses (and
+// the assets / Cost of Sales inputs apply to that estimated part only).
+//   - nothing entered  -> identical to computeNiat() on the scope totals
+//   - all entered      -> Tax Due = sum of entered tax; no estimate
+//   - some entered     -> entered + estimate for the rest
+// NIAT = Net Income Before Tax (all quarters) − Tax Due.
+// The rcit / mcit / rcitRate / grossIncome / usedMcit fields describe the
+// ESTIMATED part only (all zero when every quarter has entered tax).
+// ---------------------------------------------------------------------------
+export interface NiatQuarter {
+  quarter: number;
+  revenue: number;
+  expenses: number;
+  incomeTax: number | null; // null = not entered
+}
+
+export type TaxSource = "ENTERED" | "ESTIMATED" | "MIXED";
+
+export interface NiatWithTaxResult extends NiatResult {
+  enteredTax: number;
+  estimatedTax: number;
+  taxSource: TaxSource;
+  enteredQuarters: number[];
+  estimatedQuarters: number[];
+}
+
+export function computeNiatWithTax(quarters: NiatQuarter[], assetsExceed100M: boolean, cogs?: number): NiatWithTaxResult {
+  const revenue = quarters.reduce((s, q) => s + q.revenue, 0);
+  const expenses = quarters.reduce((s, q) => s + q.expenses, 0);
+  const entered = quarters.filter((q) => q.incomeTax !== null);
+  const missing = quarters.filter((q) => q.incomeTax === null);
+
+  const enteredTax = entered.reduce((s, q) => s + (q.incomeTax as number), 0);
+  const est = computeNiat(
+    missing.reduce((s, q) => s + q.revenue, 0),
+    missing.reduce((s, q) => s + q.expenses, 0),
+    assetsExceed100M,
+    missing.length ? cogs : undefined
+  );
+  const estimatedTax = missing.length ? est.taxDue : 0;
+  const netIncomeBeforeTax = revenue - expenses;
+  const taxDue = enteredTax + estimatedTax;
+
+  return {
+    ...est,
+    revenue,
+    expenses,
+    netIncomeBeforeTax,
+    taxDue,
+    niat: netIncomeBeforeTax - taxDue,
+    usedMcit: missing.length ? est.usedMcit : false,
+    enteredTax,
+    estimatedTax,
+    taxSource: entered.length === 0 ? "ESTIMATED" : missing.length === 0 ? "ENTERED" : "MIXED",
+    enteredQuarters: entered.map((q) => q.quarter),
+    estimatedQuarters: missing.map((q) => q.quarter),
+  };
+}
+
+// Older server responses (no per-quarter inputs): treat the scope as one
+// block with nothing entered — exactly the previous behaviour.
+export function niatQuartersOrTotals(row: { niatQuarters?: NiatQuarter[]; quarterActual: { total: number; expenses: number } }): NiatQuarter[] {
+  return row.niatQuarters ?? [{ quarter: 0, revenue: row.quarterActual.total, expenses: row.quarterActual.expenses, incomeTax: null }];
+}
+
+export function sumNiatWithTax(results: NiatWithTaxResult[]) {
+  return results.reduce(
+    (sum, r) => ({
+      revenue: sum.revenue + r.revenue,
+      expenses: sum.expenses + r.expenses,
+      netIncomeBeforeTax: sum.netIncomeBeforeTax + r.netIncomeBeforeTax,
+      enteredTax: sum.enteredTax + r.enteredTax,
+      estimatedTax: sum.estimatedTax + r.estimatedTax,
+      taxDue: sum.taxDue + r.taxDue,
+      niat: sum.niat + r.niat,
+    }),
+    { revenue: 0, expenses: 0, netIncomeBeforeTax: 0, enteredTax: 0, estimatedTax: 0, taxDue: 0, niat: 0 }
+  );
+}
+
+export function quarterList(qs: number[]): string {
+  return qs.filter((q) => q > 0).map((q) => `Q${q}`).join(", ");
+}

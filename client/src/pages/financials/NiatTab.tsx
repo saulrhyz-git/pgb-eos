@@ -6,7 +6,14 @@ import {
   formatCurrencyShort,
   formatPct,
 } from "../../utils/format";
-import { computeNiat, sumNiat, type NiatResult } from "../../utils/niat";
+import {
+  computeNiatWithTax,
+  niatQuartersOrTotals,
+  quarterList,
+  sumNiatWithTax,
+  type NiatWithTaxResult,
+  type TaxSource,
+} from "../../utils/niat";
 import type { FinancialsOutletContext } from "./FinancialsLayout";
 
 // NIAT (Net Income After Taxes) sub-tab — see utils/niat.ts for the actual
@@ -45,13 +52,14 @@ export default function NiatTab() {
         <div className="flex items-start gap-2 rounded-md bg-amber-50 dark:bg-amber-950/40 px-4 py-3 text-sm text-amber-700 dark:text-amber-300">
           <FlaskConical className="mt-0.5 h-4 w-4 shrink-0" />
           <span>
-            <strong>BETA.</strong> NIAT is computed as the higher of RCIT (25%,
-            or 20% if the asset and income tests both pass) and MCIT (2% of
-            Gross Income) applied to Revenue − Expenses, per Philippine
-            corporate tax rules. The aggregate view below assumes assets exceed
-            ₱100M and no Cost of Sales split for every Company — pick a specific
-            Company in the filter bar above to adjust those and compute its
-            exact figure.
+            <strong>BETA.</strong> NIAT = Revenue − Expenses − income tax.
+            Where a Company's quarterly income tax has been entered (Data
+            Entry → Income Tax), that amount is used. For quarters with
+            nothing entered, tax is estimated as the higher of RCIT (25%, or
+            20% if the asset and income tests both pass) and MCIT (2% of Gross
+            Income). The aggregate view estimates with assets exceeding ₱100M
+            and no Cost of Sales split — pick a specific Company in the filter
+            bar above to adjust those for its estimated quarters.
           </span>
         </div>
       )}
@@ -85,7 +93,7 @@ function AggregateView({
       companyName: string;
       businessUnitId: string;
       businessUnitName: string;
-      result: NiatResult;
+      result: NiatWithTaxResult;
     }[] = [];
     for (const bu of data.operationalGrid) {
       for (const c of bu.companies) {
@@ -94,18 +102,16 @@ function AggregateView({
           companyName: c.companyName,
           businessUnitId: bu.businessUnitId,
           businessUnitName: bu.businessUnitName,
-          result: computeNiat(
-            c.quarterActual.total,
-            c.quarterActual.expenses,
-            true,
-          ),
+          // Entered income tax where it exists; the rest estimated at
+          // default assumptions (assets exceed ₱100M, no Cost of Sales).
+          result: computeNiatWithTax(niatQuartersOrTotals(c), true),
         });
       }
     }
     return out;
   }, [data]);
 
-  const total = useMemo(() => sumNiat(rows.map((r) => r.result)), [rows]);
+  const total = useMemo(() => sumNiatWithTax(rows.map((r) => r.result)), [rows]);
   const totalMarginPct =
     total.revenue > 0 ? (total.niat / total.revenue) * 100 : 0;
   const netIncomeMarginPct =
@@ -130,7 +136,7 @@ function AggregateView({
         buId,
         businessUnitName: group.businessUnitName,
         rows: group.rows,
-        subtotal: sumNiat(group.rows.map((r) => r.result)),
+        subtotal: sumNiatWithTax(group.rows.map((r) => r.result)),
       }))
       .sort((a, b) => a.businessUnitName.localeCompare(b.businessUnitName));
   }, [rows]);
@@ -167,6 +173,9 @@ function AggregateView({
                 title={formatCurrency(total.taxDue)}
               >
                 {formatCurrencyShort(total.taxDue)}
+              </div>
+              <div className="mt-1 text-xs font-medium text-slate-500 dark:text-slate-400">
+                {formatCurrencyShort(total.enteredTax)} entered · {formatCurrencyShort(total.estimatedTax)} estimated
               </div>
             </div>
             <div className="rounded-lg border border-slate-200 dark:border-slate-700 bg-white dark:bg-slate-900 p-4 shadow-sm sm:p-6">
@@ -205,8 +214,10 @@ function AggregateView({
                   <th className="px-4 py-3 text-right">{netIncomeLabel}</th>
                   {showTax && (
                     <>
-                      <th className="px-4 py-3 text-right">RCIT</th>
-                      <th className="px-4 py-3 text-right">MCIT</th>
+                      <th className="px-4 py-3 text-right">Entered Tax</th>
+                      <th className="px-4 py-3 text-right" title="RCIT/MCIT estimate for quarters with no entered tax">
+                        Estimated Tax
+                      </th>
                       <th className="px-4 py-3 text-right">Tax Due</th>
                       <th className="px-4 py-3 text-right">NIAT</th>
                     </>
@@ -232,10 +243,10 @@ function AggregateView({
                       {showTax && (
                         <>
                           <td className="px-4 py-2 text-right text-xs text-slate-600 dark:text-slate-300">
-                            {formatCurrencyShort(group.subtotal.rcit)}
+                            {formatCurrencyShort(group.subtotal.enteredTax)}
                           </td>
                           <td className="px-4 py-2 text-right text-xs text-slate-600 dark:text-slate-300">
-                            {formatCurrencyShort(group.subtotal.mcit)}
+                            {formatCurrencyShort(group.subtotal.estimatedTax)}
                           </td>
                           <td className="px-4 py-2 text-right text-xs font-semibold text-amber-700 dark:text-amber-400">
                             {formatCurrencyShort(group.subtotal.taxDue)}
@@ -250,6 +261,7 @@ function AggregateView({
                       <tr key={r.companyId}>
                         <td className="px-4 py-3 pl-6 font-medium text-slate-800 dark:text-slate-100">
                           {r.companyName}
+                          {showTax && <TaxSourceBadge result={r.result} />}
                         </td>
                         <td className="px-4 py-3 text-right text-slate-600 dark:text-slate-300">
                           {formatCurrencyShort(r.result.revenue)}
@@ -263,18 +275,16 @@ function AggregateView({
                         {showTax && (
                           <>
                             <td className="px-4 py-3 text-right text-slate-600 dark:text-slate-300">
-                              {formatCurrencyShort(r.result.rcit)}
+                              {r.result.taxSource === "ESTIMATED" ? "—" : formatCurrencyShort(r.result.enteredTax)}
                             </td>
                             <td className="px-4 py-3 text-right text-slate-600 dark:text-slate-300">
-                              {formatCurrencyShort(r.result.mcit)}
+                              {r.result.taxSource === "ENTERED" ? "—" : formatCurrencyShort(r.result.estimatedTax)}
+                              {r.result.taxSource !== "ENTERED" && r.result.usedMcit && (
+                                <span className="ml-1 text-xs text-slate-400 dark:text-slate-500">(MCIT)</span>
+                              )}
                             </td>
                             <td className="px-4 py-3 text-right font-medium text-amber-700 dark:text-amber-400">
                               {formatCurrencyShort(r.result.taxDue)}
-                              {r.result.usedMcit && (
-                                <span className="ml-1 text-xs text-slate-400 dark:text-slate-500">
-                                  (MCIT)
-                                </span>
-                              )}
                             </td>
                             <td
                               className={`px-4 py-3 text-right font-semibold ${r.result.niat >= 0 ? "text-slate-800 dark:text-slate-100" : "text-red-600 dark:text-red-400"}`}
@@ -318,10 +328,22 @@ function SingleCompanyView({
           businessUnitName: bu.businessUnitName,
           revenue: c.quarterActual.total,
           expenses: c.quarterActual.expenses,
+          quarters: niatQuartersOrTotals(c),
         };
     }
     return null;
   }, [data, companyId]);
+
+  // Which quarters in view have entered income tax (Data Entry). When all
+  // of them do, there's nothing to estimate: NIAT shows straight away and
+  // the assets / Cost of Sales inputs aren't needed.
+  const estimatedQuarters = selectedCompany?.quarters.filter((q) => q.incomeTax === null).map((q) => q.quarter) ?? [];
+  const allEntered = Boolean(selectedCompany) && estimatedQuarters.length === 0;
+  const someEntered = Boolean(selectedCompany) && estimatedQuarters.length < (selectedCompany?.quarters.length ?? 0);
+  const enteredResult = useMemo(
+    () => (selectedCompany && allEntered ? computeNiatWithTax(selectedCompany.quarters, true) : null),
+    [selectedCompany, allEntered],
+  );
 
   // Assumed true by default per PHI's companies generally exceeding ₱100M
   // in total assets — untick for a specific Company where that's not the
@@ -331,7 +353,9 @@ function SingleCompanyView({
   // a stale one isn't shown next to inputs that no longer match it.
   const [assetsExceed100M, setAssetsExceed100M] = useState(true);
   const [cogsInput, setCogsInput] = useState("");
-  const [result, setResult] = useState<NiatResult | null>(null);
+  const [computed, setComputed] = useState<NiatWithTaxResult | null>(null);
+  const result = enteredResult ?? computed;
+  const setResult = setComputed;
 
   useEffect(() => {
     // Any scope change — a different Company, or the same Company under a
@@ -348,14 +372,7 @@ function SingleCompanyView({
     const n = Number(cogsInput);
     const cogs =
       cogsInput.trim() !== "" && !Number.isNaN(n) && n >= 0 ? n : undefined;
-    setResult(
-      computeNiat(
-        selectedCompany.revenue,
-        selectedCompany.expenses,
-        assetsExceed100M,
-        cogs,
-      ),
-    );
+    setResult(computeNiatWithTax(selectedCompany.quarters, assetsExceed100M, cogs));
   }
 
   if (!selectedCompany) {
@@ -418,7 +435,20 @@ function SingleCompanyView({
           </div>
         </div>
 
-        {showTax && (
+        {showTax && allEntered && (
+          <div className="border-t border-slate-100 dark:border-slate-800 pt-4 text-sm text-slate-600 dark:text-slate-300">
+            Income tax has been entered for every quarter in view, so NIAT below uses the entered amounts — nothing is estimated.
+          </div>
+        )}
+
+        {showTax && !allEntered && someEntered && (
+          <div className="border-t border-slate-100 dark:border-slate-800 pt-4 text-sm text-slate-600 dark:text-slate-300">
+            Income tax is entered for some quarters. Only {quarterList(estimatedQuarters)} will be estimated; the inputs below apply to
+            those quarter{estimatedQuarters.length === 1 ? "" : "s"} only.
+          </div>
+        )}
+
+        {showTax && !allEntered && (
           <div className="flex flex-col gap-4 border-t border-slate-100 dark:border-slate-800 pt-4 sm:flex-row sm:flex-wrap sm:items-end sm:gap-6">
             <label className="flex items-center gap-2 text-sm font-medium text-slate-700 dark:text-slate-200">
               <input
@@ -435,7 +465,7 @@ function SingleCompanyView({
 
             <div className="flex flex-col gap-1">
               <label className="text-xs font-medium text-slate-500 dark:text-slate-400">
-                Cost of Sales (optional)
+                Cost of Sales (optional{someEntered ? `, for ${quarterList(estimatedQuarters)}` : ""})
               </label>
               <input
                 type="number"
@@ -461,74 +491,89 @@ function SingleCompanyView({
         )}
       </div>
 
-      {showTax && result && (
-        <div className="grid grid-cols-1 gap-4 sm:grid-cols-2 lg:grid-cols-4">
-          <div className="rounded-lg border border-slate-200 dark:border-slate-700 bg-white dark:bg-slate-900 p-4 shadow-sm sm:p-6">
-            <div className="text-xs font-semibold uppercase tracking-wide text-slate-500 dark:text-slate-400">
-              RCIT
-            </div>
-            <div
-              className="mt-2 text-xl font-bold text-slate-800 dark:text-slate-100"
-              title={formatCurrency(result.rcit)}
-            >
-              {formatCurrencyShort(result.rcit)}
-            </div>
-            <div className="mt-1 text-xs text-slate-500 dark:text-slate-400">
-              {result.rcitRate === 0.2 ? "20%" : "25%"} rate
-            </div>
-          </div>
-          <div className="rounded-lg border border-slate-200 dark:border-slate-700 bg-white dark:bg-slate-900 p-4 shadow-sm sm:p-6">
-            <div className="text-xs font-semibold uppercase tracking-wide text-slate-500 dark:text-slate-400">
-              MCIT
-            </div>
-            <div
-              className="mt-2 text-xl font-bold text-slate-800 dark:text-slate-100"
-              title={formatCurrency(result.mcit)}
-            >
-              {formatCurrencyShort(result.mcit)}
-            </div>
-            <div className="mt-1 text-xs text-slate-500 dark:text-slate-400">
-              2% of Gross Income
-              {result.opex !== undefined
-                ? " (Revenue − Cost of Sales)"
-                : " (≈ Revenue)"}
-            </div>
-          </div>
-          <div className="rounded-lg border border-slate-200 dark:border-slate-700 bg-white dark:bg-slate-900 p-4 shadow-sm sm:p-6">
-            <div className="text-xs font-semibold uppercase tracking-wide text-slate-500 dark:text-slate-400">
-              Tax Due
-            </div>
-            <div
-              className="mt-2 text-xl font-bold text-amber-600 dark:text-amber-400"
-              title={formatCurrency(result.taxDue)}
-            >
-              {formatCurrencyShort(result.taxDue)}
-            </div>
-            <div className="mt-1 text-xs text-slate-500 dark:text-slate-400">
-              {result.usedMcit ? "MCIT applied" : "RCIT applied"}
-            </div>
-          </div>
-          <div className="rounded-lg border border-slate-200 dark:border-slate-700 bg-white dark:bg-slate-900 p-4 shadow-sm sm:p-6">
-            <div className="flex items-center gap-2 text-xs font-semibold uppercase tracking-wide text-slate-500 dark:text-slate-400">
-              <Scale className="h-3.5 w-3.5" /> NIAT
-            </div>
-            <div
-              className={`mt-2 text-xl font-bold ${result.niat >= 0 ? "text-slate-800 dark:text-slate-100" : "text-red-600 dark:text-red-400"}`}
-              title={formatCurrency(result.niat)}
-            >
-              {formatCurrencyShort(result.niat)}
-            </div>
-            <div className="mt-1 text-xs text-slate-500 dark:text-slate-400">
-              {formatPct(
-                Math.abs(
-                  result.revenue > 0 ? (result.niat / result.revenue) * 100 : 0,
-                ),
-              )}{" "}
-              net margin
-            </div>
-          </div>
-        </div>
-      )}
+      {showTax && result && <ResultCards result={result} />}
     </>
   );
+}
+
+// Small label after a Company's name: where its tax figure comes from.
+const SOURCE_STYLE: Record<TaxSource, string> = {
+  ENTERED: "bg-green-50 dark:bg-green-950/40 text-green-700 dark:text-green-300",
+  MIXED: "bg-blue-50 dark:bg-blue-950/40 text-blue-700 dark:text-blue-300",
+  ESTIMATED: "bg-amber-50 dark:bg-amber-950/40 text-amber-700 dark:text-amber-300",
+};
+
+function TaxSourceBadge({ result }: { result: NiatWithTaxResult }) {
+  const label =
+    result.taxSource === "ENTERED"
+      ? "tax entered"
+      : result.taxSource === "ESTIMATED"
+        ? "tax estimated"
+        : `estimated: ${quarterList(result.estimatedQuarters)}`;
+  return (
+    <span className={`ml-2 rounded-full px-1.5 py-0.5 align-middle text-[10px] font-medium ${SOURCE_STYLE[result.taxSource]}`}>
+      {label}
+    </span>
+  );
+}
+
+function Card({ label, value, sub, tone = "plain", icon }: { label: string; value: number; sub?: React.ReactNode; tone?: "plain" | "tax" | "niat"; icon?: React.ReactNode }) {
+  const color =
+    tone === "tax"
+      ? "text-amber-600 dark:text-amber-400"
+      : tone === "niat" && value < 0
+        ? "text-red-600 dark:text-red-400"
+        : "text-slate-800 dark:text-slate-100";
+  return (
+    <div className="rounded-lg border border-slate-200 dark:border-slate-700 bg-white dark:bg-slate-900 p-4 shadow-sm sm:p-6">
+      <div className="flex items-center gap-2 text-xs font-semibold uppercase tracking-wide text-slate-500 dark:text-slate-400">
+        {icon} {label}
+      </div>
+      <div className={`mt-2 text-xl font-bold ${color}`} title={formatCurrency(value)}>
+        {formatCurrencyShort(value)}
+      </div>
+      {sub && <div className="mt-1 text-xs text-slate-500 dark:text-slate-400">{sub}</div>}
+    </div>
+  );
+}
+
+// Result cards for one Company: the estimate's RCIT/MCIT (only for the
+// quarters being estimated), the entered tax (when any), Tax Due and NIAT.
+function ResultCards({ result }: { result: NiatWithTaxResult }) {
+  const estLabel = result.taxSource === "MIXED" ? ` (${quarterList(result.estimatedQuarters)})` : "";
+  const margin = formatPct(Math.abs(result.revenue > 0 ? (result.niat / result.revenue) * 100 : 0));
+  const cards: React.ReactNode[] = [];
+  if (result.taxSource !== "ENTERED") {
+    cards.push(<Card key="rcit" label={`RCIT${estLabel}`} value={result.rcit} sub={`${result.rcitRate === 0.2 ? "20%" : "25%"} rate · estimate`} />);
+    cards.push(
+      <Card
+        key="mcit"
+        label={`MCIT${estLabel}`}
+        value={result.mcit}
+        sub={`2% of Gross Income${result.opex !== undefined ? " (Revenue − Cost of Sales)" : " (≈ Revenue)"} · estimate`}
+      />
+    );
+  }
+  if (result.taxSource !== "ESTIMATED") {
+    cards.push(<Card key="entered" label="Entered Income Tax" value={result.enteredTax} sub={`From Data Entry: ${quarterList(result.enteredQuarters)}`} />);
+  }
+  cards.push(
+    <Card
+      key="due"
+      label="Tax Due"
+      value={result.taxDue}
+      tone="tax"
+      sub={
+        result.taxSource === "ENTERED"
+          ? "Entered tax"
+          : result.taxSource === "ESTIMATED"
+            ? result.usedMcit
+              ? "Estimated · MCIT applied"
+              : "Estimated · RCIT applied"
+            : `${formatCurrencyShort(result.enteredTax)} entered + ${formatCurrencyShort(result.estimatedTax)} estimated (${result.usedMcit ? "MCIT" : "RCIT"})`
+      }
+    />
+  );
+  cards.push(<Card key="niat" label="NIAT" value={result.niat} tone="niat" icon={<Scale className="h-3.5 w-3.5" />} sub={`${margin} net margin`} />);
+  return <div className={`grid grid-cols-1 gap-4 sm:grid-cols-2 ${cards.length >= 5 ? "lg:grid-cols-5" : cards.length === 4 ? "lg:grid-cols-4" : "lg:grid-cols-3"}`}>{cards}</div>;
 }

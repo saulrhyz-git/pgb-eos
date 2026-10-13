@@ -30,6 +30,7 @@ import type {
   TargetLockEntry,
   Year,
   FinancialStream,
+  IncomeTaxEntry,
   StreamActualRow,
   StreamCategory,
   YearReportData,
@@ -95,6 +96,14 @@ export const api = {
 
   years: () => request<Year[]>("/years"),
   createYear: (year: number) => request<Year>("/years", { method: "POST", body: JSON.stringify({ year }) }),
+  // ---------- Income Tax (quarterly, per Company — used by NIAT) ----------
+  incomeTax: (params: { yearId: string; quarter: number; companyId: string }) =>
+    request<IncomeTaxEntry>(`/income-tax?yearId=${params.yearId}&quarter=${params.quarter}&companyId=${params.companyId}`),
+  saveIncomeTax: (payload: { yearId: string; quarter: number; companyId: string; amount: number; remarks: string }) =>
+    request<{ amount: number; remarks: string; updatedAt: string }>("/income-tax", { method: "PUT", body: JSON.stringify(payload) }),
+  clearIncomeTax: (params: { yearId: string; quarter: number; companyId: string }) =>
+    request<void>(`/income-tax?yearId=${params.yearId}&quarter=${params.quarter}&companyId=${params.companyId}`, { method: "DELETE" }),
+
   // ---------- Financial Streams ----------
   streams: (params: { businessUnitId?: string; companyId?: string; category?: StreamCategory; includeInactive?: boolean } = {}) => {
     const qs = new URLSearchParams();

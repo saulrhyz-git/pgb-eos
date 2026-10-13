@@ -21,7 +21,8 @@ export type Resource =
   | "DISBURSEMENTS"
   | "COMPARISON"
   | "AI_ANALYSIS"
-  | "STREAMS";
+  | "STREAMS"
+  | "INCOME_TAX";
 
 export interface AuthUser {
   id: string;
@@ -381,6 +382,17 @@ export interface OperationalGridCompanyRow {
   collectionsExternalUnearnedRemarks: string;
   collectionsExternalOthersRemarks: string;
   expensesRemarks: string;
+  // Per-quarter inputs for the NIAT tab: Revenue / Expenses for each quarter
+  // in scope, and the entered income tax (null = not entered, so the NIAT
+  // tab estimates that quarter). Optional for older server responses.
+  niatQuarters?: NiatQuarterInput[];
+}
+
+export interface NiatQuarterInput {
+  quarter: number;
+  revenue: number;
+  expenses: number;
+  incomeTax: number | null;
 }
 
 // A Business Unit's target (the sum of its Companies' own targets) vs its
@@ -768,4 +780,14 @@ export interface AuditLogPage {
 export interface AuditLogMeta {
   actions: string[];
   entityTypes: string[];
+}
+
+// A Company's entered income tax for one quarter (Data Entry). amount null =
+// nothing entered yet, so the NIAT tab estimates that quarter.
+export interface IncomeTaxEntry {
+  canView: boolean;
+  canEdit: boolean;
+  amount: number | null;
+  remarks: string;
+  updatedAt: string | null;
 }
