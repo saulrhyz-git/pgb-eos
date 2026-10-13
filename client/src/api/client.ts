@@ -77,6 +77,56 @@ async function request<T>(path: string, options: RequestInit = {}): Promise<T> {
   return body as T;
 }
 
+// ---------- Full-data Backup & Restore (Superadmin) ----------
+export interface BackupSummary {
+  createdAt: string;
+  createdBy: { id: string; name: string };
+  source: { latestMigration: string | null; migrationCount: number; postgresVersion: string };
+  tableCount: number;
+  totalRows: number;
+}
+export interface RestorePlan {
+  ok: boolean;
+  errors: string[];
+  warnings: string[];
+  tables: { name: string; rowCount: number; status: "restore" | "missing-in-target" | "empty-not-in-backup" }[];
+  sourceLatestMigration: string | null;
+  targetLatestMigration: string | null;
+}
+
+// Base64 so any passphrase characters survive an HTTP header.
+function passphraseHeader(passphrase: string): Record<string, string> {
+  if (!passphrase) return {};
+  const bytes = new TextEncoder().encode(passphrase);
+  let bin = "";
+  bytes.forEach((b) => (bin += String.fromCharCode(b)));
+  return { "X-Backup-Passphrase": btoa(bin) };
+}
+
+/** Downloads a full backup file and saves it via the browser. Returns the file name. */
+export async function downloadBackup(passphrase: string): Promise<string> {
+  const token = getToken();
+  const res = await fetch(`${BASE_URL}/backup/export`, {
+    method: "POST",
+    headers: { "Content-Type": "application/json", ...(token ? { Authorization: `Bearer ${token}` } : {}) },
+    body: JSON.stringify({ passphrase }),
+  });
+  if (!res.ok) {
+    const body = await res.json().catch(() => null);
+    throw new ApiError(body?.error || `Backup failed (status ${res.status})`, res.status);
+  }
+  const name = /filename="([^"]+)"/.exec(res.headers.get("content-disposition") || "")?.[1] || "pgb-eos-backup.eosbak";
+  const url = URL.createObjectURL(await res.blob());
+  const a = document.createElement("a");
+  a.href = url;
+  a.download = name;
+  document.body.appendChild(a);
+  a.click();
+  a.remove();
+  setTimeout(() => URL.revokeObjectURL(url), 10_000);
+  return name;
+}
+
 export const api = {
   login: (identifier: string, password: string) =>
     request<{ token: string; user: AuthUser }>("/auth/login", {
@@ -96,6 +146,20 @@ export const api = {
 
   years: () => request<Year[]>("/years"),
   createYear: (year: number) => request<Year>("/years", { method: "POST", body: JSON.stringify({ year }) }),
+  backupStatus: () => request<{ restoreEnabled: boolean; tableCount: number }>("/backup/status"),
+  previewRestore: (file: File, passphrase: string) =>
+    request<BackupSummary & { encrypted: boolean; plan: RestorePlan; restoreEnabled: boolean }>("/backup/restore/preview", {
+      method: "POST",
+      headers: { "Content-Type": "application/octet-stream", ...passphraseHeader(passphrase) },
+      body: file,
+    }),
+  restoreBackup: (file: File, passphrase: string) =>
+    request<BackupSummary & { restored: { table: string; rows: number }[] }>("/backup/restore", {
+      method: "POST",
+      headers: { "Content-Type": "application/octet-stream", "X-Confirm": "RESTORE", ...passphraseHeader(passphrase) },
+      body: file,
+    }),
+
   // ---------- Income Tax (quarterly, per Company — used by NIAT) ----------
   incomeTax: (params: { yearId: string; quarter: number; companyId: string }) =>
     request<IncomeTaxEntry>(`/income-tax?yearId=${params.yearId}&quarter=${params.quarter}&companyId=${params.companyId}`),

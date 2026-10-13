@@ -26,6 +26,7 @@ import AdminAiSettings from "./pages/admin/AdminAiSettings";
 import AdminNoteCategories from "./pages/admin/AdminNoteCategories";
 import AdminFeatureFlags from "./pages/admin/AdminFeatureFlags";
 import AdminAuditLog from "./pages/admin/AdminAuditLog";
+import AdminBackup from "./pages/admin/AdminBackup";
 import AdminLayout from "./pages/admin/AdminLayout";
 import Years from "./pages/Years";
 import Streams from "./pages/Streams";
@@ -140,6 +141,7 @@ export default function App() {
           <Route path="ai-settings" element={<AdminAiSettings />} />
           <Route path="note-categories" element={<AdminNoteCategories />} />
           <Route path="feature-flags" element={<AdminFeatureFlags />} />
+          <Route path="backup" element={<AdminBackup />} />
           {/* Nested (unlike the top-level /audit-log above) so the tab bar
               in AdminLayout stays mounted/visible while a Superadmin is on
               this page, exactly like every other Admin tab. */}

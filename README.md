@@ -523,6 +523,49 @@ send a test email. Settings are stored in the `SmtpSettings` table; no
 notifications are auto-triggered yet, this wires up the configuration and
 test-send capability for future use.
 
+## Backup & Restore (Superadmin)
+
+**Admin → Backup & Restore** has a one-click **Back up all data** button. It
+downloads a single `.eosbak` file containing every table (users and roles,
+settings, all figures, Rocks, streams, income tax, the Audit Log) plus the
+database's migration history, taken as one consistent snapshot. Set a
+passphrase to encrypt it (AES-256-GCM): the file contains password hashes, the
+SMTP password and the AI API key.
+
+**Restore** replaces *all* data on the instance you run it on, in one
+transaction (any error changes nothing). It only works where the server
+`.env` has `ALLOW_DATA_RESTORE=true` — set that on the instance you restore
+*into*, never on production.
+
+### Restoring into a fresh dev instance
+
+The migration files can't rebuild production's schema on an empty database
+(some tables and columns were created outside the migration history), so
+build a dev database straight from `schema.prisma` instead:
+
+```bash
+# on the dev server, same app version (git commit) as the backup
+cd server
+# .env: DATABASE_URL=<empty dev database>, ALLOW_DATA_RESTORE=true
+npx prisma db push --skip-generate   # schema from schema.prisma
+npx prisma generate
+npm run seed                         # a superadmin to sign in with
+npm run build && pm2 restart <app>   # start WITHOUT `prisma migrate deploy`
+```
+
+Then sign in as the seeded superadmin, open **Admin → Backup & Restore**,
+choose the file, **Check file**, type `RESTORE`, and restore. The restore
+brings production's migration history with it, so from then on
+`prisma migrate deploy` behaves on this instance (and on anything cloned from
+it) exactly as it did on production. Sign in again with a production account.
+
+Before promoting a dev instance to production, set `ALLOW_DATA_RESTORE` back
+to `false` (or remove it).
+
+nginx's default `client_max_body_size` is 1 MB; raise it on the dev
+instance's API location (e.g. `client_max_body_size 200m;`) or uploads of
+larger backups fail with HTTP 413.
+
 ## Troubleshooting
 
 **Dashboard is stuck on "Loading dashboard..." after login, nothing renders,

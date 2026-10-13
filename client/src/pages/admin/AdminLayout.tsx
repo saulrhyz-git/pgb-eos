@@ -1,5 +1,5 @@
 import { NavLink, Outlet } from "react-router-dom";
-import { Users, Building2, Briefcase, Mail, ShieldCheck, ScrollText, Sparkles, Tags, ToggleLeft } from "lucide-react";
+import { Users, Building2, Briefcase, DatabaseBackup, Mail, ShieldCheck, ScrollText, Sparkles, Tags, ToggleLeft } from "lucide-react";
 
 export default function AdminLayout() {
   const tabClass = ({ isActive }: { isActive: boolean }) =>
@@ -40,6 +40,9 @@ export default function AdminLayout() {
         </NavLink>
         <NavLink to="/admin/audit-log" className={tabClass}>
           <ScrollText className="h-4 w-4" /> Audit Log
+        </NavLink>
+        <NavLink to="/admin/backup" className={tabClass}>
+          <DatabaseBackup className="h-4 w-4" /> Backup &amp; Restore
         </NavLink>
       </nav>
       <Outlet />
