@@ -14,7 +14,8 @@ export type Resource =
   | "REPORTS"
   | "DISBURSEMENTS"
   | "COMPARISON"
-  | "AI_ANALYSIS";
+  | "AI_ANALYSIS"
+  | "STREAMS";
 // Deliberately excludes AUDIT_LOG: ALL_RESOURCES feeds `canAny()`, which
 // meta.ts uses to decide whether a Business Unit/Company should show up in
 // dropdowns at all ("does this role have any view grant here"). Unlike the
@@ -40,6 +41,9 @@ export const ALL_RESOURCES: Resource[] = [
   "DISBURSEMENTS",
   "COMPARISON",
   "AI_ANALYSIS",
+  // Managing Financial Stream definitions is BU/Company-scoped, so a role
+  // that only grants STREAMS still needs to see its BU/Company in dropdowns.
+  "STREAMS",
 ];
 // The three financial categories a single QuarterActual record covers at
 // once. Its PUT endpoint submits all three together, so — since permissions

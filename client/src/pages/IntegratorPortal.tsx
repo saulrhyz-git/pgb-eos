@@ -2,7 +2,8 @@ import { FormEvent, useEffect, useState } from "react";
 import { CheckCircle2, Plus, Save, Trash2, Upload } from "lucide-react";
 import { api } from "../api/client";
 import YearLockedBanner, { isYearLocked } from "../components/YearLockedBanner";
-import type { BusinessUnit, Company, NoteCategory, NoteEntry, Year } from "../api/types";
+import type { BusinessUnit, Company, NoteCategory, NoteEntry, StreamActualRow, StreamCategory, Year } from "../api/types";
+import StreamEntryCard from "../components/StreamEntryCard";
 import { useAuth } from "../contexts/AuthContext";
 import BulkDataEntryUpload from "../components/BulkDataEntryUpload";
 
@@ -399,6 +400,34 @@ export default function IntegratorPortal() {
   // Pre-fill the actuals form, the disbursements form, and both notable
   // line items lists with whatever already exists for the selected scope —
   // fetched together since they all share one scope picker.
+  // Labeled Financial Streams for the selected Company/quarter — one fetch,
+  // split per category into each section's StreamEntryCard.
+  const [streamRows, setStreamRows] = useState<StreamActualRow[]>([]);
+  const [streamsLoading, setStreamsLoading] = useState(false);
+  const [streamReloadKey, setStreamReloadKey] = useState(0);
+  useEffect(() => {
+    if (!yearId || !companyId) {
+      setStreamRows([]);
+      return;
+    }
+    setStreamsLoading(true);
+    api
+      .streamActuals({ yearId, quarter, companyId })
+      .then(setStreamRows)
+      .catch(() => setStreamRows([]))
+      .finally(() => setStreamsLoading(false));
+  }, [yearId, quarter, companyId, reloadKey, streamReloadKey]);
+  const streamCardProps = (category: StreamCategory) => ({
+    category,
+    rows: streamRows.filter((r) => r.category === category),
+    loading: streamsLoading,
+    locked: isYearLocked(years.find((y) => y.id === yearId)),
+    yearId,
+    quarter,
+    companyId,
+    onSaved: () => setStreamReloadKey((k) => k + 1),
+  });
+
   useEffect(() => {
     if (!yearId || !companyId) return;
     setSaved(false);
@@ -703,6 +732,7 @@ export default function IntegratorPortal() {
               />
             </div>
           </div>
+          <StreamEntryCard {...streamCardProps("REVENUE")} />
           <NotableItemsCard
             title="Notable Revenue Items"
             categories={revenueCategories}
@@ -735,6 +765,7 @@ export default function IntegratorPortal() {
               </div>
             </div>
           ))}
+          <StreamEntryCard {...streamCardProps("COLLECTIONS")} />
           <NotableItemsCard
             title="Notable Collections Items"
             categories={collectionCategories}
@@ -757,6 +788,7 @@ export default function IntegratorPortal() {
             onValueChange={(v) => setForm((f) => ({ ...f, expenses: v }))}
             onRemarksChange={(v) => setRemarks((r) => ({ ...r, expensesRemarks: v }))}
           />
+          <StreamEntryCard {...streamCardProps("EXPENSES")} />
           <NotableItemsCard
             title="Notable Expense Items"
             categories={expenseCategories}
@@ -779,6 +811,7 @@ export default function IntegratorPortal() {
             onValueChange={(v) => setDisbForm((f) => ({ ...f, amount: v }))}
             onRemarksChange={(v) => setDisbForm((f) => ({ ...f, remarks: v }))}
           />
+          <StreamEntryCard {...streamCardProps("DISBURSEMENTS")} />
           <NotableItemsCard
             title="Notable Disbursement Items"
             categories={disbursementCategories}

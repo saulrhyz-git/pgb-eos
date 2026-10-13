@@ -4,6 +4,8 @@ import { ArrowLeft, Download, Lock, Printer } from "lucide-react";
 import { api } from "../api/client";
 import type { RockStatus, YearReportData, YearReportPeriod, YearReportRockSummary } from "../api/types";
 import { formatCurrency, formatCurrencyShort, formatPct, formatProgressPct } from "../utils/format";
+import StreamBreakdownCard from "../components/StreamBreakdownCard";
+import { STREAM_CATEGORIES } from "../utils/streams";
 
 // The frozen full-year report generated when a Year is wrapped up
 // (server/src/utils/yearReport.ts). Read-only by nature — it's a snapshot,
@@ -317,6 +319,14 @@ export default function YearReport() {
           </div>
         ))}
       </Section>
+
+      {report.streams && report.streams.some((b) => b.lines.length > 1) && (
+        <Section title="Financial Streams" note="Full-year totals split into the original figures and each labeled stream.">
+          {STREAM_CATEGORIES.map((c) => (
+            <StreamBreakdownCard key={c} breakdown={report.streams} category={c} />
+          ))}
+        </Section>
+      )}
 
       <Section
         title="Rocks"

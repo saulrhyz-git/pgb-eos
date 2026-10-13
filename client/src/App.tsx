@@ -28,6 +28,7 @@ import AdminFeatureFlags from "./pages/admin/AdminFeatureFlags";
 import AdminAuditLog from "./pages/admin/AdminAuditLog";
 import AdminLayout from "./pages/admin/AdminLayout";
 import Years from "./pages/Years";
+import Streams from "./pages/Streams";
 import YearReport from "./pages/YearReport";
 
 function RequireAuth({ children }: { children: JSX.Element }) {
@@ -108,6 +109,8 @@ export default function App() {
         {/* Year management + wrap-up (Group Integrator / Superadmin — the
             page shows a notice to anyone else, and the server enforces it). */}
         <Route path="years" element={<Years />} />
+        {/* Financial Streams setup — the server decides who can manage them. */}
+        <Route path="streams" element={<Streams />} />
         <Route path="years/:id/report" element={<YearReport />} />
         {/* This top-level /audit-log route exists only so a non-superadmin
             granted AUDIT_LOG view through a Custom Role has a way to reach

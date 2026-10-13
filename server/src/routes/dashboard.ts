@@ -22,6 +22,7 @@ import {
   toDisbursementFigures,
   toFigures,
 } from "../utils/aggregate";
+import { addStreamActuals, addStreamDisbursements, buildStreamBreakdown } from "../utils/streams";
 import { can, canAnyOf, FINANCIAL_RESOURCES, narrowingApplies, Resource } from "../utils/permissions";
 
 const router = Router();
@@ -146,6 +147,8 @@ router.get("/", async (req, res) => {
     : [];
   const disbByCompanyQuarter = new Map<string, DisbursementFigures>();
   for (const d of disbursementActuals) disbByCompanyQuarter.set(`${d.companyId}:${d.quarter}`, toDisbursementFigures(d));
+  // Financial Streams add to the original figures (utils/streams.ts).
+  await addStreamDisbursements(disbByCompanyQuarter, yearId, disbCompanyIds, emptyDisbursementFigures);
 
   let quarterDisbursementsActualTotal = 0;
   for (const cid of disbCompanyIds) {
@@ -185,6 +188,11 @@ router.get("/", async (req, res) => {
       chart: [],
       targetMatrix: [],
       operationalGrid: [],
+      streamBreakdown: await buildStreamBreakdown({
+        yearId,
+        quarters: quartersInScope,
+        companyIdsByCategory: { REVENUE: [], COLLECTIONS: [], EXPENSES: [], DISBURSEMENTS: disbCompanyIds },
+      }),
     });
   }
 
@@ -236,6 +244,11 @@ router.get("/", async (req, res) => {
       expensesRemarks: a.expensesRemarks,
     });
   }
+
+  // Financial Streams add to the original figures (utils/streams.ts) — done
+  // here, before any total below is computed, so every KPI, chart bar and
+  // grid cell includes them.
+  await addStreamActuals(qActualByCompanyQuarter, yearId, companyIds);
 
   const companiesByBu = new Map<string, typeof companies>();
   const businessUnitIdByCompany = new Map<string, string>();
@@ -534,6 +547,18 @@ router.get("/", async (req, res) => {
     chart,
     targetMatrix,
     operationalGrid,
+    // Original figures + one line per labeled stream, per category, for the
+    // scope in view — masked per category exactly like the totals above.
+    streamBreakdown: await buildStreamBreakdown({
+      yearId,
+      quarters: quartersInScope,
+      companyIdsByCategory: {
+        REVENUE: companyIds.filter((cid) => isCatAllowed(cid, "REVENUE")),
+        COLLECTIONS: companyIds.filter((cid) => isCatAllowed(cid, "COLLECTIONS")),
+        EXPENSES: companyIds.filter((cid) => isCatAllowed(cid, "EXPENSES")),
+        DISBURSEMENTS: disbCompanyIds,
+      },
+    }),
   });
 });
 

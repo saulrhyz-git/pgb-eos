@@ -4,6 +4,7 @@ import ProgressChart from "../../components/ProgressChart";
 import TargetMatrix from "../../components/TargetMatrix";
 import OperationalGrid from "../../components/OperationalGrid";
 import NotableItemsList from "../../components/NotableItemsList";
+import StreamBreakdownCard from "../../components/StreamBreakdownCard";
 import type { FinancialsOutletContext } from "./FinancialsLayout";
 
 // Index route of the Financials section (/revenue) — the Revenue-only slice
@@ -19,6 +20,7 @@ export default function RevenueTab() {
       <ProgressChart chart={data.chart} />
       <TargetMatrix rows={data.targetMatrix} category="revenue" />
       <OperationalGrid rows={data.operationalGrid} yearId={filters.yearId} quarter={filters.quarter} onRemarksSaved={reload} category="REVENUE" />
+      <StreamBreakdownCard breakdown={data.streamBreakdown} category="REVENUE" />
       <NotableItemsList
         title="Notable Revenue Items"
         type="REVENUE"

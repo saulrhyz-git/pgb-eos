@@ -2,6 +2,7 @@ import { useOutletContext } from "react-router-dom";
 import DisbursementCards from "../../components/DisbursementCards";
 import DisbursementRemarksList from "../../components/DisbursementRemarksList";
 import NotableItemsList from "../../components/NotableItemsList";
+import StreamBreakdownCard from "../../components/StreamBreakdownCard";
 import type { FinancialsOutletContext } from "./FinancialsLayout";
 
 // Disbursements sub-tab (/revenue/disbursements). Disbursements are
@@ -17,6 +18,7 @@ export default function DisbursementsTab() {
   return (
     <div className="flex flex-col gap-6">
       <DisbursementCards kpis={data.kpis} quarter={filters.quarter} />
+      <StreamBreakdownCard breakdown={data.streamBreakdown} category="DISBURSEMENTS" />
       <DisbursementRemarksList
         yearId={filters.yearId}
         quarter={filters.quarter}

@@ -30,6 +30,7 @@ const resourceEnum = z.enum([
   "DISBURSEMENTS",
   "COMPARISON",
   "AI_ANALYSIS",
+  "STREAMS",
 ]);
 
 // Each entry grants access to exactly one scope: either a whole Business Unit

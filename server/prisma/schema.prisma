@@ -51,6 +51,19 @@ enum PermissionResource {
   DISBURSEMENTS
   COMPARISON
   AI_ANALYSIS
+  // Managing labeled Financial Streams (create/rename/deactivate/delete the
+  // stream definitions themselves). Entering a stream's quarterly amounts is
+  // governed by the matching category resource (REVENUE, COLLECTIONS,
+  // EXPENSES, DISBURSEMENTS), same as the original figures.
+  STREAMS
+}
+
+// Which figure a Financial Stream adds to.
+enum StreamCategory {
+  REVENUE
+  COLLECTIONS
+  EXPENSES
+  DISBURSEMENTS
 }
 
 model User {
@@ -251,10 +264,11 @@ model BusinessUnit {
   name      String   @unique
   createdAt DateTime @default(now())
 
-  companies       Company[]
-  users           UserBusinessUnit[]
-  businessGoals   BusinessGoalBusinessUnit[]
-  rolePermissions RolePermission[]
+  companies        Company[]
+  users            UserBusinessUnit[]
+  businessGoals    BusinessGoalBusinessUnit[]
+  rolePermissions  RolePermission[]
+  financialStreams FinancialStream[]
 }
 
 model Company {
@@ -264,7 +278,7 @@ model Company {
   businessUnitId String
   createdAt      DateTime @default(now())
 
-  businessUnit        BusinessUnit         @relation(fields: [businessUnitId], references: [id], onDelete: Cascade)
+  businessUnit        BusinessUnit            @relation(fields: [businessUnitId], references: [id], onDelete: Cascade)
   quarterTargets      QuarterTarget[]
   quarterActuals      QuarterActual[]
   disbursementActuals DisbursementActual[]
@@ -274,6 +288,8 @@ model Company {
   collectionNotes     CollectionNote[]
   rocks               Rock[]
   rolePermissions     RolePermission[]
+  financialStreams    FinancialStream[]
+  streamActuals       FinancialStreamActual[]
 
   @@unique([businessUnitId, name])
   @@index([businessUnitId])
@@ -326,6 +342,7 @@ model Year {
   collectionNotes     CollectionNote[]
   rocks               Rock[]
   targetLocks         TargetLock[]
+  streamActuals       FinancialStreamActual[]
 }
 
 // A manual, admin-controlled lock on a Year+Quarter's Targets. This is the
@@ -696,4 +713,90 @@ model Rock {
   @@index([companyId])
   @@index([yearId, quarter])
   @@index([businessGoalId])
+}
+
+// ---------------------------------------------------------------------------
+// Financial Streams — labeled, additional Revenue / Collections / Expenses /
+// Disbursements lines on top of the original (unlabeled) figures in
+// QuarterActual / DisbursementActual, which are left exactly as they are.
+//
+// A stream is defined either for a whole Business Unit (businessUnitId set,
+// companyId null — every Company in that BU can record against it) or for a
+// single Company (companyId set, businessUnitId null). Each Company records
+// its own quarterly amount per stream in FinancialStreamActual.
+//
+// Stream actuals ADD to the category total everywhere (dashboard, Scorecard,
+// Comparison, Reports, AI Analysis, Year wrap-up report): Revenue =
+// original Internal + External + every revenue stream's Internal + External.
+// Streams have Actuals only — no Targets — so attainment compares the
+// combined actual against the existing category target.
+//
+// A stream with recorded amounts can't be deleted (that would silently
+// change past totals) — it can be deactivated instead, which hides it from
+// Data Entry while keeping its history in every total and report.
+// ---------------------------------------------------------------------------
+model FinancialStream {
+  id             String         @id @default(uuid())
+  category       StreamCategory
+  label          String
+  description    String         @default("")
+  businessUnitId String?
+  companyId      String?
+  active         Boolean        @default(true)
+  sortOrder      Int            @default(0)
+  createdById    String?
+  createdAt      DateTime       @default(now())
+  updatedAt      DateTime       @updatedAt
+
+  businessUnit BusinessUnit?           @relation(fields: [businessUnitId], references: [id], onDelete: Cascade)
+  company      Company?                @relation(fields: [companyId], references: [id], onDelete: Cascade)
+  actuals      FinancialStreamActual[]
+
+  @@index([businessUnitId])
+  @@index([companyId])
+  @@index([category])
+}
+
+// One Company's amount for one stream in one quarter. Mirrors the original
+// figures' splits, using the same column names as QuarterActual so it folds
+// straight into the same totals: a REVENUE stream uses revenueInternal/
+// revenueExternal; a COLLECTIONS stream the six collections* columns; an
+// EXPENSES stream `expenses`; a DISBURSEMENTS stream `disbursements`. The
+// columns that don't belong to the stream's category are always 0 (the API
+// enforces it).
+model FinancialStreamActual {
+  id        String @id @default(uuid())
+  streamId  String
+  companyId String
+  yearId    String
+  quarter   Int // 1-4
+
+  revenueInternal Decimal @default(0) @db.Decimal(14, 2)
+  revenueExternal Decimal @default(0) @db.Decimal(14, 2)
+
+  collectionsInternalEarned   Decimal @default(0) @db.Decimal(14, 2)
+  collectionsInternalUnearned Decimal @default(0) @db.Decimal(14, 2)
+  collectionsInternalOthers   Decimal @default(0) @db.Decimal(14, 2)
+  collectionsExternalEarned   Decimal @default(0) @db.Decimal(14, 2)
+  collectionsExternalUnearned Decimal @default(0) @db.Decimal(14, 2)
+  collectionsExternalOthers   Decimal @default(0) @db.Decimal(14, 2)
+
+  expenses      Decimal @default(0) @db.Decimal(14, 2)
+  disbursements Decimal @default(0) @db.Decimal(14, 2)
+
+  remarks String @default("")
+
+  updatedById String?
+  updatedAt   DateTime @updatedAt
+
+  // NoAction (not Restrict): a stream with amounts can't be deleted on its
+  // own, but deleting its Company/Business Unit still cascades cleanly,
+  // since NO ACTION is checked at the end of the statement.
+  stream  FinancialStream @relation(fields: [streamId], references: [id], onDelete: NoAction)
+  company Company         @relation(fields: [companyId], references: [id], onDelete: Cascade)
+  year    Year            @relation(fields: [yearId], references: [id], onDelete: Cascade)
+
+  @@unique([streamId, companyId, yearId, quarter])
+  @@index([yearId, quarter])
+  @@index([companyId])
 }

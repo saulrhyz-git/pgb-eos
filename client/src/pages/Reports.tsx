@@ -1,10 +1,11 @@
 import { useEffect, useMemo, useState } from "react";
-import { Download, FileSpreadsheet, Gauge, Mountain, PhilippinePeso, Printer, ShieldAlert } from "lucide-react";
+import { Download, FileSpreadsheet, Gauge, Layers, Mountain, PhilippinePeso, Printer, ShieldAlert } from "lucide-react";
 import { api } from "../api/client";
 import { useAuth } from "../contexts/AuthContext";
 import Pagination from "../components/Pagination";
 import SortableTh from "../components/SortableTh";
-import type { BusinessGoal, BusinessUnit, Company, ReportResult, RockStatus, Year } from "../api/types";
+import type { BusinessGoal, BusinessUnit, Company, ReportResult, RockStatus, StreamCategory, Year } from "../api/types";
+import { STREAM_CATEGORIES, STREAM_CATEGORY_LABEL } from "../utils/streams";
 
 // The Reports engine: a filterable, exportable view over the same
 // Targets/Actuals and Rocks data every other page already shows. Every
@@ -21,10 +22,11 @@ import type { BusinessGoal, BusinessUnit, Company, ReportResult, RockStatus, Yea
 // view and hands off to the browser's native print-to-PDF dialog. Both are
 // clearly labeled in the UI so this isn't a silent downgrade.
 
-type ReportType = "financial" | "rocks" | "executive-summary";
+type ReportType = "financial" | "streams" | "rocks" | "executive-summary";
 
 const REPORT_TABS: { key: ReportType; label: string; icon: React.ReactNode }[] = [
   { key: "financial", label: "Financial Performance", icon: <PhilippinePeso className="h-4 w-4" /> },
+  { key: "streams", label: "Financial Streams", icon: <Layers className="h-4 w-4" /> },
   { key: "rocks", label: "Rocks", icon: <Mountain className="h-4 w-4" /> },
   { key: "executive-summary", label: "Executive Summary", icon: <Gauge className="h-4 w-4" /> },
 ];
@@ -90,6 +92,7 @@ export default function Reports() {
   const [companyId, setCompanyId] = useState("");
   const [businessGoalId, setBusinessGoalId] = useState("");
   const [status, setStatus] = useState<RockStatus | "">("");
+  const [streamCategory, setStreamCategory] = useState<StreamCategory | "">("");
 
   const [data, setData] = useState<ReportResult | null>(null);
   const [loading, setLoading] = useState(false);
@@ -145,6 +148,8 @@ export default function Reports() {
     const req =
       reportType === "financial"
         ? api.reportFinancial({ ...base, companyId: companyId || undefined })
+        : reportType === "streams"
+        ? api.reportStreams({ ...base, companyId: companyId || undefined, category: streamCategory || undefined })
         : reportType === "rocks"
         ? api.reportRocks({
             ...base,
@@ -168,7 +173,7 @@ export default function Reports() {
       .finally(() => setLoading(false));
   }
 
-  useEffect(loadReport, [reportType, yearId, quarter, businessUnitId, companyId, businessGoalId, status]);
+  useEffect(loadReport, [reportType, yearId, quarter, businessUnitId, companyId, businessGoalId, status, streamCategory]);
 
   const columnType = useMemo(() => {
     const map = new Map<string, "text" | "number">();
@@ -206,12 +211,15 @@ export default function Reports() {
     if (reportType !== "executive-summary") {
       parts.push({ label: "Company", value: companyId ? companies.find((c) => c.id === companyId)?.name || "—" : "All Companies" });
     }
+    if (reportType === "streams") {
+      parts.push({ label: "Category", value: streamCategory ? STREAM_CATEGORY_LABEL[streamCategory] : "All Categories" });
+    }
     if (reportType === "rocks") {
       parts.push({ label: "Business Goal", value: businessGoalId ? businessGoals.find((g) => g.id === businessGoalId)?.name || "—" : "All Business Goals" });
       parts.push({ label: "Status", value: status ? STATUS_LABELS[status] : "All Statuses" });
     }
     return parts;
-  }, [years, yearId, periodLabel, businessUnitId, businessUnits, reportType, companyId, companies, businessGoalId, businessGoals, status]);
+  }, [years, yearId, periodLabel, businessUnitId, businessUnits, reportType, companyId, companies, businessGoalId, businessGoals, status, streamCategory]);
 
   function handleExportCsv() {
     if (!data) return;
@@ -368,6 +376,23 @@ export default function Reports() {
               {companies.map((c) => (
                 <option key={c.id} value={c.id}>
                   {c.name}
+                </option>
+              ))}
+            </select>
+          </div>
+        )}
+        {reportType === "streams" && (
+          <div className="flex flex-col gap-1">
+            <label className="text-xs font-medium text-slate-500 dark:text-slate-400">Category</label>
+            <select
+              className="w-full rounded-md border border-slate-300 dark:border-slate-600 dark:bg-slate-800 dark:text-slate-100 px-3 py-1.5 text-sm sm:min-w-[160px]"
+              value={streamCategory}
+              onChange={(e) => setStreamCategory(e.target.value as StreamCategory | "")}
+            >
+              <option value="">All Categories</option>
+              {STREAM_CATEGORIES.map((c) => (
+                <option key={c} value={c}>
+                  {STREAM_CATEGORY_LABEL[c]}
                 </option>
               ))}
             </select>

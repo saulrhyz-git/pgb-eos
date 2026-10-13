@@ -20,7 +20,8 @@ export type Resource =
   | "REPORTS"
   | "DISBURSEMENTS"
   | "COMPARISON"
-  | "AI_ANALYSIS";
+  | "AI_ANALYSIS"
+  | "STREAMS";
 
 export interface AuthUser {
   id: string;
@@ -196,6 +197,9 @@ export interface YearReportData {
     quarters: YearReportPeriod[];
     companies: { companyId: string; companyName: string; annual: YearReportPeriod; quarters: YearReportPeriod[] }[];
   }[];
+  // Original figures + each Financial Stream, full year (absent on reports
+  // generated before streams existed).
+  streams?: StreamBreakdown[];
   rocks: {
     summary: YearReportRockSummary;
     byQuarter: YearReportRockSummary[];
@@ -408,6 +412,62 @@ export interface DashboardResponse {
   chart: ChartPoint[];
   targetMatrix: TargetMatrixRow[];
   operationalGrid: OperationalGridRow[];
+  // Original figures + each labeled Financial Stream, per category, for the
+  // scope in view (optional so an older server response still type-checks).
+  streamBreakdown?: StreamBreakdown[];
+}
+
+// ---------- Financial Streams ----------
+// Labeled, additional Revenue / Collections / Expenses / Disbursements lines
+// per Business Unit or Company, on top of the original figures. They add to
+// the category totals everywhere. See server/src/routes/streams.ts.
+export type StreamCategory = "REVENUE" | "COLLECTIONS" | "EXPENSES" | "DISBURSEMENTS";
+
+export interface FinancialStream {
+  id: string;
+  category: StreamCategory;
+  label: string;
+  description: string;
+  active: boolean;
+  sortOrder: number;
+  scope: "BUSINESS_UNIT" | "COMPANY";
+  businessUnitId: string;
+  businessUnitName: string | null;
+  companyId: string | null;
+  companyName: string | null;
+  entryCount: number;
+  canEdit: boolean;
+  canDelete: boolean;
+}
+
+export interface StreamActualRow {
+  streamId: string;
+  category: StreamCategory;
+  label: string;
+  description: string;
+  active: boolean;
+  scope: "BUSINESS_UNIT" | "COMPANY";
+  scopeName: string;
+  canEdit: boolean;
+  amounts: Record<string, number>;
+  remarks: string;
+  updatedAt: string | null;
+}
+
+export interface StreamBreakdownLine {
+  streamId: string | null; // null = the original figures
+  label: string;
+  scope: "BASE" | "BUSINESS_UNIT" | "COMPANY";
+  scopeName: string;
+  active: boolean;
+  parts: Record<string, number>;
+  total: number;
+}
+
+export interface StreamBreakdown {
+  category: StreamCategory;
+  total: number;
+  lines: StreamBreakdownLine[];
 }
 
 // Generic shape shared by every report type the Reports engine can produce —

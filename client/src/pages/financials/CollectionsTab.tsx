@@ -3,6 +3,7 @@ import KpiCards from "../../components/KpiCards";
 import TargetMatrix from "../../components/TargetMatrix";
 import OperationalGrid from "../../components/OperationalGrid";
 import NotableItemsList from "../../components/NotableItemsList";
+import StreamBreakdownCard from "../../components/StreamBreakdownCard";
 import type { FinancialsOutletContext } from "./FinancialsLayout";
 
 // Collections-only sub-tab (/revenue/collections). No ProgressChart here —
@@ -16,6 +17,7 @@ export default function CollectionsTab() {
       <KpiCards kpis={data.kpis} quarter={filters.quarter} category="COLLECTIONS" />
       <TargetMatrix rows={data.targetMatrix} category="collections" />
       <OperationalGrid rows={data.operationalGrid} yearId={filters.yearId} quarter={filters.quarter} onRemarksSaved={reload} category="COLLECTIONS" />
+      <StreamBreakdownCard breakdown={data.streamBreakdown} category="COLLECTIONS" />
       <NotableItemsList
         title="Notable Collections Items"
         type="COLLECTION"

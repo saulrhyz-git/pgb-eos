@@ -25,6 +25,7 @@ import {
   toDisbursementFigures,
   toFigures,
 } from "../utils/aggregate";
+import { addStreamActuals, addStreamDisbursements } from "../utils/streams";
 import { escalateStaleRocks } from "../utils/rockAutoStatus";
 import { latestRockVersions } from "../utils/rockRollover";
 
@@ -184,6 +185,8 @@ export async function computeScorecard(user: AuthUser, params: ScorecardParams) 
   for (const t of quarterTargets) qTargetByCompanyQuarter.set(`${t.companyId}:${t.quarter}`, toFigures(t));
   const qActualByCompanyQuarter = new Map<string, Figures>();
   for (const a of quarterActuals) qActualByCompanyQuarter.set(`${a.companyId}:${a.quarter}`, toFigures(a));
+  // Financial Streams add to the original figures (utils/streams.ts).
+  await addStreamActuals(qActualByCompanyQuarter, yearId, revenueCompanyIds);
 
   const annualByCompany = new Map<string, Figures>();
   for (const cid of revenueCompanyIds) {
@@ -407,6 +410,7 @@ export async function computeScorecard(user: AuthUser, params: ScorecardParams) 
     : [];
   const disbByCompanyQuarter = new Map<string, DisbursementFigures>();
   for (const d of disbursementActuals) disbByCompanyQuarter.set(`${d.companyId}:${d.quarter}`, toDisbursementFigures(d));
+  await addStreamDisbursements(disbByCompanyQuarter, yearId, disbCompanyIds, emptyDisbursementFigures);
 
   const disbCompaniesByBu = new Map<string, typeof disbCompanies>();
   for (const c of disbCompanies) {

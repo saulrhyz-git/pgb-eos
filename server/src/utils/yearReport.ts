@@ -10,6 +10,7 @@ import {
   revenueTotal,
   toFigures,
 } from "./aggregate";
+import { addStreamActuals, addStreamDisbursements, buildStreamBreakdown, StreamBreakdown, STREAM_CATEGORIES } from "./streams";
 import { quarterDateRange } from "./quarterDates";
 
 // ---------------------------------------------------------------------------
@@ -54,6 +55,9 @@ export interface BusinessUnitReport {
   annual: PeriodFigures;
   quarters: PeriodFigures[];
   companies: CompanyReport[];
+  // Original figures + each labeled Financial Stream, full year. Optional:
+  // reports generated before streams existed don't have it.
+  streams?: StreamBreakdown[];
 }
 
 export interface RockReportItem {
@@ -92,6 +96,8 @@ export interface YearReport {
   annual: PeriodFigures;
   quarters: PeriodFigures[];
   businessUnits: BusinessUnitReport[];
+  // Group-wide stream breakdown (sum of the BUs' — see mergeStreamBreakdowns).
+  streams?: StreamBreakdown[];
   rocks: {
     summary: RockSummary;
     byQuarter: RockSummary[];
@@ -224,7 +230,12 @@ export async function buildYearReport(yearId: string, generatedBy: { id: string;
   const key = (companyId: string, quarter: number) => `${companyId}:${quarter}`;
   const targetBy = new Map(targets.map((t) => [key(t.companyId, t.quarter), toFigures(t)]));
   const actualBy = new Map(actuals.map((a) => [key(a.companyId, a.quarter), toFigures(a)]));
-  const disbBy = new Map(disbursements.map((d) => [key(d.companyId, d.quarter), n(d.amount)]));
+  const disbAmounts = new Map(disbursements.map((d) => [key(d.companyId, d.quarter), { amount: n(d.amount) }]));
+  // Financial Streams add to the original figures (utils/streams.ts).
+  const allCompanyIds = businessUnits.flatMap((bu) => bu.companies.map((c) => c.id));
+  await addStreamActuals(actualBy, yearId, allCompanyIds);
+  await addStreamDisbursements(disbAmounts, yearId, allCompanyIds, () => ({ amount: 0 }));
+  const disbBy = new Map([...disbAmounts].map(([k, v]) => [k, v.amount]));
 
   const buReports: BusinessUnitReport[] = businessUnits.map((bu) => {
     const companies: CompanyReport[] = bu.companies.map((c) => {
@@ -236,6 +247,15 @@ export async function buildYearReport(yearId: string, generatedBy: { id: string;
     const quarters = sumQuarterArrays(companies.map((c) => c.quarters));
     return { businessUnitId: bu.id, businessUnitName: bu.name, companies, quarters, annual: sumPeriods(quarters) };
   });
+
+  for (const bu of buReports) {
+    const ids = bu.companies.map((c) => c.companyId);
+    bu.streams = await buildStreamBreakdown({
+      yearId,
+      quarters: [1, 2, 3, 4],
+      companyIdsByCategory: { REVENUE: ids, COLLECTIONS: ids, EXPENSES: ids, DISBURSEMENTS: ids },
+    });
+  }
 
   const quarters = sumQuarterArrays(buReports.map((b) => b.quarters));
 
@@ -273,6 +293,7 @@ export async function buildYearReport(yearId: string, generatedBy: { id: string;
     annual: sumPeriods(quarters),
     quarters,
     businessUnits: buReports,
+    streams: mergeStreamBreakdowns(buReports.map((b) => b.streams || [])),
     rocks: rockBreakdowns(
       items,
       buReports.map((b) => ({ businessUnitId: b.businessUnitId, businessUnitName: b.businessUnitName }))
@@ -293,9 +314,37 @@ export function scopeYearReport(report: YearReport, businessUnitIds: string[] | 
     businessUnits,
     quarters,
     annual: sumPeriods(quarters),
+    streams: report.streams ? mergeStreamBreakdowns(businessUnits.map((b) => b.streams || [])) : undefined,
     rocks: rockBreakdowns(
       items,
       businessUnits.map((b) => ({ businessUnitId: b.businessUnitId, businessUnitName: b.businessUnitName }))
     ),
   };
+}
+
+// Adds several stream breakdowns together line by line (same stream id, or
+// the original figures). Used to build the group-wide view from the BUs.
+export function mergeStreamBreakdowns(list: StreamBreakdown[][]): StreamBreakdown[] {
+  return STREAM_CATEGORIES.map((category) => {
+    const lines = new Map<string, StreamBreakdown["lines"][number]>();
+    for (const breakdowns of list) {
+      const b = breakdowns.find((x) => x.category === category);
+      if (!b) continue;
+      for (const l of b.lines) {
+        const k = l.streamId ?? "__base__";
+        const cur = lines.get(k);
+        if (!cur) {
+          lines.set(k, { ...l, parts: { ...l.parts } });
+          continue;
+        }
+        for (const [f, v] of Object.entries(l.parts)) cur.parts[f] = (cur.parts[f] || 0) + v;
+        cur.total += l.total;
+      }
+    }
+    const all = [...lines.values()];
+    const base = all.filter((l) => l.streamId === null);
+    const rest = all.filter((l) => l.streamId !== null);
+    const ordered = [...base, ...rest];
+    return { category, total: ordered.reduce((sum, l) => sum + l.total, 0), lines: ordered };
+  });
 }

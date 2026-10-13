@@ -29,6 +29,9 @@ import type {
   SmtpSettings,
   TargetLockEntry,
   Year,
+  FinancialStream,
+  StreamActualRow,
+  StreamCategory,
   YearReportData,
   YearWrapUpPreview,
 } from "./types";
@@ -92,6 +95,34 @@ export const api = {
 
   years: () => request<Year[]>("/years"),
   createYear: (year: number) => request<Year>("/years", { method: "POST", body: JSON.stringify({ year }) }),
+  // ---------- Financial Streams ----------
+  streams: (params: { businessUnitId?: string; companyId?: string; category?: StreamCategory; includeInactive?: boolean } = {}) => {
+    const qs = new URLSearchParams();
+    if (params.businessUnitId) qs.set("businessUnitId", params.businessUnitId);
+    if (params.companyId) qs.set("companyId", params.companyId);
+    if (params.category) qs.set("category", params.category);
+    if (params.includeInactive) qs.set("includeInactive", "true");
+    return request<FinancialStream[]>(`/streams?${qs.toString()}`);
+  },
+  canManageStreams: (businessUnitId: string, companyId?: string) => {
+    const qs = new URLSearchParams({ businessUnitId });
+    if (companyId) qs.set("companyId", companyId);
+    return request<{ canManage: boolean }>(`/streams/can-manage?${qs.toString()}`);
+  },
+  createStream: (payload: { category: StreamCategory; label: string; description?: string; businessUnitId?: string; companyId?: string }) =>
+    request<FinancialStream>("/streams", { method: "POST", body: JSON.stringify(payload) }),
+  updateStream: (id: string, payload: { label?: string; description?: string; active?: boolean; sortOrder?: number }) =>
+    request<FinancialStream>(`/streams/${id}`, { method: "PUT", body: JSON.stringify(payload) }),
+  deleteStream: (id: string) => request<void>(`/streams/${id}`, { method: "DELETE" }),
+  streamActuals: (params: { yearId: string; quarter: number; companyId: string }) =>
+    request<StreamActualRow[]>(`/streams/actuals?yearId=${params.yearId}&quarter=${params.quarter}&companyId=${params.companyId}`),
+  saveStreamActuals: (payload: {
+    yearId: string;
+    quarter: number;
+    companyId: string;
+    entries: { streamId: string; amounts: Record<string, number>; remarks: string }[];
+  }) => request<{ saved: number }>("/streams/actuals", { method: "PUT", body: JSON.stringify(payload) }),
+
   yearWrapUpPreview: (yearId: string) => request<YearWrapUpPreview>(`/years/${yearId}/wrap-up/preview`),
   wrapUpYear: (yearId: string, confirmYear: number) =>
     request<{ yearId: string; year: number; wrappedUpAt: string; wrappedUpByName: string }>(`/years/${yearId}/wrap-up`, {
@@ -451,6 +482,13 @@ export const api = {
     if (params.businessGoalId) qs.set("businessGoalId", params.businessGoalId);
     if (params.status) qs.set("status", params.status);
     return request<ReportResult>(`/reports/rocks?${qs.toString()}`);
+  },
+  reportStreams: (params: { yearId: string; quarter?: number; businessUnitId?: string; companyId?: string; category?: StreamCategory }) => {
+    const qs = new URLSearchParams({ yearId: params.yearId, quarter: !params.quarter ? "all" : String(params.quarter) });
+    if (params.businessUnitId) qs.set("businessUnitId", params.businessUnitId);
+    if (params.companyId) qs.set("companyId", params.companyId);
+    if (params.category) qs.set("category", params.category);
+    return request<ReportResult>(`/reports/streams?${qs.toString()}`);
   },
   reportExecutiveSummary: (params: { yearId: string; quarter?: number; businessUnitId?: string }) => {
     const qs = new URLSearchParams({ yearId: params.yearId, quarter: !params.quarter ? "all" : String(params.quarter) });

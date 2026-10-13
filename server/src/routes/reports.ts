@@ -10,6 +10,8 @@ import {
 } from "../middleware/auth";
 import { assertPermission, can, canAnyOf, FINANCIAL_RESOURCES, narrowingApplies } from "../utils/permissions";
 import { addFigures, emptyFigures, Figures, expensesTotal, collectionsTotal, revenueTotal, pct, toFigures } from "../utils/aggregate";
+import { addStreamActuals, STREAM_AMOUNT_FIELDS, STREAM_CATEGORIES, StreamCategory } from "../utils/streams";
+import { n } from "../utils/aggregate";
 import { escalateStaleRocks } from "../utils/rockAutoStatus";
 import { latestRockVersions } from "../utils/rockRollover";
 
@@ -140,6 +142,8 @@ router.get("/financial", async (req, res) => {
   for (const t of targets) targetByCq.set(`${t.companyId}:${t.quarter}`, toFigures(t));
   const actualByCq = new Map<string, Figures>();
   for (const a of actuals) actualByCq.set(`${a.companyId}:${a.quarter}`, toFigures(a));
+  // Financial Streams add to the original figures (utils/streams.ts).
+  await addStreamActuals(actualByCq, yearId, companyIds);
 
   const quartersInScope = isAllQuarters ? [1, 2, 3, 4] : [quarter];
   const periodLabel = isAllQuarters ? "Annual" : `Q${quarter}`;
@@ -306,6 +310,191 @@ router.get("/rocks", async (req, res) => {
   res.json(result);
 });
 
+// ---------- Financial Streams report ----------
+
+const STREAM_CATEGORY_LABEL: Record<StreamCategory, string> = {
+  REVENUE: "Revenue",
+  COLLECTIONS: "Collections",
+  EXPENSES: "Expenses",
+  DISBURSEMENTS: "Disbursements",
+};
+
+// Split columns per category — the same splits Data Entry uses. With no
+// category filter, Revenue/Collections are shown as Internal/External and
+// Expenses/Disbursements as a single amount (Total).
+const STREAM_SPLIT_COLUMNS: Record<StreamCategory | "ALL", ReportColumn[]> = {
+  REVENUE: [
+    { key: "internal", label: "Internal", type: "number" },
+    { key: "external", label: "External", type: "number" },
+  ],
+  COLLECTIONS: [
+    { key: "collectionsInternalEarned", label: "Internal Earned", type: "number" },
+    { key: "collectionsInternalUnearned", label: "Internal Unearned", type: "number" },
+    { key: "collectionsInternalOthers", label: "Internal Others", type: "number" },
+    { key: "collectionsExternalEarned", label: "External Earned", type: "number" },
+    { key: "collectionsExternalUnearned", label: "External Unearned", type: "number" },
+    { key: "collectionsExternalOthers", label: "External Others", type: "number" },
+  ],
+  EXPENSES: [],
+  DISBURSEMENTS: [],
+  ALL: [
+    { key: "internal", label: "Internal", type: "number" },
+    { key: "external", label: "External", type: "number" },
+  ],
+};
+
+function internalExternal(category: StreamCategory, parts: Record<string, number>) {
+  if (category === "REVENUE") return { internal: parts.revenueInternal || 0, external: parts.revenueExternal || 0 };
+  if (category === "COLLECTIONS")
+    return {
+      internal: (parts.collectionsInternalEarned || 0) + (parts.collectionsInternalUnearned || 0) + (parts.collectionsInternalOthers || 0),
+      external: (parts.collectionsExternalEarned || 0) + (parts.collectionsExternalUnearned || 0) + (parts.collectionsExternalOthers || 0),
+    };
+  return { internal: 0, external: 0 };
+}
+
+/**
+ * GET /api/reports/streams
+ * Query params: yearId (required), quarter (1-4, or "all"/omitted for the
+ * full year), businessUnitId, companyId, category (all optional).
+ * One row per Company x category x line, where the lines are "Original
+ * figures" plus every labeled Financial Stream that applies to the Company —
+ * so each Company's lines add up to its category total. Share % is each
+ * line's part of that total. Masked per category with the same view rules as
+ * every other report (Disbursements by the DISBURSEMENTS grant).
+ */
+router.get("/streams", async (req, res) => {
+  const user = req.user!;
+  const { yearId, businessUnitId, companyId, category } = req.query as Record<string, string | undefined>;
+  const quarterParam = req.query.quarter as string | undefined;
+  const isAllQuarters = quarterParam === "all" || quarterParam === undefined;
+  const quarter = isAllQuarters ? 0 : Number(quarterParam);
+  if (!yearId) return res.status(400).json({ error: "yearId is required" });
+  if (!isAllQuarters && (quarter < 1 || quarter > 4)) return res.status(400).json({ error: 'quarter must be 1-4 or "all"' });
+  if (category && !STREAM_CATEGORIES.includes(category as StreamCategory)) return res.status(400).json({ error: "Invalid category" });
+  const categories: StreamCategory[] = category ? [category as StreamCategory] : STREAM_CATEGORIES;
+  const quarters = isAllQuarters ? [1, 2, 3, 4] : [quarter];
+
+  const companyWhere: any = {};
+  try {
+    if (companyId) {
+      const buId = await resolveCompanyBusinessUnit(companyId);
+      assertBusinessUnitAccess(user, buId);
+      companyWhere.id = companyId;
+    } else {
+      const buFilter = scopedBusinessUnitFilter(user, businessUnitId);
+      if (buFilter) companyWhere.businessUnitId = buFilter;
+    }
+  } catch (err: any) {
+    return res.status(err.status || 500).json({ error: err.message });
+  }
+
+  const permRows = await loadUserPermissions(user);
+  const companies = await prisma.company.findMany({
+    where: companyWhere,
+    include: { businessUnit: { select: { name: true } } },
+    orderBy: [{ businessUnit: { name: "asc" } }, { name: "asc" }],
+  });
+  function canSee(c: { id: string; businessUnitId: string }, cat: StreamCategory) {
+    if (!narrowingApplies(Boolean(user.role), permRows, [cat])) return true;
+    return can(permRows, "view", cat, { businessUnitId: c.businessUnitId, companyId: c.id });
+  }
+
+  const companyIds = companies.map((c) => c.id);
+  const buIds = Array.from(new Set(companies.map((c) => c.businessUnitId)));
+  const [baseActuals, baseDisb, streams, streamActuals] = companyIds.length
+    ? await Promise.all([
+        prisma.quarterActual.findMany({ where: { yearId, quarter: { in: quarters }, companyId: { in: companyIds } } }),
+        prisma.disbursementActual.findMany({ where: { yearId, quarter: { in: quarters }, companyId: { in: companyIds } } }),
+        prisma.financialStream.findMany({
+          where: { category: { in: categories }, OR: [{ companyId: { in: companyIds } }, { businessUnitId: { in: buIds } }] },
+          orderBy: [{ sortOrder: "asc" }, { label: "asc" }],
+        }),
+        prisma.financialStreamActual.findMany({ where: { yearId, quarter: { in: quarters }, companyId: { in: companyIds } } }),
+      ])
+    : [[], [], [], []];
+
+  const periodLabel = isAllQuarters ? "Annual" : `Q${quarter}`;
+  const rows: Record<string, string | number>[] = [];
+
+  for (const c of companies) {
+    for (const cat of categories) {
+      if (!canSee(c, cat)) continue;
+      const fields = STREAM_AMOUNT_FIELDS[cat];
+
+      const baseParts: Record<string, number> = Object.fromEntries(fields.map((f) => [f, 0]));
+      if (cat === "DISBURSEMENTS") {
+        for (const d of baseDisb) if (d.companyId === c.id) baseParts.disbursements += n(d.amount);
+      } else {
+        for (const a of baseActuals) if (a.companyId === c.id) for (const f of fields) baseParts[f] += n((a as any)[f]);
+      }
+
+      const lines: { label: string; definedFor: string; parts: Record<string, number>; remarks: string }[] = [
+        { label: "Original figures", definedFor: "Original", parts: baseParts, remarks: "" },
+      ];
+      const applicable = streams.filter((s) => s.category === cat && (s.companyId === c.id || s.businessUnitId === c.businessUnitId));
+      for (const s of applicable) {
+        const mine = streamActuals.filter((a) => a.streamId === s.id && a.companyId === c.id);
+        const parts: Record<string, number> = Object.fromEntries(fields.map((f) => [f, 0]));
+        for (const a of mine) for (const f of fields) parts[f] += n((a as any)[f]);
+        const total = Object.values(parts).reduce((x, y) => x + y, 0);
+        if (!s.active && total === 0) continue; // a retired stream with nothing here adds only noise
+        lines.push({
+          label: s.active ? s.label : `${s.label} (inactive)`,
+          definedFor: s.companyId ? "This Company" : "Business Unit-wide",
+          parts,
+          remarks: isAllQuarters ? "" : mine[0]?.remarks || "",
+        });
+      }
+
+      const categoryTotal = lines.reduce((sum, l) => sum + Object.values(l.parts).reduce((x, y) => x + y, 0), 0);
+      for (const l of lines) {
+        const total = Object.values(l.parts).reduce((x, y) => x + y, 0);
+        const row: Record<string, string | number> = {
+          businessUnitName: c.businessUnit.name,
+          companyName: c.name,
+          category: STREAM_CATEGORY_LABEL[cat],
+          stream: l.label,
+          definedFor: l.definedFor,
+          period: periodLabel,
+          total,
+          sharePct: categoryTotal ? Math.round((total / categoryTotal) * 1000) / 10 : 0,
+          remarks: l.remarks,
+        };
+        if (category === "COLLECTIONS") for (const f of fields) row[f] = l.parts[f];
+        else Object.assign(row, internalExternal(cat, l.parts));
+        rows.push(row);
+      }
+    }
+  }
+
+  const splitCols = STREAM_SPLIT_COLUMNS[(category as StreamCategory) || "ALL"];
+  const result: ReportResult = {
+    title: category ? `${STREAM_CATEGORY_LABEL[category as StreamCategory]} Streams Report` : "Financial Streams Report",
+    scope: {
+      yearId,
+      period: periodLabel,
+      businessUnitId: businessUnitId || null,
+      companyId: companyId || null,
+      category: category || "All",
+    },
+    columns: [
+      { key: "businessUnitName", label: "Business Unit", type: "text" },
+      { key: "companyName", label: "Company", type: "text" },
+      { key: "category", label: "Category", type: "text" },
+      { key: "stream", label: "Stream", type: "text" },
+      { key: "definedFor", label: "Defined For", type: "text" },
+      { key: "period", label: "Period", type: "text" },
+      ...splitCols,
+      { key: "total", label: "Total", type: "number" },
+      { key: "sharePct", label: "Share of Category %", type: "number" },
+      ...(isAllQuarters ? [] : [{ key: "remarks", label: "Remarks", type: "text" as const }]),
+    ],
+    rows,
+  };
+  res.json(result);
+});
+
 function executiveSummaryColumns(): ReportColumn[] {
   return [
     { key: "businessUnitName", label: "Business Unit", type: "text" },
@@ -393,6 +582,8 @@ router.get("/executive-summary", async (req, res) => {
   for (const t of targets) targetByCq.set(`${t.companyId}:${t.quarter}`, toFigures(t));
   const actualByCq = new Map<string, Figures>();
   for (const a of actuals) actualByCq.set(`${a.companyId}:${a.quarter}`, toFigures(a));
+  // Financial Streams add to the original figures (utils/streams.ts).
+  await addStreamActuals(actualByCq, yearId, revenueCompanyIds);
 
   const revenueCompaniesByBu = new Map<string, typeof revenueCompanies>();
   for (const c of revenueCompanies) {

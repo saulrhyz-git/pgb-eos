@@ -11,6 +11,7 @@ import "express-async-errors";
 import express from "express";
 import cors from "cors";
 import authRoutes from "./routes/auth";
+import streamRoutes from "./routes/streams";
 import yearRoutes from "./routes/years";
 import metaRoutes from "./routes/meta";
 import targetRoutes from "./routes/targets";
@@ -40,6 +41,7 @@ app.get("/api/health", (_req, res) => res.json({ ok: true }));
 
 app.use("/api/auth", authRoutes);
 app.use("/api/years", yearRoutes);
+app.use("/api/streams", streamRoutes);
 app.use("/api", metaRoutes);
 app.use("/api/targets", targetRoutes);
 app.use("/api/actuals", actualRoutes);

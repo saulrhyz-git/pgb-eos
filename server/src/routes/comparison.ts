@@ -24,6 +24,7 @@ import {
   toDisbursementFigures,
   toFigures,
 } from "../utils/aggregate";
+import { addStreamActuals, addStreamDisbursements } from "../utils/streams";
 import { escalateStaleRocks } from "../utils/rockAutoStatus";
 import { latestRockVersions } from "../utils/rockRollover";
 
@@ -155,6 +156,8 @@ router.get("/snapshot", async (req, res) => {
   for (const t of quarterTargets) targetByCq.set(`${t.companyId}:${t.quarter}`, toFigures(t));
   const actualByCq = new Map<string, Figures>();
   for (const a of quarterActuals) actualByCq.set(`${a.companyId}:${a.quarter}`, toFigures(a));
+  // Financial Streams add to the original figures (utils/streams.ts).
+  await addStreamActuals(actualByCq, yearId, companyIds);
 
   let revenueTargetTotal = 0;
   let revenueActualTotal = 0;
@@ -213,6 +216,7 @@ router.get("/snapshot", async (req, res) => {
     : [];
   const disbByCq = new Map<string, DisbursementFigures>();
   for (const d of disbursementActuals) disbByCq.set(`${d.companyId}:${d.quarter}`, toDisbursementFigures(d));
+  await addStreamDisbursements(disbByCq, yearId, disbCompanyIds, emptyDisbursementFigures);
 
   let disbursementsActualTotal = 0;
   for (const cid of disbCompanyIds) {

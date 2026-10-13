@@ -8,6 +8,7 @@ import {
   FileSpreadsheet,
   Gauge,
   GitCompare,
+  Layers,
   LayoutDashboard,
   LogOut,
   Menu,
@@ -76,6 +77,10 @@ export default function Layout() {
         <NavLink to="/data-entry" className={linkClass} onClick={closeMobile} title="Financials Data Entry">
           <ClipboardEdit className="h-4 w-4 shrink-0" />
           {showLabels && "Financials Data Entry"}
+        </NavLink>
+        <NavLink to="/streams" className={linkClass} onClick={closeMobile} title="Financial Streams">
+          <Layers className="h-4 w-4 shrink-0" />
+          {showLabels && "Financial Streams"}
         </NavLink>
         {/* Label-only rename to "Financials Target Setup" — route stays
             /targets. */}

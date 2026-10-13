@@ -15,6 +15,7 @@ const RESOURCES: Resource[] = [
   "DISBURSEMENTS",
   "COMPARISON",
   "AI_ANALYSIS",
+  "STREAMS",
 ];
 const RESOURCE_LABELS: Record<Resource, string> = {
   TARGETS: "Targets",
@@ -28,6 +29,7 @@ const RESOURCE_LABELS: Record<Resource, string> = {
   DISBURSEMENTS: "Disbursements",
   COMPARISON: "Comparison",
   AI_ANALYSIS: "AI Analysis",
+  STREAMS: "Financial Streams (manage)",
 };
 
 type Grants = Record<Resource, { canView: boolean; canEdit: boolean; canDelete: boolean }>;
