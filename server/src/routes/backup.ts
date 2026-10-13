@@ -1,3 +1,6 @@
+import crypto from "crypto";
+import fs from "fs";
+import path from "path";
 import express, { Router } from "express";
 import { z } from "zod";
 import { Prisma } from "@prisma/client";
@@ -6,6 +9,7 @@ import { blockPendingPasswordChange, requireAuth, requireRole } from "../middlew
 import { logAudit } from "../utils/auditLog";
 import {
   BackupFileError,
+  CodeMigration,
   decodeBackup,
   encodeBackup,
   exportAll,
@@ -35,6 +39,26 @@ router.use(blockPendingPasswordChange);
 router.use(requireRole("SUPERADMIN"));
 
 const restoreEnabled = () => process.env.ALLOW_DATA_RESTORE === "true";
+
+// The migrations that ship with the deployed code (server/prisma/migrations —
+// the same path from src/routes and dist/routes). Used when restoring into a
+// fresh database that has no migration history yet. undefined if the folder
+// can't be read, in which case only the backup's own history is used.
+function codeMigrations(): CodeMigration[] | undefined {
+  try {
+    const dir = path.resolve(__dirname, "../../prisma/migrations");
+    return fs
+      .readdirSync(dir, { withFileTypes: true })
+      .filter((d) => d.isDirectory() && fs.existsSync(path.join(dir, d.name, "migration.sql")))
+      .map((d) => ({
+        name: d.name,
+        checksum: crypto.createHash("sha256").update(fs.readFileSync(path.join(dir, d.name, "migration.sql"))).digest("hex"),
+      }))
+      .sort((a, b) => a.name.localeCompare(b.name));
+  } catch {
+    return undefined;
+  }
+}
 
 function txRunner(tx: Prisma.TransactionClient): SqlRunner {
   return {
@@ -100,7 +124,7 @@ router.post("/restore/preview", rawBody, async (req, res) => {
   try {
     const encrypted = Buffer.isBuffer(req.body) && isEncrypted(req.body);
     const backup = readUpload(req);
-    const plan = await planRestore(txRunner(prisma as unknown as Prisma.TransactionClient), backup);
+    const plan = await planRestore(txRunner(prisma as unknown as Prisma.TransactionClient), backup, codeMigrations());
     res.json({ ...summarize(backup), encrypted, plan, restoreEnabled: restoreEnabled() });
   } catch (err: any) {
     res.status(err.status || 500).json({ error: err.message, code: err.code });
@@ -119,7 +143,8 @@ router.post("/restore", rawBody, async (req, res) => {
     const backup = readUpload(req);
     // Everything in ONE transaction: any error rolls back and leaves this
     // instance's data exactly as it was.
-    const restored = await prisma.$transaction((tx) => restoreAll(txRunner(tx), backup), { timeout: 15 * 60_000, maxWait: 10_000 });
+    const migrations = codeMigrations();
+    const restored = await prisma.$transaction((tx) => restoreAll(txRunner(tx), backup, migrations), { timeout: 15 * 60_000, maxWait: 10_000 });
     const s = summarize(backup);
     // Logged into the RESTORED data, so the history shows when it arrived.
     await logAudit({

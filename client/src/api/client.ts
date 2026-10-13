@@ -89,9 +89,10 @@ export interface RestorePlan {
   ok: boolean;
   errors: string[];
   warnings: string[];
-  tables: { name: string; rowCount: number; status: "restore" | "missing-in-target" | "empty-not-in-backup" }[];
+  tables: { name: string; rowCount: number; status: "restore" | "missing-in-target" | "empty-not-in-backup" | "kept-target" }[];
   sourceLatestMigration: string | null;
   targetLatestMigration: string | null;
+  history: { action: "keep-target" | "use-backup"; markApplied: string[] };
 }
 
 // Base64 so any passphrase characters survive an HTTP header.

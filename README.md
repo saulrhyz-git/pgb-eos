@@ -559,6 +559,22 @@ brings production's migration history with it, so from then on
 `prisma migrate deploy` behaves on this instance (and on anything cloned from
 it) exactly as it did on production. Sign in again with a production account.
 
+### Restoring into an existing dev instance
+
+The dev **database** must be on the same migrations as the backup's source,
+not just the same code. PM2 starts `dist/index.js` directly, so pulling new
+code doesn't apply its migrations — after every pull, on every instance:
+
+```bash
+cd server && npm run prisma:deploy && npm run prisma:generate && npm run build
+pm2 restart <app>
+```
+
+If the dev database is behind, **Check file** blocks the restore and lists
+the missing migrations. An existing instance always keeps its own migration
+history (it describes that database's schema); only a fresh `db push`
+database takes the backup's.
+
 Before promoting a dev instance to production, set `ALLOW_DATA_RESTORE` back
 to `false` (or remove it).
 

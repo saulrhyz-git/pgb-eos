@@ -212,35 +212,110 @@ export function decodeBackup(buf: Buffer, passphrase?: string): BackupFile {
 
 // ---------- Compatibility ----------
 
+// A migration that ships with the deployed app code (prisma/migrations).
+export interface CodeMigration {
+  name: string;
+  checksum: string; // sha256 of migration.sql, as Prisma records it
+}
+
 export interface RestorePlan {
   ok: boolean;
   errors: string[];
   warnings: string[];
-  tables: { name: string; rowCount: number; status: "restore" | "missing-in-target" | "empty-not-in-backup" }[];
+  tables: { name: string; rowCount: number; status: "restore" | "missing-in-target" | "empty-not-in-backup" | "kept-target" }[];
   sourceLatestMigration: string | null;
   targetLatestMigration: string | null;
+  // What happens to Prisma's migration history (_prisma_migrations):
+  //  - "keep-target": this instance already has a history — it's kept as is,
+  //    because it describes THIS database's schema.
+  //  - "use-backup": this instance has none (a fresh `prisma db push`
+  //    database) — the backup's history is restored, plus `markApplied`:
+  //    migrations that ship with this instance's code but are newer than the
+  //    backup (db push already created their schema).
+  history: { action: "keep-target" | "use-backup"; markApplied: string[] };
 }
 
+function appliedFrom(rows: { migration_name: string; finished_at: unknown; rolled_back_at: unknown }[]): string[] {
+  return rows.filter((r) => r.finished_at && !r.rolled_back_at).map((r) => r.migration_name).sort();
+}
+
+/** Migration names the backup's source database had applied (empty if the backup has no history). */
+export function backupMigrations(backup: BackupFile): string[] {
+  const t = backup.tables.find((x) => x.name === MIGRATIONS_TABLE);
+  return t ? appliedFrom(JSON.parse(t.rows)) : [];
+}
+
+/** Migration names applied on the target, or null if it has no (or an empty) history table. */
+async function targetMigrations(sql: SqlRunner, tables: Map<string, BackupColumn[]>): Promise<string[] | null> {
+  if (!tables.has(MIGRATIONS_TABLE)) return null;
+  const rows = await sql.query<{ migration_name: string; finished_at: unknown; rolled_back_at: unknown }>(
+    `SELECT migration_name, finished_at, rolled_back_at FROM ${q(MIGRATIONS_TABLE)}`
+  );
+  const names = appliedFrom(rows);
+  return names.length ? names : null;
+}
+
+const list = (names: string[]) => (names.length > 4 ? `${names.slice(0, 4).join(", ")} and ${names.length - 4} more` : names.join(", "));
+
 /**
- * Compares a backup with the target database, column by column. Blocking:
- * a backup table (with rows) the target doesn't have, a backup column (with
- * data) the target doesn't have, or a required target column the backup
- * can't fill. Everything else restores; target tables the backup doesn't
- * have are emptied (e.g. a newer feature's table when the backup is older).
+ * Compares a backup with the target database. Blocking:
+ *  - the target's database is BEHIND the backup (migrations the backup's
+ *    source had that haven't run here) — its schema can't hold the data;
+ *  - on a fresh target, the backup is from NEWER app code than is deployed;
+ *  - a backup table / column with data that the target doesn't have;
+ *  - a required target column the backup can't fill.
+ * Everything else restores; target tables the backup doesn't have are left
+ * empty (e.g. an older backup restored into a newer version).
  */
-export async function planRestore(sql: SqlRunner, backup: BackupFile): Promise<RestorePlan> {
+export async function planRestore(sql: SqlRunner, backup: BackupFile, codeMigrations?: CodeMigration[]): Promise<RestorePlan> {
   const target = await listColumns(sql);
   const errors: string[] = [];
   const warnings: string[] = [];
   const tables: RestorePlan["tables"] = [];
 
+  // ---- Migration history ----
+  const fromBackup = backupMigrations(backup);
+  const onTarget = await targetMigrations(sql, target);
+  let history: RestorePlan["history"];
+  if (onTarget) {
+    history = { action: "keep-target", markApplied: [] };
+    const behind = fromBackup.filter((m) => !onTarget.includes(m));
+    if (behind.length) {
+      errors.push(
+        `This instance's database is behind the backup: ${behind.length} migration${behind.length === 1 ? "" : "s"} (${list(behind)}) haven't been applied here. ` +
+          `Deploy the same app version as the source, then on this server run "npm run prisma:deploy && npm run prisma:generate" in server/, restart, and check the file again.`
+      );
+    }
+    const ahead = onTarget.filter((m) => !fromBackup.includes(m));
+    if (ahead.length && fromBackup.length) {
+      warnings.push(`The backup is from an older app version (this instance also has ${list(ahead)}). Its data will be restored into this newer version; this instance's migration history is kept.`);
+    }
+  } else {
+    const markApplied: string[] = [];
+    if (codeMigrations) {
+      const codeNames = new Set(codeMigrations.map((m) => m.name));
+      const unknown = fromBackup.filter((m) => !codeNames.has(m));
+      if (unknown.length) {
+        errors.push(`The backup is from a newer app version than is deployed here (${list(unknown)}). Deploy the newer version here first.`);
+      }
+      markApplied.push(...codeMigrations.map((m) => m.name).filter((m) => !fromBackup.includes(m)).sort());
+      if (markApplied.length && fromBackup.length) {
+        warnings.push(`This instance's code is newer than the backup; ${list(markApplied)} will be recorded as applied (this database was created from the current schema).`);
+      }
+    }
+    history = { action: "use-backup", markApplied };
+  }
+
+  // ---- Tables & columns ----
   for (const t of backup.tables) {
+    if (t.name === MIGRATIONS_TABLE) {
+      tables.push({ name: t.name, rowCount: t.rowCount, status: history.action === "keep-target" ? "kept-target" : "restore" });
+      continue;
+    }
     const cols = target.get(t.name);
     if (!cols) {
-      if (t.name === MIGRATIONS_TABLE) {
-        tables.push({ name: t.name, rowCount: t.rowCount, status: "restore" }); // created on restore if missing
-      } else if (t.rowCount > 0) {
-        errors.push(`Table "${t.name}" (${t.rowCount} rows) doesn't exist on this instance. Deploy the same app version here first.`);
+      if (t.rowCount > 0) {
+        errors.push(`Table "${t.name}" (${t.rowCount} rows) doesn't exist on this instance. Deploy the same app version here (and apply its migrations) first.`);
         tables.push({ name: t.name, rowCount: t.rowCount, status: "missing-in-target" });
       } else {
         warnings.push(`Table "${t.name}" doesn't exist here; it's empty in the backup, so nothing is lost.`);
@@ -254,13 +329,13 @@ export async function planRestore(sql: SqlRunner, backup: BackupFile): Promise<R
     const extra = t.columns.filter((c) => !targetNames.has(c));
     if (extra.length && t.rowCount > 0) {
       const withData = extra.filter((c) => jsonColumnHasData(t.rows, c));
-      if (withData.length) errors.push(`"${t.name}" has data in column(s) ${withData.join(", ")} that this instance doesn't have. Deploy the same app version here first.`);
+      if (withData.length) errors.push(`"${t.name}" has data in column(s) ${withData.join(", ")} that this instance doesn't have. Deploy the same app version here (and apply its migrations) first.`);
       const empty = extra.filter((c) => !withData.includes(c));
       if (empty.length) warnings.push(`"${t.name}": column(s) ${empty.join(", ")} aren't on this instance; they're empty in the backup, so they're skipped.`);
     }
     const missingRequired = cols.filter((c) => !backupNames.has(c.name) && !c.nullable && !c.hasDefault);
     if (missingRequired.length && t.rowCount > 0) {
-      errors.push(`"${t.name}" needs column(s) ${missingRequired.map((c) => c.name).join(", ")} that the backup doesn't have. This instance is on a newer app version than the backup.`);
+      errors.push(`"${t.name}" needs column(s) ${missingRequired.map((c) => c.name).join(", ")} that the backup doesn't have.`);
     }
     const missingOptional = cols.filter((c) => !backupNames.has(c.name) && (c.nullable || c.hasDefault));
     if (missingOptional.length && t.rowCount > 0) {
@@ -269,22 +344,25 @@ export async function planRestore(sql: SqlRunner, backup: BackupFile): Promise<R
   }
   const inBackup = new Set(backup.tables.map((t) => t.name));
   for (const name of target.keys()) {
-    if (!inBackup.has(name)) {
+    if (!inBackup.has(name) && name !== MIGRATIONS_TABLE) {
       warnings.push(`Table "${name}" isn't in the backup; it will be left empty.`);
       tables.push({ name, rowCount: 0, status: "empty-not-in-backup" });
     }
   }
 
   const t = await latestMigration(sql, target);
-  if (backup.source.latestMigration && t.latestMigration && backup.source.latestMigration !== t.latestMigration) {
-    warnings.push(
-      `The backup's latest migration (${backup.source.latestMigration}) differs from this instance's (${t.latestMigration}). The restore replaces this instance's migration history with the backup's, so deploy the same app version that made the backup.`
-    );
-  }
-  return { ok: errors.length === 0, errors, warnings, tables, sourceLatestMigration: backup.source.latestMigration, targetLatestMigration: t.latestMigration };
+  return {
+    ok: errors.length === 0,
+    errors,
+    warnings,
+    tables,
+    sourceLatestMigration: backup.source.latestMigration,
+    targetLatestMigration: t.latestMigration,
+    history,
+  };
 }
 
-// Cheap check without parsing numbers: does any row have a non-null value for this key?
+// Cheap check without keeping numbers: does any row have a non-null value for this key?
 function jsonColumnHasData(rowsJson: string, column: string): boolean {
   const rows = JSON.parse(rowsJson, (_k, v) => (typeof v === "number" ? 0 : v)) as Record<string, unknown>[];
   return rows.some((r) => r[column] !== null && r[column] !== undefined);
@@ -304,14 +382,16 @@ const PRISMA_MIGRATIONS_DDL = `CREATE TABLE IF NOT EXISTS ${q(MIGRATIONS_TABLE)}
 )`;
 
 /** Must run inside ONE transaction — on any error the caller's transaction rolls everything back. */
-export async function restoreAll(sql: SqlRunner, backup: BackupFile): Promise<{ table: string; rows: number }[]> {
-  const plan = await planRestore(sql, backup);
+export async function restoreAll(sql: SqlRunner, backup: BackupFile, codeMigrations?: CodeMigration[]): Promise<{ table: string; rows: number }[]> {
+  const plan = await planRestore(sql, backup, codeMigrations);
   if (!plan.ok) throw Object.assign(new Error(plan.errors.join(" ")), { status: 409 });
 
-  if (backup.tables.some((t) => t.name === MIGRATIONS_TABLE)) await sql.exec(PRISMA_MIGRATIONS_DDL);
+  const useBackupHistory = plan.history.action === "use-backup";
+  if (useBackupHistory) await sql.exec(PRISMA_MIGRATIONS_DDL);
 
   const target = await listColumns(sql);
-  const all = [...target.keys()];
+  // The target's own migration history is never touched when it's kept.
+  const all = [...target.keys()].filter((name) => useBackupHistory || name !== MIGRATIONS_TABLE);
   if (all.length) await sql.exec(`TRUNCATE TABLE ${all.map(q).join(", ")} CASCADE`);
 
   const byName = new Map(backup.tables.map((t) => [t.name, t]));
@@ -328,6 +408,19 @@ export async function restoreAll(sql: SqlRunner, backup: BackupFile): Promise<{ 
     const [{ n }] = await sql.query<{ n: number }>(`SELECT count(*)::int AS n FROM ${q(name)}`);
     if (Number(n) !== t.rowCount) throw new Error(`"${name}": expected ${t.rowCount} rows after restore, found ${n}. Nothing was changed.`);
     restored.push({ table: name, rows: Number(n) });
+  }
+
+  // Fresh target whose code is newer than the backup: record the newer
+  // migrations as applied (like `prisma migrate resolve --applied`), since
+  // `prisma db push` already created their schema.
+  if (useBackupHistory && plan.history.markApplied.length && codeMigrations) {
+    for (const name of plan.history.markApplied) {
+      const m = codeMigrations.find((x) => x.name === name)!;
+      await sql.exec(
+        `INSERT INTO ${q(MIGRATIONS_TABLE)} (id, checksum, finished_at, migration_name, logs, rolled_back_at, started_at, applied_steps_count) VALUES ($1, $2, now(), $3, NULL, NULL, now(), 1)`,
+        [crypto.randomUUID(), m.checksum, m.name]
+      );
+    }
   }
   return restored;
 }
