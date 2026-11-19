@@ -23,13 +23,18 @@ import { buildYearReport, scopeYearReport, YearReport } from "../utils/yearRepor
 const router = Router();
 router.use(requireAuth);
 router.use(blockPendingPasswordChange);
-router.use(requireRole("GROUP_INTEGRATOR", "SUPERADMIN"));
+// NOT router.use(): this router is mounted at /api/years ahead of meta.ts,
+// so a router-level role gate also ran for GET /api/years (the Year list
+// every page's filter needs, served by meta.ts) and 403'd it for BU
+// Integrators and blank-role users — leaving their Year dropdown empty and
+// every page blank. The gate is applied per-route below instead.
+const wrapUpRole = requireRole("GROUP_INTEGRATOR", "SUPERADMIN");
 
 function yearEnded(year: number): boolean {
   return new Date() > new Date(Date.UTC(year, 11, 31, 23, 59, 59, 999));
 }
 
-router.get("/:id/wrap-up/preview", async (req, res) => {
+router.get("/:id/wrap-up/preview", wrapUpRole, async (req, res) => {
   const year = await prisma.year.findUnique({
     where: { id: req.params.id },
     select: { id: true, year: true, wrappedUpAt: true, wrappedUpByName: true },
@@ -62,7 +67,7 @@ router.get("/:id/wrap-up/preview", async (req, res) => {
   });
 });
 
-router.post("/:id/wrap-up", async (req, res) => {
+router.post("/:id/wrap-up", wrapUpRole, async (req, res) => {
   const user = req.user!;
   if (!hasGlobalBusinessUnitAccess(user)) {
     return res.status(403).json({
@@ -112,7 +117,7 @@ router.post("/:id/wrap-up", async (req, res) => {
   res.json({ yearId: year.id, year: year.year, wrappedUpAt: now, wrappedUpByName: user.name });
 });
 
-router.get("/:id/wrap-up/report", async (req, res) => {
+router.get("/:id/wrap-up/report", wrapUpRole, async (req, res) => {
   const year = await prisma.year.findUnique({
     where: { id: req.params.id },
     select: { year: true, wrappedUpAt: true, wrappedUpByName: true, wrapUpReport: true },
